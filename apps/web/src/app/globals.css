@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    font-size: 16px;
+  }
+  /* Touch target minimum 44px untuk mobile */
+  button, a {
+    @apply outline-none;
+  }
+  input, textarea, select {
+    @apply outline-none;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors min-h-[44px] px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-600 active:bg-primary-700;
+  }
+  .btn-secondary {
+    @apply btn bg-secondary text-white hover:bg-secondary-500;
+  }
+  .btn-outline {
+    @apply btn border border-gray-300 bg-white text-gray-800 hover:bg-gray-50;
+  }
+  .input {
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 min-h-[44px] focus:border-primary focus:ring-2 focus:ring-primary/20;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .card {
+    @apply bg-white rounded-card shadow-sm border border-gray-100;
+  }
+}

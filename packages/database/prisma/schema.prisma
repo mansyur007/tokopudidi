@@ -1,0 +1,530 @@
+// Prisma schema untuk Tokopudidi.
+// Catatan: harga dan ongkir disimpan sebagai Int (rupiah penuh) — tidak pakai float untuk hindari floating point error.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= ENUMS =============
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum ProductCondition {
+  NEW
+  USED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  TRANSFER_MANUAL
+  QRIS_MOCK
+}
+
+enum ShippingMethod {
+  REGULAR
+  SAME_DAY
+  PICKUP_SENDIRI
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  NEW_MESSAGE
+  PROMO
+  SYSTEM
+}
+
+enum BannerPlacement {
+  HOME_TOP
+  HOME_MIDDLE
+  CATEGORY_PAGE
+}
+
+enum DiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RESOLVED
+}
+
+// ============= USER & AUTH =============
+
+model User {
+  id              String    @id @default(uuid())
+  phone           String    @unique
+  email           String?   @unique
+  passwordHash    String
+  fullName        String
+  role            UserRole  @default(BUYER)
+  isPhoneVerified Boolean   @default(false)
+  avatarUrl       String?
+  referralCode    String    @unique
+  referredById    String?
+  referredBy      User?     @relation("UserReferral", fields: [referredById], references: [id])
+  referrals       User[]    @relation("UserReferral")
+  isSuspended     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  addresses     Address[]
+  shop          Shop?
+  cart          Cart?
+  orders        Order[]         @relation("BuyerOrders")
+  reviews       Review[]
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+  otpCodes      OtpCode[]
+  chatMessages  ChatMessage[]
+  buyerRooms    ChatRoom[]      @relation("BuyerRoom")
+  refundRequests RefundRequest[]
+  paymentVerifs PaymentProof[]  @relation("VerifiedBy")
+
+  @@index([phone])
+  @@index([referralCode])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String
+  code      String
+  purpose   String   // "REGISTER" | "LOGIN" | "RESET_PASSWORD"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([phone, purpose])
+}
+
+model Address {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label          String
+  recipientName  String
+  recipientPhone String
+  province       String
+  city           String
+  district       String
+  subdistrict    String
+  postalCode     String
+  fullAddress    String
+  latitude       Float?
+  longitude      Float?
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([userId])
+}
+
+// ============= SHOP =============
+
+model Shop {
+  id            String   @id @default(uuid())
+  ownerId       String   @unique
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug          String   @unique
+  name          String
+  description   String?
+  logoUrl       String?
+  bannerUrl     String?
+  city          String
+  province      String?
+  isOpen        Boolean  @default(true)
+  closedReason  String?
+  joinedAt      DateTime @default(now())
+  ratingAvg     Float    @default(0)
+  ratingCount   Int      @default(0)
+  totalSold     Int      @default(0)
+  ktpVerified   Boolean  @default(false)
+  ktpUrl        String?  // hanya admin akses via signed URL
+  bankName      String?
+  bankAccountNo String?
+  bankAccountName String?
+  balance       Int      @default(0) // dalam rupiah
+  pendingBalance Int     @default(0)
+  autoReplyText String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  products  Product[]
+  orders    Order[]
+  reviews   Review[]
+  chatRooms ChatRoom[]
+  withdrawals Withdrawal[]
+
+  @@index([slug])
+  @@index([city])
+}
+
+// ============= CATEGORY =============
+
+model Category {
+  id       String  @id @default(uuid())
+  parentId String?
+  parent   Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  name     String
+  slug     String  @unique
+  iconUrl  String?
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@index([parentId])
+  @@index([slug])
+}
+
+// ============= PRODUCT =============
+
+model Product {
+  id           String   @id @default(uuid())
+  shopId       String
+  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id])
+  name         String
+  slug         String   @unique
+  description  String   @db.Text
+  price        Int
+  stock        Int
+  minOrderQty  Int      @default(1)
+  weight       Int      // gram
+  condition    ProductCondition @default(NEW)
+  isActive     Boolean  @default(true)
+  soldCount    Int      @default(0)
+  viewCount    Int      @default(0)
+  ratingAvg    Float    @default(0)
+  ratingCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  images     ProductImage[]
+  variants   ProductVariant[]
+  cartItems  CartItem[]
+  reviews    Review[]
+  orderItems OrderItem[]
+  // searchVector dikelola via raw SQL trigger di migration
+
+  @@index([shopId])
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isActive])
+}
+
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  order     Int     @default(0)
+
+  @@index([productId])
+}
+
+model ProductVariant {
+  id            String  @id @default(uuid())
+  productId     String
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name          String
+  priceModifier Int     @default(0)
+  stock         Int     @default(0)
+  isActive      Boolean @default(true)
+
+  cartItems  CartItem[]
+
+  @@index([productId])
+}
+
+// ============= CART =============
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity  Int
+  addedAt   DateTime @default(now())
+
+  @@index([cartId])
+}
+
+// ============= ORDER =============
+
+model Order {
+  id             String   @id @default(uuid())
+  orderNumber    String   @unique
+  buyerId        String
+  buyer          User     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  shopId         String
+  shop           Shop     @relation(fields: [shopId], references: [id])
+  addressId      String?
+  address        Address? @relation(fields: [addressId], references: [id])
+  status         OrderStatus @default(PENDING_PAYMENT)
+  subtotal       Int
+  shippingCost   Int
+  discountAmount Int      @default(0)
+  total          Int
+  paymentMethod  PaymentMethod
+  shippingMethod ShippingMethod
+  trackingNumber String?
+  buyerAddress   Json     // snapshot
+  shopAddress    Json     // snapshot
+  notes          String?
+  promoCode      String?
+  paidAt         DateTime?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items         OrderItem[]
+  paymentProof  PaymentProof?
+  refundRequest RefundRequest?
+
+  @@index([buyerId])
+  @@index([shopId])
+  @@index([status])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id           String  @id @default(uuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  variantId    String?
+  productName  String
+  productImage String?
+  variantName  String?
+  price        Int
+  quantity     Int
+  subtotal     Int
+
+  review Review?
+
+  @@index([orderId])
+}
+
+model PaymentProof {
+  id             String    @id @default(uuid())
+  orderId        String    @unique
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  bankName       String
+  accountName    String
+  transferAmount Int
+  proofImageUrl  String
+  uploadedAt     DateTime  @default(now())
+  verifiedAt     DateTime?
+  verifiedById   String?
+  verifiedBy     User?     @relation("VerifiedBy", fields: [verifiedById], references: [id])
+  rejectedAt     DateTime?
+  rejectReason   String?
+}
+
+// ============= REVIEW =============
+
+model Review {
+  id             String    @id @default(uuid())
+  orderItemId    String    @unique
+  orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  buyerId        String
+  buyer          User      @relation(fields: [buyerId], references: [id])
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id])
+  shopId         String
+  shop           Shop      @relation(fields: [shopId], references: [id])
+  rating         Int       // 1-5
+  comment        String?
+  imageUrls      String[]
+  sellerReply    String?
+  sellerRepliedAt DateTime?
+  isHidden       Boolean   @default(false)
+  isReported     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([shopId])
+  @@index([buyerId])
+}
+
+// ============= CHAT =============
+
+model ChatRoom {
+  id            String   @id @default(uuid())
+  buyerId       String
+  buyer         User     @relation("BuyerRoom", fields: [buyerId], references: [id])
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  messages ChatMessage[]
+
+  @@unique([buyerId, shopId])
+  @@index([buyerId])
+  @@index([shopId])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  content   String
+  imageUrl  String?
+  readAt    DateTime?
+  isReported Boolean @default(false)
+  sentAt    DateTime @default(now())
+
+  @@index([roomId])
+}
+
+// ============= NOTIFICATION =============
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  linkUrl   String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
+
+// ============= BANNER =============
+
+model Banner {
+  id          String          @id @default(uuid())
+  imageUrl    String
+  linkUrl     String?
+  order       Int             @default(0)
+  isActive    Boolean         @default(true)
+  validFrom   DateTime?
+  validUntil  DateTime?
+  placement   BannerPlacement @default(HOME_TOP)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+// ============= PROMO =============
+
+model PromoCode {
+  id           String       @id @default(uuid())
+  code         String       @unique
+  discountType DiscountType
+  discountValue Int
+  minPurchase  Int          @default(0)
+  maxDiscount  Int?
+  usageLimit   Int?
+  usedCount    Int          @default(0)
+  validFrom    DateTime
+  validUntil   DateTime
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([code])
+}
+
+// ============= REFUND =============
+
+model RefundRequest {
+  id             String       @id @default(uuid())
+  orderId        String       @unique
+  order          Order        @relation(fields: [orderId], references: [id])
+  requestedById  String
+  requestedBy    User         @relation(fields: [requestedById], references: [id])
+  reason         String
+  evidenceImages String[]
+  status         RefundStatus @default(PENDING)
+  adminNote      String?
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// ============= WITHDRAWAL (seller payout) =============
+
+model Withdrawal {
+  id            String   @id @default(uuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  amount        Int
+  status        String   @default("PENDING") // PENDING | PROCESSED | REJECTED
+  bankName      String
+  bankAccountNo String
+  requestedAt   DateTime @default(now())
+  processedAt   DateTime?
+  note          String?
+
+  @@index([shopId])
+}

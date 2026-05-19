@@ -1,0 +1,45 @@
+# docker-compose untuk dev: postgres + redis + minio (S3-compatible).
+# Cukup `docker compose up -d` lalu `npm run db:migrate && npm run db:seed`.
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: tokopudidi-postgres
+    environment:
+      POSTGRES_USER: tokopudidi
+      POSTGRES_PASSWORD: tokopudidi
+      POSTGRES_DB: tokopudidi
+    ports:
+      - "5432:5432"
+    volumes:
+      - tokopudidi_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tokopudidi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: tokopudidi-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - tokopudidi_redisdata:/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: tokopudidi-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: tokopudidi
+      MINIO_ROOT_PASSWORD: tokopudidi123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - tokopudidi_miniodata:/data
+
+volumes:
+  tokopudidi_pgdata:
+  tokopudidi_redisdata:
+  tokopudidi_miniodata:
