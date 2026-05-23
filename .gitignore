@@ -9,5 +9,6 @@ build
 .DS_Store
 coverage
 .turbo
+*.tsbuildinfo
 prisma/migrations/dev.db*
 uploads/

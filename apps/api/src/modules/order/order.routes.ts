@@ -3,6 +3,7 @@ import {
   checkoutSchema,
   cancelOrderSchema,
   uploadProofSchema,
+  requestRefundSchema,
 } from '@tokopudidi/shared';
 import { ok, created } from '../../lib/response';
 import { requireAuth } from '../../middleware/auth';
@@ -14,6 +15,7 @@ import {
   cancelOrder,
   completeOrder,
   uploadPaymentProof,
+  requestRefund,
 } from './order.service';
 import { generatePaymentInstruction, markOrderAsPaid } from '../payment/payment.service';
 import { mockTracking } from '../shipping/shipping.service';
@@ -98,5 +100,13 @@ orderRouter.post('/:id/complete', async (req, res, next) => {
   try {
     const order = await completeOrder(req.user!.sub, req.params.id);
     return ok(res, order, 'Pesanan diselesaikan, terima kasih ya!');
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/orders/:id/refund — buyer ajukan refund.
+orderRouter.post('/:id/refund', validateBody(requestRefundSchema), async (req, res, next) => {
+  try {
+    const refund = await requestRefund(req.user!.sub, req.params.id, req.body);
+    return created(res, refund, 'Pengajuan refund terkirim. Admin akan meninjau dalam 1-2 hari kerja.');
   } catch (err) { next(err); }
 });

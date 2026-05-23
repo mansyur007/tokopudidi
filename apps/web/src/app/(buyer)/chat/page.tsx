@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -16,7 +16,7 @@ const QUICK_REPLIES_BUYER = [
   'Ada varian lain?',
 ];
 
-export default function ChatPage() {
+function ChatPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, tokens } = useAuthStore();
@@ -135,5 +135,13 @@ export default function ChatPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="px-4 py-8 text-center text-sm text-gray-500">Memuat chat...</div>}>
+      <ChatPageInner />
+    </Suspense>
   );
 }

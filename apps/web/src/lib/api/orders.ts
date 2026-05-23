@@ -56,6 +56,13 @@ export interface OrderDetail extends OrderListItem {
     rejectedAt: string | null;
     rejectReason: string | null;
   } | null;
+  refundRequest: {
+    id: string;
+    reason: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'RESOLVED';
+    adminNote: string | null;
+    createdAt: string;
+  } | null;
   tracking: { status: string; timestamp: string; reached: boolean }[] | null;
 }
 
@@ -102,3 +109,8 @@ export const cancelOrder = (token: string, id: string, reason: string) =>
 
 export const completeOrder = (token: string, id: string) =>
   apiFetch(`/api/v1/orders/${id}/complete`, { method: 'POST', token });
+
+export const requestRefund = (token: string, id: string, reason: string, evidenceImages?: string[]) =>
+  apiFetch(`/api/v1/orders/${id}/refund`, {
+    method: 'POST', token, body: JSON.stringify({ reason, evidenceImages }),
+  });

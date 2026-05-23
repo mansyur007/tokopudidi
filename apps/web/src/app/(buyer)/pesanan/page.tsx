@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,7 +9,7 @@ import { listOrders, type OrderListItem } from '@/lib/api/orders';
 import { formatRupiah, timeAgo } from '@tokopudidi/shared';
 import { STATUS_LABEL, STATUS_COLOR, TABS } from '@/lib/orderStatus';
 
-export default function PesananListPage() {
+function PesananListInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, tokens } = useAuthStore();
@@ -100,5 +100,13 @@ export default function PesananListPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function PesananListPage() {
+  return (
+    <Suspense fallback={<div className="px-4 py-8 text-center text-sm text-gray-500">Memuat pesanan...</div>}>
+      <PesananListInner />
+    </Suspense>
   );
 }

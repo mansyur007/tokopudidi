@@ -1,10 +1,12 @@
-// Seed dasar untuk Milestone 1 + 2:
+// Seed dasar:
 // - 15 kategori UMKM
 // - 1 admin
 // - 8 demo seller + toko (campuran KTP-verified dan belum)
 // - ~40 produk realistis dengan gambar dari picsum.photos
 // - 3 banner homepage
-// Seed lengkap (50 seller, 500 produk, 200 order, dst) ada di Milestone 6.
+// - 3 promo code
+// - 1 demo buyer + 1 order COMPLETED + 1 pengajuan refund PENDING (untuk demo panel admin)
+// Seed lengkap (50 seller, 500 produk, 200 order, dst) menyusul.
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -322,6 +324,109 @@ async function main() {
     });
   }
   console.log(`✅ ${promoData.length} promo code (HEMAT10K, DISKON5, GRATISONGKIR)`);
+
+  // 7. Demo buyer + 1 order COMPLETED + 1 pengajuan refund PENDING.
+  //    Supaya panel admin (terutama arbitrase refund) ada datanya saat demo.
+  const buyerPassword = await bcrypt.hash('buyer123', 12);
+  const buyer = await prisma.user.upsert({
+    where: { phone: '+6281200000201' },
+    update: {},
+    create: {
+      phone: '+6281200000201',
+      fullName: 'Budi Pembeli',
+      passwordHash: buyerPassword,
+      role: 'BUYER',
+      isPhoneVerified: true,
+      referralCode: generateReferralCode(),
+      cart: { create: {} },
+    },
+  });
+
+  const buyerAddress = await prisma.address.upsert({
+    where: { id: 'seed-addr-budi' },
+    update: {},
+    create: {
+      id: 'seed-addr-budi',
+      userId: buyer.id,
+      label: 'Rumah',
+      recipientName: 'Budi Pembeli',
+      recipientPhone: '+6281200000201',
+      province: 'DKI Jakarta',
+      city: 'Jakarta Selatan',
+      district: 'Kebayoran Baru',
+      subdistrict: 'Gandaria Utara',
+      postalCode: '12140',
+      fullAddress: 'Jl. Mawar No. 10',
+      isDefault: true,
+    },
+  });
+
+  const demoShop = await prisma.shop.findUnique({ where: { slug: 'warung-bu-siti' } });
+  const demoProducts = demoShop
+    ? await prisma.product.findMany({ where: { shopId: demoShop.id }, take: 2, include: { images: { take: 1, orderBy: { order: 'asc' } } } })
+    : [];
+
+  if (demoShop && demoProducts.length > 0) {
+    const ORDER_NUMBER = 'TKP-SEED-00001';
+    const itemsData = demoProducts.map((p) => ({
+      productId: p.id,
+      productName: p.name,
+      productImage: p.images[0]?.url ?? null,
+      price: p.price,
+      quantity: 1,
+      subtotal: p.price,
+    }));
+    const subtotal = itemsData.reduce((s, it) => s + it.subtotal, 0);
+    const shippingCost = 9000;
+    const total = subtotal + shippingCost;
+    const addrSnapshot = {
+      label: buyerAddress.label,
+      recipientName: buyerAddress.recipientName,
+      recipientPhone: buyerAddress.recipientPhone,
+      province: buyerAddress.province,
+      city: buyerAddress.city,
+      district: buyerAddress.district,
+      subdistrict: buyerAddress.subdistrict,
+      postalCode: buyerAddress.postalCode,
+      fullAddress: buyerAddress.fullAddress,
+    };
+
+    const existingOrder = await prisma.order.findUnique({ where: { orderNumber: ORDER_NUMBER } });
+    const order = existingOrder ?? await prisma.order.create({
+      data: {
+        orderNumber: ORDER_NUMBER,
+        buyerId: buyer.id,
+        shopId: demoShop.id,
+        addressId: buyerAddress.id,
+        status: 'COMPLETED',
+        subtotal,
+        shippingCost,
+        total,
+        paymentMethod: 'QRIS_MOCK',
+        shippingMethod: 'REGULAR',
+        buyerAddress: addrSnapshot,
+        shopAddress: { city: demoShop.city, province: demoShop.province ?? '' },
+        paidAt: new Date(),
+        shippedAt: new Date(),
+        deliveredAt: new Date(),
+        completedAt: new Date(),
+        items: { create: itemsData },
+      },
+    });
+
+    await prisma.refundRequest.upsert({
+      where: { orderId: order.id },
+      update: {},
+      create: {
+        orderId: order.id,
+        requestedById: buyer.id,
+        reason: 'Salah satu barang yang diterima rusak/penyok saat sampai. Mohon pengembalian dana.',
+        evidenceImages: ['https://picsum.photos/seed/refund-evidence/600/600'],
+        status: 'PENDING',
+      },
+    });
+    console.log('✅ Demo buyer (+6281200000201 / buyer123) + 1 order + 1 refund PENDING');
+  }
 
   console.log('🌱 Selesai!');
 }
