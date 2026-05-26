@@ -22,18 +22,16 @@ export function BannerCarousel({ banners }: Props) {
     <section className="bg-primary">
       <div className="relative max-w-5xl mx-auto aspect-[3/1] md:aspect-[4/1] overflow-hidden">
         {banners.map((b, i) => {
-          const Wrapper = b.linkUrl ? Link : 'div';
-          const wrapperProps = b.linkUrl ? { href: b.linkUrl } : {};
-          return (
-            <Wrapper
-              key={b.id}
-              {...(wrapperProps as Record<string, string>)}
-              className={`absolute inset-0 transition-opacity duration-500 ${
-                i === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
-              }`}
-            >
-              <Image src={b.imageUrl} alt="" fill priority={i === 0} className="object-cover" sizes="(max-width:1024px) 100vw, 1024px" />
-            </Wrapper>
+          const className = `absolute inset-0 transition-opacity duration-500 ${
+            i === idx ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`;
+          const inner = (
+            <Image src={b.imageUrl} alt="" fill priority={i === 0} className="object-cover" sizes="(max-width:1024px) 100vw, 1024px" />
+          );
+          return b.linkUrl ? (
+            <Link key={b.id} href={b.linkUrl} className={className}>{inner}</Link>
+          ) : (
+            <div key={b.id} className={className}>{inner}</div>
           );
         })}
         {banners.length > 1 && (

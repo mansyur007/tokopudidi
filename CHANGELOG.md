@@ -3,6 +3,32 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [0.6.0] — 2026-05-23 — Milestone 6: Admin Panel
+
+### Added
+- **Admin API module** (`/api/v1/admin/*`, all guarded by `requireRole('ADMIN')`):
+  - `GET /dashboard` — platform metrics (total users, sellers, shops, active products, today's orders & GMV) plus action queues (shops pending KTP, pending refunds, pending payments, reported reviews) and a 7-day GMV chart.
+  - Users: `GET /users` (search + role + status filters, pagination), `POST /users/:id/suspend` (revokes refresh tokens + notifies), `POST /users/:id/unsuspend`.
+  - Shops: `GET /shops` (filter by KTP/verified/suspended), `GET /shops/:id` (detail incl. admin-only `ktpUrl`), `POST /shops/:id/verify-ktp`, `POST /shops/:id/suspend` (soft-delete + deactivates products), `POST /shops/:id/unsuspend`.
+  - Products: `GET /products` (search + status), `POST /products/:id/takedown` (hides from buyers + notifies seller), `POST /products/:id/restore`.
+  - Refunds: `GET /refunds` (filter by status), `POST /refunds/:id/resolve` — approve (restore stock, reverse seller balance/pending balance, set order `REFUNDED`) or reject, with buyer notification.
+  - Banners: full CRUD (`GET/POST/PATCH/DELETE /banners`).
+  - Categories: full CRUD with slug auto-generation; delete is blocked while products or subcategories still reference the category.
+- **Buyer refund flow:** `POST /api/v1/orders/:id/refund` lets a buyer open a refund request for a `DELIVERED`/`COMPLETED` order (one per order), notifying the seller — so admins have real requests to arbitrate.
+- **Admin web panel** (`/admin/*`, Bahasa Indonesia UI, role-guarded `AdminShell` with sidebar):
+  - `/admin` dashboard with metric cards, action-queue shortcuts, and a 7-day GMV bar chart.
+  - `/admin/pengguna` — user list with search/role filter and suspend/unsuspend.
+  - `/admin/toko` — shop list + detail modal (KTP image preview), verify KTP, suspend/restore. Honors `?status=PENDING_KTP` deep link from the dashboard.
+  - `/admin/produk` — product list with takedown/restore.
+  - `/admin/refund` — refund arbitration with order summary, evidence images, approve/reject.
+  - `/admin/banner` — banner CRUD with image upload (data URL) or URL.
+  - `/admin/kategori` — category CRUD with parent selection.
+  - Refund status surfaced on the buyer order detail page (`/pesanan/[id]`) with an "Ajukan Refund" CTA; admin entry point added to `/akun` for `ADMIN` accounts.
+- **Seed:** demo buyer (`+6281200000201` / `buyer123`), one `COMPLETED` order, and one `PENDING` refund request so the admin panel is demoable out of the box.
+
+### Fixed
+- Pre-existing build blockers from the initial commit (incidental, required for a green build): brittle `Parameters<...>['where']` cast in `seller.payment.routes.ts`; `agreeTerms` literal typing that broke the seller-registration form default; `Link`-without-`href` union in `BannerCarousel`; and missing Suspense boundaries around `useSearchParams()` on `/chat` and `/pesanan`.
+
 ## [0.5.0] — 2026-05-14 — Milestone 5: Chat, Reviews & Notifications
 
 ### Added

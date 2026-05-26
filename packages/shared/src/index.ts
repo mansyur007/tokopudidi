@@ -1,4 +1,5 @@
 export * from './schemas/address';
+export * from './schemas/admin';
 export * from './schemas/auth';
 export * from './schemas/cart';
 export * from './schemas/chat';

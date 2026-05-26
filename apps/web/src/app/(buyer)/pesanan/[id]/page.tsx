@@ -11,6 +11,7 @@ import {
   payOrderMock,
   cancelOrder,
   completeOrder,
+  requestRefund,
   type OrderDetail,
 } from '@/lib/api/orders';
 import { ApiClientError } from '@/lib/api/client';
@@ -75,6 +76,20 @@ export default function OrderDetailPage() {
       await load();
     } catch (err) {
       setMsg(err instanceof ApiClientError ? err.message : 'Gagal selesaikan');
+    } finally { setBusy(false); }
+  }
+
+  async function handleRefund() {
+    if (!tokens?.accessToken || !order) return;
+    const reason = prompt('Ceritakan masalahnya (minimal 10 karakter):');
+    if (!reason || reason.trim().length < 10) return;
+    setBusy(true); setMsg(null);
+    try {
+      await requestRefund(tokens.accessToken, order.id, reason.trim());
+      setMsg('Pengajuan refund terkirim. Admin akan meninjau dalam 1-2 hari kerja.');
+      await load();
+    } catch (err) {
+      setMsg(err instanceof ApiClientError ? err.message : 'Gagal mengajukan refund');
     } finally { setBusy(false); }
   }
 
@@ -218,6 +233,30 @@ export default function OrderDetailPage() {
         </div>
       </section>
 
+      {/* Status refund */}
+      {order.refundRequest && (
+        <section className="card p-4 text-sm">
+          <h2 className="font-semibold mb-1">↩️ Pengajuan Refund</h2>
+          <p className="text-gray-600">Alasan: {order.refundRequest.reason}</p>
+          <p className="mt-1">
+            Status:{' '}
+            <span className={
+              order.refundRequest.status === 'APPROVED' ? 'text-green-700'
+                : order.refundRequest.status === 'REJECTED' ? 'text-red-600'
+                : 'text-orange-600'
+            }>
+              {order.refundRequest.status === 'PENDING' ? 'Menunggu peninjauan admin'
+                : order.refundRequest.status === 'APPROVED' ? 'Disetujui — dana dikembalikan'
+                : order.refundRequest.status === 'REJECTED' ? 'Ditolak'
+                : 'Selesai'}
+            </span>
+          </p>
+          {order.refundRequest.adminNote && (
+            <p className="text-xs text-gray-500 mt-1">Catatan admin: {order.refundRequest.adminNote}</p>
+          )}
+        </section>
+      )}
+
       {msg && (
         <p className="card px-3 py-2 text-sm text-center bg-primary-50 text-primary">{msg}</p>
       )}
@@ -248,6 +287,11 @@ export default function OrderDetailPage() {
           <Link href="/pesanan/ulasan" className="btn-primary flex-1 text-center">
             ⭐ Beri Ulasan
           </Link>
+        )}
+        {(['DELIVERED', 'COMPLETED'] as const).includes(order.status as 'DELIVERED') && !order.refundRequest && (
+          <button onClick={handleRefund} disabled={busy} className="btn-outline text-red-600">
+            ↩️ Ajukan Refund
+          </button>
         )}
         <Link href={`/chat?shop=${order.shop.slug}`} className="btn-outline">
           💬 Chat Penjual

@@ -360,3 +360,46 @@ export async function uploadPaymentProof(
     create: { orderId, ...data },
   });
 }
+
+// Buyer mengajukan refund. Hanya untuk pesanan yang sudah sampai/selesai dan belum pernah diajukan.
+export async function requestRefund(
+  userId: string,
+  orderId: string,
+  data: { reason: string; evidenceImages?: string[] },
+) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, buyerId: userId },
+    include: { refundRequest: true },
+  });
+  if (!order) throw new NotFoundError('Pesanan tidak ditemukan');
+  if (!['DELIVERED', 'COMPLETED'].includes(order.status)) {
+    throw new BadRequestError('Refund hanya bisa diajukan setelah pesanan sampai');
+  }
+  if (order.refundRequest) {
+    throw new BadRequestError('Kamu sudah pernah mengajukan refund untuk pesanan ini');
+  }
+
+  const refund = await prisma.refundRequest.create({
+    data: {
+      orderId,
+      requestedById: userId,
+      reason: data.reason,
+      evidenceImages: data.evidenceImages ?? [],
+    },
+  });
+
+  // Beri tahu seller toko terkait.
+  const shop = await prisma.shop.findUnique({ where: { id: order.shopId }, select: { ownerId: true } });
+  if (shop) {
+    await prisma.notification.create({
+      data: {
+        userId: shop.ownerId,
+        type: 'ORDER_UPDATE',
+        title: 'Ada pengajuan refund',
+        body: `Pembeli mengajukan refund untuk pesanan ${order.orderNumber}. Admin akan meninjau.`,
+        linkUrl: `/seller/pesanan/${order.id}`,
+      },
+    });
+  }
+  return refund;
+}

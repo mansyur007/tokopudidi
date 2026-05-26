@@ -2,20 +2,20 @@
 
 Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederhana, tanpa iklan, tanpa fitur premium yang bikin lemot.
 
-> **Status:** Milestone 1 (Foundation) — auth + data model + shell layout.
+> **Status:** Milestone 6 (Admin Panel) — moderasi pengguna/toko/produk, verifikasi KTP, arbitrase refund, kelola banner & kategori.
 
 ---
 
-## 📦 Apa yang sudah jadi (Milestone 1)
+## 📦 Apa yang sudah jadi
 
-- Monorepo dengan workspaces: `apps/web` (Next.js 14), `apps/api` (Express + TS), `packages/database` (Prisma), `packages/shared` (types & schemas).
-- **Data model lengkap** semua entity (User, Shop, Product, Order, Cart, Chat, dll).
-- **Auth API:** register, login, refresh, logout, OTP mock (print ke console), reset password.
-- **Halaman web:** Beranda placeholder, Daftar, Masuk, Lupa Password, shell layout (Header + BottomNav + Footer).
-- **Seed dasar:** 15 kategori UMKM Indonesia + akun admin.
-- **Dev infra:** docker-compose untuk Postgres + Redis + MinIO.
+- **Milestone 1 — Fondasi:** monorepo (web/api/database/shared), data model lengkap, Auth API (register/login/refresh/logout/OTP mock/reset), shell layout, seed dasar, docker-compose dev.
+- **Milestone 2 — Buyer Browse:** katalog produk, pencarian + filter, halaman kategori/produk/toko, keranjang.
+- **Milestone 3 — Checkout & Order:** alamat, ongkir per zona, promo, checkout (1 order per toko), pembayaran mock, riwayat & detail pesanan.
+- **Milestone 4 — Seller Panel:** dashboard, kelola produk/pesanan, verifikasi bayar, keuangan & pencairan.
+- **Milestone 5 — Chat, Ulasan & Notifikasi:** chat realtime (Socket.IO), ulasan produk, notifikasi.
+- **Milestone 6 — Admin Panel:** dashboard platform, moderasi pengguna & toko, verifikasi KTP, takedown produk, arbitrase refund (buyer bisa ajukan refund), CRUD banner & kategori.
 
-Yang berikutnya (Milestone 2): produk, cart, search, halaman detail produk.
+Riwayat lengkap tiap milestone ada di [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

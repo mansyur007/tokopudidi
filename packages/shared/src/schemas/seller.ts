@@ -6,7 +6,7 @@ export const upgradeToSellerSchema = z.object({
   province: z.string().trim().min(1, 'Provinsi wajib diisi'),
   city: z.string().trim().min(1, 'Kota wajib diisi'),
   ktpUrl: z.string().min(5, 'Foto KTP wajib diupload'),
-  agreeTerms: z.literal(true, { errorMap: () => ({ message: 'Setujui syarat & ketentuan dulu ya' }) }),
+  agreeTerms: z.boolean().refine((v) => v === true, { message: 'Setujui syarat & ketentuan dulu ya' }),
 });
 export type UpgradeToSellerInput = z.infer<typeof upgradeToSellerSchema>;
 

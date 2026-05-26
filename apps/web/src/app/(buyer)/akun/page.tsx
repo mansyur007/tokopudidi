@@ -43,6 +43,14 @@ export default function AkunPage() {
         </div>
       </header>
 
+      {user.role === 'ADMIN' && (
+        <Link href="/admin" className="card flex items-center gap-3 px-4 py-3 mb-4 hover:bg-gray-50 border-purple-200">
+          <span aria-hidden className="text-xl">🛡️</span>
+          <span className="flex-1 font-medium text-purple-700">Panel Admin</span>
+          <span aria-hidden className="text-gray-400">›</span>
+        </Link>
+      )}
+
       <div className="card divide-y">
         {MENU.map((m) => (
           <Link key={m.href} href={m.href} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">

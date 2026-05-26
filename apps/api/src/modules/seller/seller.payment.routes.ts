@@ -1,6 +1,6 @@
 // Verifikasi bukti transfer manual oleh seller.
 import { Router } from 'express';
-import { prisma } from '@tokopudidi/database';
+import { prisma, Prisma } from '@tokopudidi/database';
 import { verifyPaymentSchema } from '@tokopudidi/shared';
 import { ok } from '../../lib/response';
 import { requireAuth } from '../../middleware/auth';
@@ -15,14 +15,14 @@ sellerPaymentRouter.use(requireAuth, requireShopOwner);
 sellerPaymentRouter.get('/', async (req, res, next) => {
   try {
     const status = String(req.query.status ?? 'PENDING'); // PENDING | VERIFIED | REJECTED
-    const where = { order: { shopId: req.shop!.id } } as Record<string, unknown>;
+    const where: Prisma.PaymentProofWhereInput = { order: { shopId: req.shop!.id } };
     if (status === 'PENDING')  where.verifiedAt = null;
     if (status === 'PENDING')  where.rejectedAt = null;
     if (status === 'VERIFIED') where.verifiedAt = { not: null };
     if (status === 'REJECTED') where.rejectedAt = { not: null };
 
     const items = await prisma.paymentProof.findMany({
-      where: where as Parameters<typeof prisma.paymentProof.findMany>[0]['where'],
+      where,
       orderBy: { uploadedAt: 'desc' },
       include: {
         order: {

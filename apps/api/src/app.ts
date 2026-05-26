@@ -8,6 +8,13 @@ import { logger } from './lib/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 import { addressRouter } from './modules/address/address.routes';
+import { adminBannerRouter } from './modules/admin/admin.banner.routes';
+import { adminCategoryRouter } from './modules/admin/admin.category.routes';
+import { adminDashboardRouter } from './modules/admin/admin.dashboard.routes';
+import { adminProductRouter } from './modules/admin/admin.product.routes';
+import { adminRefundRouter } from './modules/admin/admin.refund.routes';
+import { adminShopRouter } from './modules/admin/admin.shop.routes';
+import { adminUserRouter } from './modules/admin/admin.user.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { bannerRouter } from './modules/banner/banner.routes';
 import { cartRouter } from './modules/cart/cart.routes';
@@ -75,6 +82,15 @@ export function createApp(): Application {
   app.use('/api/v1/seller/orders', sellerOrderRouter);
   app.use('/api/v1/seller/payments', sellerPaymentRouter);
   app.use('/api/v1/seller/finance', sellerFinanceRouter);
+
+  // Admin panel
+  app.use('/api/v1/admin', adminDashboardRouter);          // /dashboard
+  app.use('/api/v1/admin/users', adminUserRouter);
+  app.use('/api/v1/admin/shops', adminShopRouter);
+  app.use('/api/v1/admin/products', adminProductRouter);
+  app.use('/api/v1/admin/refunds', adminRefundRouter);
+  app.use('/api/v1/admin/banners', adminBannerRouter);
+  app.use('/api/v1/admin/categories', adminCategoryRouter);
 
   // 404 + error
   app.use(notFound);
