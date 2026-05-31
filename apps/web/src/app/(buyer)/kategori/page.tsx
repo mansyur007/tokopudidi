@@ -5,7 +5,7 @@ export default async function KategoriListPage() {
   const categories = await fetchCategories();
 
   return (
-    <div className="px-4 py-4 max-w-5xl mx-auto">
+    <div className="wrap py-4">
       <h1 className="text-xl font-semibold mb-4">Semua Kategori</h1>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
         {categories.map((cat) => (

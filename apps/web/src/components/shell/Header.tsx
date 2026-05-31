@@ -5,55 +5,103 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
 import { NotifBell } from './NotifBell';
+import { Icon } from './Icon';
+
+function Logo() {
+  return (
+    <Link href="/" className="flex items-center gap-2 select-none shrink-0">
+      <span
+        className="grid place-items-center w-[30px] h-[30px] rounded-[9px] bg-primary"
+        style={{ boxShadow: '0 2px 6px rgba(31,164,99,0.35)' }}
+        aria-hidden
+      >
+        <span
+          className="block w-3 h-3 bg-white"
+          style={{ borderRadius: '50% 50% 50% 2px', transform: 'rotate(45deg)' }}
+        />
+      </span>
+      <span className="font-extrabold text-[21px] tracking-tight text-ink leading-none">
+        toko<span className="text-primary">pudidi</span>
+      </span>
+    </Link>
+  );
+}
 
 export function Header() {
   const user = useAuthStore((s) => s.user);
   const refreshCart = useCartStore((s) => s.refresh);
   const cartCount = useCartStore((s) => s.totalQuantity());
 
-  // Sinkronkan keranjang sekali saat user login muncul.
   useEffect(() => {
     if (user) refreshCart();
   }, [user, refreshCart]);
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-        <Link href="/" className="font-bold text-primary text-lg shrink-0">
-          Tokopudidi
-        </Link>
-        <form action="/cari" method="get" className="flex-1">
-          <input
-            type="search"
-            name="q"
-            placeholder="Cari produk, toko, kategori..."
-            className="input"
-            aria-label="Cari produk"
-          />
+    <header className="sticky top-0 z-40 bg-white" style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
+      {/* Top utility strip — desktop only */}
+      <div className="hidden md:block border-b border-line">
+        <div className="wrap flex items-center justify-between h-[30px] text-[11.5px] text-ink-muted">
+          <div className="flex items-center gap-1.5 font-semibold text-ink">
+            <span className="text-primary">●</span>
+            Gratis Ongkir + Banyak Promo, belanja di aplikasi
+            <Icon name="chevron-right" size={13} />
+          </div>
+          <nav className="flex items-center gap-[18px]">
+            {['Tentang Tokopudidi', 'Pusat Edukasi Seller', 'Promo', 'Tokopudidi Care'].map((x) => (
+              <a key={x} href="#" onClick={(e) => e.preventDefault()} className="text-ink-muted hover:text-primary no-underline">
+                {x}
+              </a>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Main bar */}
+      <div className="wrap flex items-center gap-3 md:gap-[18px] h-[62px]">
+        <Logo />
+        <button type="button" className="hidden md:inline-flex ghost-btn items-center gap-1.5 font-semibold text-sm">
+          <Icon name="menu" size={18} /> Kategori
+        </button>
+        <form action="/cari" method="get" className="search-box">
+          <Icon name="search" size={18} className="text-ink-muted" />
+          <input type="search" name="q" placeholder="Cari di Tokopudidi" aria-label="Cari produk" />
         </form>
         <div className="flex items-center gap-1 shrink-0">
-          <Link
-            href="/keranjang"
-            className="relative p-2 rounded-lg hover:bg-gray-100"
-            aria-label={`Keranjang ${cartCount} item`}
-          >
-            <span aria-hidden>🛒</span>
-            {cartCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-secondary text-white text-[10px] leading-none min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
-                {cartCount > 99 ? '99+' : cartCount}
-              </span>
-            )}
+          <Link href="/keranjang" className="icon-btn" aria-label={`Keranjang ${cartCount} item`}>
+            <Icon name="cart" size={22} />
+            {cartCount > 0 && <span className="icon-badge">{cartCount > 99 ? '99+' : cartCount}</span>}
           </Link>
           <NotifBell />
-          {user ? (
-            <Link href="/akun" className="text-sm text-gray-700 hidden md:inline px-2">
-              Halo, {user.fullName.split(' ')[0]}
-            </Link>
-          ) : (
-            <Link href="/masuk" className="btn-outline text-sm hidden md:inline-flex">
-              Masuk
-            </Link>
-          )}
+          <Link href="/chat" className="icon-btn hidden md:inline-grid" aria-label="Chat">
+            <Icon name="chat" size={22} />
+          </Link>
+        </div>
+        <div className="hidden md:block w-px h-7 bg-line" />
+        {user ? (
+          <Link href="/akun" className="hidden md:flex items-center gap-2.5 shrink-0">
+            <span className="w-[30px] h-[30px] rounded-full bg-primary-50 border border-line grid place-items-center text-primary font-bold text-sm" aria-hidden>
+              {user.fullName.charAt(0).toUpperCase()}
+            </span>
+            <span className="leading-tight">
+              <span className="block text-[11px] text-ink-muted max-w-[120px] truncate">Toko Saya</span>
+              <span className="block text-[13px] font-bold text-ink">{user.fullName.split(' ')[0].toLowerCase()}</span>
+            </span>
+          </Link>
+        ) : (
+          <Link href="/masuk" className="btn-outline hidden md:inline-flex text-sm">
+            Masuk
+          </Link>
+        )}
+      </div>
+
+      {/* Location bar — desktop only */}
+      <div className="hidden md:block">
+        <div className="wrap flex justify-end pb-2 -mt-1">
+          <button className="ghost-btn flex items-center gap-1.5 text-[12.5px] text-ink">
+            <Icon name="pin" size={15} className="text-primary" />
+            Dikirim ke <strong className="font-bold">Alamat Utama</strong>
+            <Icon name="chevron-down" size={14} />
+          </button>
         </div>
       </div>
     </header>

@@ -47,7 +47,7 @@ export default async function CariPage({ searchParams }: PageProps) {
   const totalPages = Math.max(1, Math.ceil(result.total / result.limit));
 
   return (
-    <div className="px-4 py-4 max-w-5xl mx-auto">
+    <div className="wrap py-4">
       <header className="mb-3">
         {q ? (
           <h1 className="text-lg">

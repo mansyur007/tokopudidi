@@ -30,7 +30,7 @@ export default async function TokoDetailPage({ params }: Props) {
       </div>
 
       <section className="px-4 py-4 bg-white border-b">
-        <div className="flex items-start gap-3 max-w-5xl mx-auto">
+        <div className="wrap flex items-start gap-3">
           <div className="relative w-16 h-16 rounded-full bg-gray-100 overflow-hidden shrink-0 -mt-10 ring-4 ring-white">
             {shop.logoUrl && (
               <Image src={shop.logoUrl} alt={shop.name} fill sizes="64px" className="object-cover" />
@@ -51,7 +51,7 @@ export default async function TokoDetailPage({ params }: Props) {
           </div>
         </div>
         {shop.description && (
-          <p className="text-sm text-gray-700 mt-3 max-w-5xl mx-auto">{shop.description}</p>
+          <p className="wrap text-sm text-ink-soft mt-3">{shop.description}</p>
         )}
         {!shop.isOpen && (
           <p className="mt-3 text-sm bg-orange-50 text-orange-700 px-3 py-2 rounded">
@@ -60,7 +60,7 @@ export default async function TokoDetailPage({ params }: Props) {
         )}
       </section>
 
-      <section className="px-4 py-4 max-w-5xl mx-auto">
+      <section className="wrap py-4">
         <h2 className="font-semibold mb-3">Semua Produk ({products.total})</h2>
         <ProductGrid
           items={products.items}

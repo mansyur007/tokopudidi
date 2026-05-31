@@ -27,7 +27,7 @@ export default async function KategoriDetailPage({ params, searchParams }: Props
   const totalPages = Math.max(1, Math.ceil(result.total / result.limit));
 
   return (
-    <div className="px-4 py-4 max-w-5xl mx-auto">
+    <div className="wrap py-4">
       <header className="mb-4">
         <h1 className="text-xl font-semibold">Kategori: {cat.name}</h1>
         <p className="text-sm text-gray-500 mt-1">{result.total} produk</p>
