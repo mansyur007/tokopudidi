@@ -36,7 +36,8 @@ export default function SellerProductListPage() {
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [tokens?.accessToken, tab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { refresh(); }, [tokens?.accessToken, tab]);
 
   async function handleDelete(id: string) {
     if (!tokens?.accessToken) return;

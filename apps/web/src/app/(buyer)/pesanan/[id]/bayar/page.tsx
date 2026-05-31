@@ -160,6 +160,7 @@ export default function BayarPage() {
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="text-sm" />
           {proofImageUrl && (
             <div className="mt-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={proofImageUrl} alt="Preview bukti" className="max-h-48 rounded border" />
             </div>
           )}

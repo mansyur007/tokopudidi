@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -30,7 +30,7 @@ export default function OrderDetailPage() {
     if (!user) { router.push('/masuk'); return; }
   }, [user, router]);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try {
@@ -38,9 +38,9 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tokens?.accessToken, id]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tokens?.accessToken, id]);
+  useEffect(() => { load(); }, [load]);
 
   async function handlePayMock() {
     if (!tokens?.accessToken || !order) return;

@@ -99,7 +99,7 @@ export default function SellerDashboardPage() {
         <div className="card p-4 bg-orange-50 border-orange-200">
           <p className="text-sm">
             <strong>Toko belum terverifikasi.</strong> Tunggu admin verifikasi KTP-mu (max 2 hari kerja).
-            Kamu tetap bisa jualan, tapi pembeli akan lihat badge "Belum Terverifikasi".
+            Kamu tetap bisa jualan, tapi pembeli akan lihat badge &quot;Belum Terverifikasi&quot;.
           </p>
         </div>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { timeAgo } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
@@ -23,16 +23,16 @@ export default function SellerReviewsPage() {
     getSellerShop(tokens.accessToken).then((s) => setShopId(s.id));
   }, [tokens?.accessToken]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!shopId) return;
     setLoading(true);
     try {
       const r = await listShopReviews(shopId, 1, filter);
       setItems(r.items);
     } finally { setLoading(false); }
-  }
+  }, [shopId, filter]);
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [shopId, filter]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function handleReply(reviewId: string) {
     if (!tokens?.accessToken) return;

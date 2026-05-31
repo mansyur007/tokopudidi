@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -23,14 +23,14 @@ export default function PendingReviewPage() {
     if (!user) router.push('/masuk');
   }, [user, router]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try { setItems(await getPendingReviews(tokens.accessToken)); }
     finally { setLoading(false); }
-  }
+  }, [tokens?.accessToken]);
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [tokens?.accessToken]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   if (!user) return null;
   const active = items.find((it) => it.id === activeId);

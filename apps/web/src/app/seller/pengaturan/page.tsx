@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import {
   getSellerShop,
@@ -18,14 +18,14 @@ export default function SellerSettingsPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try { setShop(await getSellerShop(tokens.accessToken)); }
     finally { setLoading(false); }
-  }
+  }, [tokens?.accessToken]);
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [tokens?.accessToken]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   function setField<K extends keyof SellerShop>(key: K, val: SellerShop[K]) {
     setShop((prev) => (prev ? { ...prev, [key]: val } : prev));
