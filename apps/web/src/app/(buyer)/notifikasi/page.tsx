@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
@@ -31,14 +31,14 @@ export default function NotificationsPage() {
     if (!user) router.push('/masuk');
   }, [user, router]);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try { setItems(await listNotifications(tokens.accessToken)); }
     finally { setLoading(false); }
-  }
+  }, [tokens?.accessToken]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tokens?.accessToken]);
+  useEffect(() => { load(); }, [load]);
 
   async function handleMarkAll() {
     if (!tokens?.accessToken || busy) return;

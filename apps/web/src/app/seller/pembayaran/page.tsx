@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { formatRupiah, timeAgo } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
@@ -24,14 +24,14 @@ export default function SellerPaymentPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try { setItems(await listSellerPayments(tokens.accessToken, tab)); }
     finally { setLoading(false); }
-  }
+  }, [tokens?.accessToken, tab]);
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [tokens?.accessToken, tab]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function handle(approve: boolean, proofId: string) {
     if (!tokens?.accessToken) return;

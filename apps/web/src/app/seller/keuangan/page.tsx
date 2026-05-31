@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatRupiah, formatTanggal } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
@@ -16,14 +16,14 @@ export default function SellerFinancePage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try { setData(await getSellerFinance(tokens.accessToken)); }
     finally { setLoading(false); }
-  }
+  }, [tokens?.accessToken]);
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [tokens?.accessToken]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function handleWithdraw() {
     if (!tokens?.accessToken) return;

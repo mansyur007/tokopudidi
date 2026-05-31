@@ -107,6 +107,7 @@ export default function DaftarSellerPage() {
           <input type="file" accept="image/jpeg,image/png" onChange={handleKtpFile} />
           {ktpDataUrl && (
             <div className="mt-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={ktpDataUrl} alt="Preview KTP" className="max-h-40 rounded border" />
             </div>
           )}

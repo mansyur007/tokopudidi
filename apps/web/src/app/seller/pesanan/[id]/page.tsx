@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -27,14 +27,14 @@ export default function SellerOrderDetailPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [trackInput, setTrackInput] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try { setOrder(await getSellerOrder(tokens.accessToken, id)); }
     finally { setLoading(false); }
-  }
+  }, [tokens?.accessToken, id]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tokens?.accessToken, id]);
+  useEffect(() => { load(); }, [load]);
 
   async function handleProcess() {
     if (!tokens?.accessToken || !order) return;

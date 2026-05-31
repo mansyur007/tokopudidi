@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,7 +27,7 @@ export default function AlamatPage() {
     if (!user) router.push('/masuk');
   }, [user, router]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
     setLoading(true);
     try {
@@ -35,9 +35,9 @@ export default function AlamatPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tokens?.accessToken]);
 
-  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tokens?.accessToken]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function handleDelete(id: string) {
     if (!tokens?.accessToken) return;
