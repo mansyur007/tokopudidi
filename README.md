@@ -40,7 +40,7 @@ Riwayat lengkap tiap milestone ada di [CHANGELOG.md](CHANGELOG.md).
 
 ### 2. Clone & Install
 ```bash
-git clone <repo-url> tokopudidi
+git clone https://github.com/mansyur007/tokopudidi.git tokopudidi
 cd tokopudidi
 npm install
 ```
