@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { getUnreadCount } from '@/lib/api/notifications';
+import { Icon } from './Icon';
 
 export function NotifBell() {
   const tokens = useAuthStore((s) => s.tokens);
@@ -26,15 +27,11 @@ export function NotifBell() {
   return (
     <Link
       href="/notifikasi"
-      className="relative p-2 rounded-lg hover:bg-gray-100"
+      className="icon-btn"
       aria-label={count > 0 ? `Notifikasi (${count} belum dibaca)` : 'Notifikasi'}
     >
-      <span aria-hidden>🔔</span>
-      {count > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 bg-secondary text-white text-[10px] leading-none min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
-          {count > 99 ? '99+' : count}
-        </span>
-      )}
+      <Icon name="bell" size={22} />
+      {count > 0 && <span className="icon-badge">{count > 99 ? '99+' : count}</span>}
     </Link>
   );
 }

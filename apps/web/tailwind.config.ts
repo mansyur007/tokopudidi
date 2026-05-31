@@ -1,41 +1,56 @@
 import type { Config } from 'tailwindcss';
 
+// Token desain Tokopudidi — diturunkan dari handoff (hijau primer + aksen merah).
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Brand Tokopudidi: hijau lumut UMKM, kuning hangat sebagai aksen.
         primary: {
-          DEFAULT: '#2D6A4F',
-          50:  '#F0F7F3',
-          100: '#D6EADD',
-          200: '#A9D2B6',
-          300: '#7BB78F',
-          400: '#4F9669',
-          500: '#2D6A4F',
-          600: '#235540',
-          700: '#1A4030',
-          800: '#112B20',
-          900: '#091610',
+          DEFAULT: '#1FA463',
+          50:  '#e8f5ee',
+          100: '#d2ecdd',
+          200: '#a6d9bc',
+          300: '#79c69b',
+          400: '#4dbf82',
+          500: '#1FA463',
+          600: '#18935a',
+          700: '#147a4a',
+          800: '#0f5e39',
+          900: '#0a4128',
         },
-        secondary: {
-          DEFAULT: '#F4A261',
-          50:  '#FEF7EE',
-          100: '#FCE7CC',
-          200: '#F9CF99',
-          300: '#F6B780',
-          400: '#F4A261',
-          500: '#E8853B',
-          600: '#C26922',
+        accent: {
+          DEFAULT: '#e5484d',
+          tint:    '#fdecec',
         },
+        ink: {
+          DEFAULT: '#2e3137',
+          soft:    '#3a3e45',
+          muted:   '#8a8f96',
+        },
+        line: {
+          DEFAULT: '#ededed',
+          dark:    '#d4d7da',
+        },
+        page: '#f3f4f5',
+        star: '#ffb700',
       },
       borderRadius: {
         DEFAULT: '8px',
         card: '12px',
+        pill: '22px',
+      },
+      maxWidth: {
+        wrap: '1208px',
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['var(--font-jakarta)', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      boxShadow: {
+        'card-hover': '0 6px 20px rgba(0,0,0,0.10)',
+        fab:          '0 4px 16px rgba(0,0,0,0.14)',
+        toast:        '0 8px 28px rgba(0,0,0,0.3)',
       },
     },
   },
