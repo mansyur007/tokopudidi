@@ -17,6 +17,8 @@ Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederh
 
 Riwayat lengkap tiap milestone ada di [CHANGELOG.md](CHANGELOG.md).
 
+Rencana fitur berikutnya (M7–M12) ada di [ROADMAP.md](ROADMAP.md) — silakan klaim item yang masih `🔵 TODO`.
+
 ---
 
 ## 🛠️ Stack
