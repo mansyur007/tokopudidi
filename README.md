@@ -85,6 +85,56 @@ npm run dev
 - API: http://localhost:4000
 - Health check: http://localhost:4000/api/health
 
+### 8. (Opsional) Preview ke publik via Cloudflare Tunnel
+
+Untuk demo / kolaborasi remote, ekspos dev server lewat tunnel sementara
+([cloudflared Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)).
+Tidak perlu akun Cloudflare; URL random aktif selama proses jalan.
+
+```bash
+# Prasyarat
+brew install cloudflared
+jq --version            # untuk baca tunnel-urls.json
+
+# Pastikan dev server sudah jalan (langkah 7) — script akan exit kalau lokal belum siap
+./scripts/tunnel.sh                          # foreground, Ctrl+C untuk stop
+# atau jalankan di latar belakang:
+nohup ./scripts/tunnel.sh > tunnel.out 2>&1 &
+```
+
+Apa yang script lakukan:
+- Spawn 2 tunnel paralel (web :3000 + api :4000) ke `*.trycloudflare.com`.
+- Tulis URL aktif ke `tunnel-urls.json` (gitignored), update otomatis kalau URL berubah.
+- Sinkronkan `apps/web/.env.local` (`NEXT_PUBLIC_API_URL`) & `apps/api/.env`
+  (`WEB_ORIGIN`) supaya web SSR & CORS API ngarah ke tunnel publik.
+- Health-check setiap 30 detik; restart tunnel mati setelah 3× gagal beruntun.
+
+Setelah script baru pertama kali jalan **atau saat URL berubah** (terlihat di
+`tunnel.log`), restart dev server biar Next.js & Express baca env baru:
+
+```bash
+# Hentikan dev lama, jalankan ulang
+pkill -f 'next dev'; pkill -f 'tsx watch'
+npm run dev
+```
+
+Cek URL publik kapan saja:
+```bash
+cat tunnel-urls.json
+# {
+#   "web": "https://....trycloudflare.com",
+#   "api": "https://....trycloudflare.com",
+#   "updatedAt": "..."
+# }
+```
+
+Stop tunnel: `pkill -f 'scripts/tunnel.sh'` (cleanup handler akan kill kedua
+subprocess cloudflared).
+
+> ⚠️ Quick Tunnel = URL random, putus saat script berhenti, **bukan untuk
+> production**. Untuk URL stabil, pakai [Named Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/)
+> dengan akun Cloudflare.
+
 ---
 
 ## 🧪 Testing
