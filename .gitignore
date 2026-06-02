@@ -12,3 +12,8 @@ coverage
 *.tsbuildinfo
 prisma/migrations/dev.db*
 uploads/
+
+# Cloudflare tunnel runtime artifacts (scripts/tunnel.sh)
+tunnel-urls.json
+tunnel.out
+nohup.out
