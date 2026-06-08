@@ -1,0 +1,38 @@
+name: Deploy to VPS
+
+# Auto-deploy ke VPS setiap ada push/merge ke `main`.
+# Bisa juga dipicu manual lewat tab Actions (workflow_dispatch).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Hindari deploy tumpang-tindih: kalau ada run baru, batalkan yang lama.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH ke VPS & rebuild
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 25m
+          script: |
+            set -e
+            cd /opt/tokopudidi
+            echo "== Pull main =="
+            git fetch origin main
+            # reset --hard hanya menyentuh file ter-track; .env.production (untracked) aman.
+            git reset --hard origin/main
+            echo "== Build & up =="
+            docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+            echo "== Bersihkan image lama =="
+            docker image prune -f
+            echo "== Status =="
+            docker compose --env-file .env.production -f docker-compose.prod.yml ps
