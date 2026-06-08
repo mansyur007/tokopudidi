@@ -1,0 +1,18 @@
+# Reverse proxy Tokopudidi.
+# Pakai hostname sslip.io (memetakan IP -> hostname) supaya Caddy bisa auto-HTTPS
+# via Let's Encrypt (sertifikat terpercaya) tanpa perlu beli domain.
+# Caddy otomatis redirect HTTP(80) -> HTTPS(443).
+103-169-207-239.sslip.io {
+	encode gzip
+
+	# API + Socket.IO -> service api
+	@api path /api/* /socket.io/*
+	handle @api {
+		reverse_proxy api:4000
+	}
+
+	# Selainnya -> Next.js web
+	handle {
+		reverse_proxy web:3000
+	}
+}
