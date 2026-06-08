@@ -5,6 +5,11 @@ name: Deploy to VPS
 on:
   push:
     branches: [main]
+    # Perubahan dokumentasi tidak perlu memicu rebuild/deploy.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 # Hindari deploy tumpang-tindih: kalau ada run baru, batalkan yang lama.
