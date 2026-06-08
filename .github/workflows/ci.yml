@@ -35,17 +35,20 @@ jobs:
       - name: Prisma generate
         run: npm run db:generate
 
+      # Build dulu paket internal — `tsx`/vitest resolve @tokopudidi/* ke dist-nya.
+      - name: Build packages (database + shared)
+        run: |
+          npm run build -w @tokopudidi/database
+          npm run build -w @tokopudidi/shared
+
       - name: Lint
         run: npm run lint
 
       - name: Test
         run: npm run test
 
-      - name: Build (mirror produksi)
+      - name: Build web (mirror produksi)
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
           NEXT_TELEMETRY_DISABLED: '1'
-        run: |
-          npm run build -w @tokopudidi/database
-          npm run build -w @tokopudidi/shared
-          npm run build -w @tokopudidi/web
+        run: npm run build -w @tokopudidi/web
