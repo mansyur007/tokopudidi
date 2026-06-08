@@ -199,15 +199,53 @@ Pakai kode itu untuk verifikasi. Untuk production, ganti `MockOtpProvider` di `a
 
 ---
 
-## 🚢 Deploy ke VPS Murah (Biznet/Idcloudhost)
+## 🚢 Deploy ke VPS (Docker Compose + Caddy)
 
-> Detail lengkap ada di Milestone 6. Ringkas:
-1. VPS Ubuntu 22.04, RAM minimal 2GB.
-2. Install Node 20, Postgres 15, Redis 7, Nginx.
-3. Clone repo, `npm install`, `npm run build`.
-4. Jalankan API & web pakai PM2: `pm2 start apps/api/dist/index.js --name tkp-api`.
-5. Reverse proxy Nginx ke port 3000 (web) dan 4000 (api).
-6. SSL pakai Certbot (Let's Encrypt) gratis.
+Deploy produksi pakai **Docker Compose** di single VPS, di-front oleh **Caddy** (port 80/443) sebagai reverse proxy dengan **HTTPS otomatis** (Let's Encrypt).
+
+**🌐 Live:** https://103-169-207-239.sslip.io
+
+### Arsitektur
+- `Dockerfile` — multi-stage, satu image untuk target `api` & `web` dari monorepo.
+- `docker-compose.prod.yml` — `postgres`, `redis`, `minio`, `api`, `web`, `caddy`. Hanya Caddy yang ekspos port publik.
+- `Caddyfile` — route `/api/*` & `/socket.io/*` → `api:4000`, sisanya → `web:3000`. Pakai hostname [sslip.io](https://sslip.io) supaya dapat sertifikat Let's Encrypt **tanpa beli domain**.
+
+### Setup pertama kali di VPS (Ubuntu)
+```bash
+# 1. Install Docker + Compose plugin (lihat docs.docker.com), tambah swap kalau RAM < 2GB
+# 2. Clone repo
+git clone https://github.com/mansyur007/tokopudidi.git /opt/tokopudidi
+cd /opt/tokopudidi
+
+# 3. Buat .env.production (JANGAN commit — sudah di .gitignore).
+#    Isi DATABASE_URL (host: postgres), JWT secrets acak, WEB_ORIGIN & NEXT_PUBLIC_API_URL
+#    ke URL publik (mis. https://<host>), kredensial MinIO, dll. Lihat .env.example.
+
+# 4. Build & jalankan
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+
+# 5. Migrasi + seed (sekali)
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -w /app api \
+  npm run prisma:deploy -w @tokopudidi/database
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -w /app api \
+  npm run db:seed
+```
+
+> Catatan: `NEXT_PUBLIC_*` di-_inline_ saat build, jadi setiap ganti URL publik perlu **rebuild** image web.
+
+### Auto-deploy (CI/CD)
+Setiap **push/merge ke `main`** memicu GitHub Actions ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) yang SSH ke VPS lalu:
+```bash
+git fetch origin main && git reset --hard origin/main
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+`reset --hard` tidak menyentuh `.env.production` (untracked), jadi secret aman. Workflow butuh repo secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`. Bisa juga dipicu manual via tab **Actions** → *Run workflow*.
+
+### Update manual (kalau perlu)
+```bash
+cd /opt/tokopudidi && git pull && \
+  docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
 
 ---
 
