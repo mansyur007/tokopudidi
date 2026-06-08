@@ -1,0 +1,51 @@
+name: CI
+
+# Gerbang mutu: jalan di setiap PR ke main (dan push ke main).
+# Validasi yang sama dengan yang dipakai produksi: prisma generate, lint, test,
+# lalu build database + shared + web (api dijalankan via tsx di produksi, jadi
+# tidak di-`tsc` di sini — lihat ROADMAP OPS-9 untuk mengembalikan tsc gate).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma generate
+        run: npm run db:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build (mirror produksi)
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: |
+          npm run build -w @tokopudidi/database
+          npm run build -w @tokopudidi/shared
+          npm run build -w @tokopudidi/web

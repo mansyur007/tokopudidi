@@ -31,13 +31,38 @@ jobs:
           script: |
             set -e
             cd /opt/tokopudidi
+            C="docker compose --env-file .env.production -f docker-compose.prod.yml"
+
             echo "== Pull main =="
             git fetch origin main
             # reset --hard hanya menyentuh file ter-track; .env.production (untracked) aman.
             git reset --hard origin/main
-            echo "== Build & up =="
-            docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+
+            echo "== Build images =="
+            $C build
+
+            echo "== Start infra (postgres/redis/minio) =="
+            $C up -d postgres redis minio
+
+            echo "== DB migrate deploy =="
+            # Jalankan migrasi SEBELUM api/web naik, supaya app tidak melayani schema lama.
+            $C run --rm -T -w /app api npm run prisma:deploy -w @tokopudidi/database
+
+            echo "== Up semua service =="
+            $C up -d
+
             echo "== Bersihkan image lama =="
             docker image prune -f
+
+            echo "== Smoke test (lewat Caddy, resolve ke localhost) =="
+            HOST=103-169-207-239.sslip.io
+            sleep 8
+            curl -fsS --retry 5 --retry-delay 3 --retry-connrefused \
+              --resolve $HOST:443:127.0.0.1 https://$HOST/api/health
+            echo
+            curl -fsS -o /dev/null --retry 5 --retry-delay 3 --retry-connrefused \
+              --resolve $HOST:443:127.0.0.1 https://$HOST/
+            echo "== Smoke test OK =="
+
             echo "== Status =="
-            docker compose --env-file .env.production -f docker-compose.prod.yml ps
+            $C ps

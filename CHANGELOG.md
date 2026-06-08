@@ -3,6 +3,25 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — DevOps: Deploy & CI/CD
+
+### Added
+- **Deploy produksi via Docker Compose** ke single VPS, di-front **Caddy** (port 80/443) sebagai reverse proxy dengan **HTTPS otomatis** (Let's Encrypt via hostname `sslip.io`, tanpa beli domain). Live: **https://103-169-207-239.sslip.io**.
+  - `Dockerfile` multi-stage (target `api` & `web` dari monorepo), `docker-compose.prod.yml` (postgres/redis/minio/api/web/caddy — hanya Caddy yang ekspos publik), `Caddyfile`.
+  - API dijalankan via `tsx` (transpile-only) di produksi karena belum lulus `tsc` strict; type/lint di-skip saat `next build` (`ignoreBuildErrors`). Lihat ROADMAP `OPS-9`.
+- **CI gate** (`.github/workflows/ci.yml`): `prisma generate` + lint + test + build (database/shared/web) di setiap PR ke `main`.
+- **Auto-deploy** (`.github/workflows/deploy.yml`): push/merge ke `main` → SSH ke VPS → `git reset --hard origin/main` → build → **`prisma migrate deploy`** (migrasi otomatis sebelum app naik) → `up -d` → **smoke-test** (`/api/health` + homepage lewat Caddy; gagal = deploy merah). `paths-ignore` agar perubahan dokumentasi tidak men-trigger deploy. Bisa dipicu manual (`workflow_dispatch`).
+- **Backup DB harian** (`scripts/backup-db.sh`): `pg_dump` terkompresi + rotasi retensi, dipasang via cron di VPS.
+
+### Changed
+- `next.config.js`: hapus `experimental.optimizePackageImports` (merusak resolusi barrel `@tokopudidi/shared` saat build container bersih).
+
+### Fixed
+- Build container gagal karena `packages/{shared,database}/tsconfig.tsbuildinfo` **ter-commit** → `tsc --incremental` melewatkan emit `.js` sebagian → dist tidak lengkap. File di-untrack + dibersihkan saat build + di-`.dockerignore`.
+
+### Security
+- `.env.production` ditambahkan ke `.gitignore`; secret produksi (JWT/DB/MinIO) di-generate acak dan hanya disimpan di VPS (lihat ROADMAP `OPS-11`).
+
 ## [0.6.0] — 2026-05-23 — Milestone 6: Admin Panel
 
 ### Added
