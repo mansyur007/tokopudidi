@@ -622,6 +622,27 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 ---
 
+## 🛠️ OPS — DevOps & Reliability
+
+> Bukan fitur produk, tapi fondasi CI/CD & keandalan produksi. Deploy live: **https://103-169-207-239.sslip.io** (Docker Compose + Caddy + HTTPS).
+
+| ID | Item | Status | Catatan |
+|---|---|---|---|
+| `OPS-1` | **CI gate di PR** (lint + test + build ala-produksi) | 🟢 DONE | `.github/workflows/ci.yml` |
+| `OPS-2` | **Auto-migrate saat deploy** (`prisma migrate deploy` sebelum app naik) | 🟢 DONE | di `deploy.yml` |
+| `OPS-3` | **Smoke-test pasca-deploy** (`/api/health` + homepage via Caddy) | 🟢 DONE | gagal → deploy ditandai merah |
+| `OPS-4` | **Backup DB harian** (`pg_dump` + rotasi) | 🟢 DONE | `scripts/backup-db.sh` + cron VPS |
+| `OPS-5` | **Branch protection `main`** (wajib CI lulus + ≥1 review) | 🔵 TODO | butuh admin repo; jadikan `CI / verify` required check |
+| `OPS-6` | **Build di CI + image registry** (GHCR), berhenti build di VPS prod | 🔵 TODO | hemat resource box 2-vCPU, image ter-tag |
+| `OPS-7` | **Rollback strategy** (deploy image ber-tag, bisa balik versi) | 🔵 TODO | tergantung OPS-6 |
+| `OPS-8` | **Staging environment** sebelum prod | 🔵 TODO | bisa compose terpisah / VPS kedua |
+| `OPS-9` | **Bereskan type API → kembalikan `tsc` gate** (lepas `tsx` runtime & `ignoreBuildErrors`) | 🔵 TODO | utang teknis dari deploy awal |
+| `OPS-10` | **Monitoring & error tracking** (uptime check, log terpusat, Sentry) | 🔵 TODO | tahu insiden dari sistem, bukan user |
+| `OPS-11` | **Secret management / backup** (`.env.production` saat ini hanya di VPS) | 🔵 TODO | risiko hilang kalau VPS rusak |
+| `OPS-12` | **Host hardening** (ufw, non-root deploy user, fail2ban) | 🔵 TODO | saat ini SSH root, ufw inactive |
+
+---
+
 ## ⛔ Dropped / out-of-scope (referensi)
 
 | ID | Fitur | Alasan |
