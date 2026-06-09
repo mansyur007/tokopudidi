@@ -3,6 +3,7 @@
 #   103-169-207-239.sslip.io            -> EMHA Universe portal (emha-portal)
 #   toko.103-169-207-239.sslip.io       -> Tokopudidi (web + api/socket.io)
 #   real-estate.103-169-207-239.sslip.io -> BSB Village (bsb-village:3000)
+#   postinia.103-169-207-239.sslip.io    -> POSTINIA POS (postinia:8080)
 #
 # Each app runs as its own compose stack but joins the tokopudidi_default
 # network so this Caddy can reach it by container name.
@@ -33,4 +34,22 @@ toko.103-169-207-239.sslip.io {
 real-estate.103-169-207-239.sslip.io {
 	encode gzip
 	reverse_proxy bsb-village:3000
+}
+
+postinia.103-169-207-239.sslip.io {
+	encode gzip zstd
+
+	# Selaras dengan MAX_BODY server (QRIS/logo base64).
+	request_body {
+		max_size 12MB
+	}
+
+	reverse_proxy postinia:8080
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
 }
