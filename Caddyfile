@@ -1,8 +1,11 @@
 # Shared front door for the EMHA Universe estate.
 #
-#   103-169-207-239.sslip.io        -> EMHA Universe portal (separate stack,
-#                                      container emha-portal on tokopudidi_default)
-#   toko.103-169-207-239.sslip.io   -> Tokopudidi (web + api/socket.io)
+#   103-169-207-239.sslip.io            -> EMHA Universe portal (emha-portal)
+#   toko.103-169-207-239.sslip.io       -> Tokopudidi (web + api/socket.io)
+#   real-estate.103-169-207-239.sslip.io -> BSB Village (bsb-village:3000)
+#
+# Each app runs as its own compose stack but joins the tokopudidi_default
+# network so this Caddy can reach it by container name.
 #
 # Caddy auto-redirects HTTP(80) -> HTTPS(443) and gets a Let's Encrypt cert
 # per host via sslip.io (no domain purchase needed).
@@ -25,4 +28,9 @@ toko.103-169-207-239.sslip.io {
 	handle {
 		reverse_proxy web:3000
 	}
+}
+
+real-estate.103-169-207-239.sslip.io {
+	encode gzip
+	reverse_proxy bsb-village:3000
 }
