@@ -51,11 +51,15 @@ jobs:
             echo "== Up semua service =="
             $C up -d
 
+            echo "== Reload Caddy (Caddyfile di-bind-mount; reload supaya perubahan routing aktif) =="
+            docker exec tokopudidi-caddy caddy reload --config /etc/caddy/Caddyfile
+
             echo "== Bersihkan image lama =="
             docker image prune -f
 
             echo "== Smoke test (lewat Caddy, resolve ke localhost) =="
-            HOST=103-169-207-239.sslip.io
+            # Tokopudidi kini di subdomain toko.* (root host dipakai portal EMHA Universe).
+            HOST=toko.103-169-207-239.sslip.io
             sleep 8
             curl -fsS --retry 5 --retry-delay 3 --retry-connrefused \
               --resolve $HOST:443:127.0.0.1 https://$HOST/api/health

@@ -1,8 +1,18 @@
-# Reverse proxy Tokopudidi.
-# Pakai hostname sslip.io (memetakan IP -> hostname) supaya Caddy bisa auto-HTTPS
-# via Let's Encrypt (sertifikat terpercaya) tanpa perlu beli domain.
-# Caddy otomatis redirect HTTP(80) -> HTTPS(443).
+# Shared front door for the EMHA Universe estate.
+#
+#   103-169-207-239.sslip.io        -> EMHA Universe portal (separate stack,
+#                                      container emha-portal on tokopudidi_default)
+#   toko.103-169-207-239.sslip.io   -> Tokopudidi (web + api/socket.io)
+#
+# Caddy auto-redirects HTTP(80) -> HTTPS(443) and gets a Let's Encrypt cert
+# per host via sslip.io (no domain purchase needed).
+
 103-169-207-239.sslip.io {
+	encode gzip
+	reverse_proxy emha-portal:3100
+}
+
+toko.103-169-207-239.sslip.io {
 	encode gzip
 
 	# API + Socket.IO -> service api
