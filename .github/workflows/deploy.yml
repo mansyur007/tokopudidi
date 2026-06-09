@@ -51,8 +51,11 @@ jobs:
             echo "== Up semua service =="
             $C up -d
 
-            echo "== Reload Caddy (Caddyfile di-bind-mount; reload supaya perubahan routing aktif) =="
-            docker exec tokopudidi-caddy caddy reload --config /etc/caddy/Caddyfile
+            echo "== Recreate Caddy supaya perubahan Caddyfile kebaca =="
+            # Caddyfile di-bind-mount sebagai file tunggal. `git reset --hard` mengganti
+            # inode file di host, sehingga `caddy reload` di dalam container malah membaca
+            # inode lama (stale). Recreate container = re-bind file terbaru. Restart ~1 detik.
+            $C up -d --force-recreate caddy
 
             echo "== Bersihkan image lama =="
             docker image prune -f
