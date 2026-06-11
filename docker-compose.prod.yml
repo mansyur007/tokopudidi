@@ -19,7 +19,10 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      # Evaluate at runtime inside the container ($$ escapes compose substitution)
+      # with a fallback to the default superuser, so the check still works if the
+      # stack is ever brought up without --env-file .env.production.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 10
