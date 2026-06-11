@@ -6,7 +6,7 @@ Versioning follows [SemVer](https://semver.org/).
 ## [Unreleased] — DevOps: Deploy & CI/CD
 
 ### Added
-- **Deploy produksi via Docker Compose** ke single VPS, di-front **Caddy** (port 80/443) sebagai reverse proxy dengan **HTTPS otomatis** (Let's Encrypt via hostname `sslip.io`, tanpa beli domain). Live: **https://103-169-207-239.sslip.io**.
+- **Deploy produksi via Docker Compose** ke single VPS, di-front **Caddy** (port 80/443) sebagai reverse proxy dengan **HTTPS otomatis** (Let's Encrypt). Live: **https://toko.emha.space**. _(Awalnya pakai hostname `sslip.io` tanpa beli domain; kini sudah pindah ke domain `emha.space`.)_
   - `Dockerfile` multi-stage (target `api` & `web` dari monorepo), `docker-compose.prod.yml` (postgres/redis/minio/api/web/caddy — hanya Caddy yang ekspos publik), `Caddyfile`.
   - API dijalankan via `tsx` (transpile-only) di produksi karena belum lulus `tsc` strict; type/lint di-skip saat `next build` (`ignoreBuildErrors`). Lihat ROADMAP `OPS-9`.
 - **CI gate** (`.github/workflows/ci.yml`): `prisma generate` + lint + test + build (database/shared/web) di setiap PR ke `main`.

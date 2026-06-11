@@ -203,12 +203,12 @@ Pakai kode itu untuk verifikasi. Untuk production, ganti `MockOtpProvider` di `a
 
 Deploy produksi pakai **Docker Compose** di single VPS, di-front oleh **Caddy** (port 80/443) sebagai reverse proxy dengan **HTTPS otomatis** (Let's Encrypt).
 
-**🌐 Live:** https://103-169-207-239.sslip.io
+**🌐 Live:** https://toko.emha.space
 
 ### Arsitektur
 - `Dockerfile` — multi-stage, satu image untuk target `api` & `web` dari monorepo.
 - `docker-compose.prod.yml` — `postgres`, `redis`, `minio`, `api`, `web`, `caddy`. Hanya Caddy yang ekspos port publik.
-- `Caddyfile` — route `/api/*` & `/socket.io/*` → `api:4000`, sisanya → `web:3000`. Pakai hostname [sslip.io](https://sslip.io) supaya dapat sertifikat Let's Encrypt **tanpa beli domain**.
+- `Caddyfile` — route `/api/*` & `/socket.io/*` → `api:4000`, sisanya → `web:3000`. Host `toko.emha.space` dapat sertifikat Let's Encrypt otomatis dari Caddy.
 
 ### Setup pertama kali di VPS (Ubuntu)
 ```bash

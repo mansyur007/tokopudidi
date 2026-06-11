@@ -624,7 +624,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 ## 🛠️ OPS — DevOps & Reliability
 
-> Bukan fitur produk, tapi fondasi CI/CD & keandalan produksi. Deploy live: **https://103-169-207-239.sslip.io** (Docker Compose + Caddy + HTTPS).
+> Bukan fitur produk, tapi fondasi CI/CD & keandalan produksi. Deploy live: **https://toko.emha.space** (Docker Compose + Caddy + HTTPS).
 
 | ID | Item | Status | Catatan |
 |---|---|---|---|
