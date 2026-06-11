@@ -110,3 +110,8 @@ postinia.emha.space {
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
 }
+
+testforge.emha.space {
+	encode gzip
+	reverse_proxy testforge:3000
+}
