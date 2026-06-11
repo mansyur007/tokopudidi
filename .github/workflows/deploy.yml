@@ -61,8 +61,8 @@ jobs:
             docker image prune -f
 
             echo "== Smoke test (lewat Caddy, resolve ke localhost) =="
-            # Tokopudidi kini di subdomain toko.* (root host dipakai portal EMHA Universe).
-            HOST=toko.103-169-207-239.sslip.io
+            # Tokopudidi di subdomain toko.emha.space (root host dipakai portal EMHA Universe).
+            HOST=toko.emha.space
             sleep 8
             curl -fsS --retry 5 --retry-delay 3 --retry-connrefused \
               --resolve $HOST:443:127.0.0.1 https://$HOST/api/health

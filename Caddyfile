@@ -1,68 +1,17 @@
 # Shared front door for the EMHA Universe estate.
 #
-#   103-169-207-239.sslip.io            -> EMHA Universe portal (emha-portal)
-#   toko.103-169-207-239.sslip.io       -> Tokopudidi (web + api/socket.io)
-#   real-estate.103-169-207-239.sslip.io -> Real Estate (real-estate:3000)
-#   postinia.103-169-207-239.sslip.io    -> POSTINIA POS (postinia:8080)
-#
-# Real domain (emha.space) mirrors the same scheme:
-#
 #   emha.space             -> EMHA Universe portal (www redirects to apex)
-#   toko.emha.space        -> Tokopudidi
-#   real-estate.emha.space -> BSB Village
-#   postinia.emha.space    -> POSTINIA POS
+#   toko.emha.space        -> Tokopudidi (web + api/socket.io)
+#   real-estate.emha.space -> Real Estate (real-estate:3000)
+#   postinia.emha.space    -> POSTINIA POS (postinia:8080)
+#   testforge.emha.space   -> TestForge (testforge:3000)
 #
 # Each app runs as its own compose stack but joins the tokopudidi_default
 # network so this Caddy can reach it by container name.
 #
 # Caddy auto-redirects HTTP(80) -> HTTPS(443) and gets a Let's Encrypt cert
-# per host. The emha.space subdomains need their own A records pointing at the
-# VPS before Caddy can obtain their certificates.
-
-103-169-207-239.sslip.io {
-	encode gzip
-	reverse_proxy emha-portal:3100
-}
-
-toko.103-169-207-239.sslip.io {
-	encode gzip
-
-	# API + Socket.IO -> service api
-	@api path /api/* /socket.io/*
-	handle @api {
-		reverse_proxy api:4000
-	}
-
-	# Selainnya -> Next.js web
-	handle {
-		reverse_proxy web:3000
-	}
-}
-
-real-estate.103-169-207-239.sslip.io {
-	encode gzip
-	reverse_proxy real-estate:3000
-}
-
-postinia.103-169-207-239.sslip.io {
-	encode gzip zstd
-
-	# Selaras dengan MAX_BODY server (QRIS/logo base64).
-	request_body {
-		max_size 12MB
-	}
-
-	reverse_proxy postinia:8080
-
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		X-Frame-Options "SAMEORIGIN"
-		Referrer-Policy "strict-origin-when-cross-origin"
-	}
-}
-
-# --- emha.space (real domain) ---
+# per host. Each emha.space subdomain needs its own A record pointing at the
+# VPS before Caddy can obtain its certificate.
 
 emha.space {
 	encode gzip
