@@ -79,7 +79,9 @@ export function Footer() {
       </div>
       <div className="border-t border-line">
         <div className="wrap py-4 flex items-center justify-between text-[12px] text-ink-muted">
-          <span>© {new Date().getFullYear()} Tokopudidi. Dibuat untuk UMKM Indonesia.</span>
+          <span>© {new Date().getFullYear()} Tokopudidi. Dibuat untuk UMKM Indonesia. · Part of{' '}
+            <a href="https://emha.space" target="_blank" rel="noopener" className="underline hover:text-primary">EMHA Universe</a>
+          </span>
           <div className="flex items-center gap-1.5">
             <button className="lang-pill" data-active="true">Indonesia</button>
             <button className="lang-pill">English</button>
