@@ -5,6 +5,7 @@
 #   real-estate.emha.space -> Real Estate (real-estate:3000)
 #   postinia.emha.space    -> POSTINIA POS (postinia:8080)
 #   testforge.emha.space   -> TestForge (testforge:3000)
+#   code.emha.space        -> code-server / VS Code in browser (code-server:8080)
 #
 # Each app runs as its own compose stack but joins the tokopudidi_default
 # network so this Caddy can reach it by container name.
@@ -63,4 +64,22 @@ postinia.emha.space {
 testforge.emha.space {
 	encode gzip
 	reverse_proxy testforge:3000
+}
+
+code.emha.space {
+	encode gzip
+
+	# code-server pakai WebSocket (editor + terminal); Caddy handle upgrade otomatis.
+	reverse_proxy code-server:8080
+
+	# Editor bisa upload/paste file besar.
+	request_body {
+		max_size 50MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
 }
