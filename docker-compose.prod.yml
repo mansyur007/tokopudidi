@@ -26,6 +26,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - emha_shared
 
   redis:
     image: redis:7-alpine
@@ -33,6 +35,8 @@ services:
     restart: unless-stopped
     volumes:
       - redisdata:/data
+    networks:
+      - emha_shared
 
   minio:
     image: minio/minio:latest
@@ -49,6 +53,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - emha_shared
 
   # One-shot: buat bucket MinIO bila belum ada (siap dipakai saat fitur upload aktif).
   minio-init:
@@ -67,6 +73,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       S3_BUCKET: ${S3_BUCKET}
+    networks:
+      - emha_shared
     restart: "no"
 
   api:
@@ -90,6 +98,8 @@ services:
         condition: service_started
     expose:
       - "4000"
+    networks:
+      - emha_shared
 
   web:
     build:
@@ -110,26 +120,21 @@ services:
       - api
     expose:
       - "3000"
+    networks:
+      - emha_shared
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: tokopudidi-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddydata:/data
-      - caddyconfig:/config
-    depends_on:
-      - web
-      - api
+# NOTE: The shared front door (Caddy + ports 80/443 + the estate routing) has
+# moved OUT of this stack and into EMHA Universe (/opt/emhauniverse). Tokopudidi
+# is now just a tenant: its web/api are reached by emha-caddy over the shared
+# network. Do not re-add a caddy service here.
+
+networks:
+  # Neutral standalone estate network (created once with `docker network create
+  # emha_shared`, owned by no compose project). Tokopudidi is just a tenant here.
+  emha_shared:
+    external: true
 
 volumes:
   pgdata:
   redisdata:
   miniodata:
-  caddydata:
-  caddyconfig:

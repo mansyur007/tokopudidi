@@ -51,16 +51,14 @@ jobs:
             echo "== Up semua service =="
             $C up -d
 
-            echo "== Recreate Caddy supaya perubahan Caddyfile kebaca =="
-            # Caddyfile di-bind-mount sebagai file tunggal. `git reset --hard` mengganti
-            # inode file di host, sehingga `caddy reload` di dalam container malah membaca
-            # inode lama (stale). Recreate container = re-bind file terbaru. Restart ~1 detik.
-            $C up -d --force-recreate caddy
+            # Pintu depan (Caddy + routing) kini dimiliki stack EMHA Universe
+            # (/opt/emhauniverse), bukan tokopudidi lagi. Deploy ini hanya
+            # mengurus service milik tokopudidi sendiri; tidak menyentuh Caddy.
 
             echo "== Bersihkan image lama =="
             docker image prune -f
 
-            echo "== Smoke test (lewat Caddy, resolve ke localhost) =="
+            echo "== Smoke test (lewat Caddy milik emhauniverse, resolve ke localhost) =="
             # Tokopudidi di subdomain toko.emha.space (root host dipakai portal EMHA Universe).
             HOST=toko.emha.space
             sleep 8
