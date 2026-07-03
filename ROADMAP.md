@@ -1,7 +1,12 @@
-# 🗺️ Tokopudidi — Roadmap M7–M12
+# 🗺️ Tokopudidi — Roadmap M7–M15
 
-> **Status dokumen**: Draft 1 · Terakhir di-update: **2026-06-02**
+> **Status dokumen**: Draft 2 · Terakhir di-update: **2026-07-03**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
+>
+> **Perubahan Draft 2 (2026-07-03)** — hasil audit kode vs fitur Tokopedia:
+> - Koreksi item basi: COD + QRIS mock + timeline order + input resi **sudah terimplementasi** sejak M3/M4 — scope M8-A6 & M10-A5 dipersempit jadi delta yang tersisa.
+> - Mode libur toko (`Shop.isOpen` + auto-reply) dan share produk (Web Share API) sudah ada — tidak perlu item baru.
+> - Milestone baru **M13–M15**: follow toko, invoice, harga grosir, broadcast, login Google, email transaksional, badge reputasi, bulk edit, flash sale, pre-order, PWA.
 
 ## Cara baca dokumen ini
 
@@ -24,7 +29,7 @@
 
 ## Konteks: yang sudah ada (M1–M6)
 
-Auth, katalog + search + kategori, cart, checkout (1-order-per-toko), payment mock + bukti bayar, alamat, ongkir per zona, promo code, riwayat order, seller panel (produk/order/keuangan/withdrawal/ulasan), chat realtime, ulasan, notifikasi, admin (user/shop/KTP/produk-takedown/refund/banner/kategori).
+Auth, katalog + search + kategori, cart, checkout (1-order-per-toko), payment **COD / transfer manual / QRIS mock** + bukti bayar, alamat, ongkir per zona (REGULAR/SAME_DAY), promo code, riwayat order + cancel, timeline status order + input/display nomor resi dasar, seller panel (produk/order/keuangan/withdrawal/ulasan), mode libur toko (`Shop.isOpen` + `closedReason` + auto-reply chat saat tutup), share produk (Web Share API di BuyBox), chat realtime, ulasan, notifikasi, admin (user/shop/KTP/produk-takedown/refund/banner/kategori).
 
 Riwayat detail per milestone di [CHANGELOG.md](CHANGELOG.md).
 
@@ -36,7 +41,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 | Out-of-scope | Alasan |
 |---|---|
-| Payment selain `MANUAL_BANK_TRANSFER` & `QRIS` (VA, e-wallet, kartu, paylater, cicilan) | Fokus 2 metode saja untuk MVP. QRIS pakai mock. |
+| Payment selain `COD`, `TRANSFER_MANUAL` & `QRIS_MOCK` (VA, e-wallet, kartu, paylater, cicilan) | Fokus 3 metode existing untuk MVP. QRIS pakai mock. |
 | Web Push Notifications (browser push) | In-app notif (existing) sudah cukup |
 | Bulk import produk via CSV | Nice-to-have, overhead besar |
 | TopUp & Tagihan real (pulsa, listrik, BPJS) | Hero card kanan boleh tetap UI mock atau dijadikan "Coming Soon" |
@@ -45,7 +50,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 ---
 
-## A. Buyer — fitur
+## A. Milestone M7–M12
 
 ### M7-A1. Wishlist / Favorit ⭐
 - **Status**: 🔵 TODO
@@ -210,31 +215,26 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 ---
 
-### M8-A6. Order Tracking Timeline + AWB
-- **Status**: 🔵 TODO
+### M8-A6. Order Tracking Timeline + AWB — penyempurnaan
+- **Status**: 🔵 TODO (scope dipersempit 2026-07-03 — sebagian besar sudah ada)
 - **Owner**: _belum di-klaim_
-- **Scope**: Order detail menampilkan timeline visual per stage dengan timestamp + input/display nomor resi dengan link kurir.
+- **Sudah ada** (M3/M4): timeline visual status di buyer order detail, `Order.trackingNumber` + input resi di seller order detail, timestamp `paidAt/shippedAt/deliveredAt/completedAt/cancelledAt` di schema.
+- **Scope (delta)**: tambah nama kurir + timestamp `processedAt`, tampilkan timestamp tanggal+jam per stage di timeline, tombol copy resi, link lacak kurir.
 - **Schema diff**:
   ```
-  // Order: tambah field
-  trackingNumber   String?
-  courierName      String?
-  paidAt           DateTime?
-  processedAt      DateTime?
-  shippedAt        DateTime?
-  deliveredAt      DateTime?
-  completedAt      DateTime?
+  // Order: tambah field (sisanya sudah ada)
+  courierName  String?
+  processedAt  DateTime?
   ```
-- **API**: status transition di order update set timestamp terkait (`paidAt` saat PAID, dst).
+- **API**: transisi PAID→PROCESSING set `processedAt`; input resi di seller menerima `courierName` sekaligus.
 - **UI touch**:
-  - [apps/web/src/app/(buyer)/pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx) — komponen `<OrderTimeline>`
-  - [apps/web/src/app/seller/pesanan/[id]/page.tsx](apps/web/src/app/seller/pesanan/[id]/page.tsx) — form input nomor resi + nama kurir saat transisi ke SHIPPED
+  - [apps/web/src/app/(buyer)/pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx) — timeline existing: tambah timestamp per stage, tombol copy resi, link kurir
+  - [apps/web/src/app/seller/pesanan/[id]/page.tsx](apps/web/src/app/seller/pesanan/[id]/page.tsx) — form resi existing: tambah dropdown nama kurir
 - **Acceptance**:
-  - [ ] Timeline render 5 stage dengan tick aktif sesuai status saat ini
   - [ ] Stage selesai tampilkan timestamp tanggal+jam
   - [ ] Nomor resi tampil dengan tombol copy
   - [ ] Link kurir berdasarkan `courierName` (mock URL pattern)
-- **Effort**: M
+- **Effort**: S (turun dari M — fondasi sudah ada)
 
 ---
 
@@ -369,22 +369,23 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 ---
 
-### M10-A5. QRIS Mock (Payment Method ke-2) 🆕
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Tambah QRIS sebagai metode bayar kedua di checkout, render QR code + countdown, tombol "Saya sudah bayar (mock)" untuk simulate webhook.
-- **Schema**: tambah `QRIS` ke enum `PaymentMethod` jika belum ada.
+### M10-A5. QRIS Mock — UX lengkap (QR render + countdown + expiry)
+- **Status**: 🔵 TODO (scope dipersempit 2026-07-03 — metode bayar sudah ada)
+- **Owner**: _belum di-klaim_
+- **Sudah ada** (M3): `QRIS_MOCK` di enum `PaymentMethod`, radio metode bayar di checkout (COD/Transfer/QRIS), `POST /api/v1/orders/:id/pay` yang langsung auto-paid.
+- **Scope (delta)**: ganti auto-paid jadi flow realistis — halaman bayar render QR code + countdown 15 menit, tombol "Saya sudah bayar (mock)" terpisah untuk simulate webhook, order expired otomatis kalau lewat batas waktu.
+- **Schema**: tidak ada migration — enum sudah punya `QRIS_MOCK`.
 - **Library**: `qrcode` (npm) untuk render data URI server-side atau `react-qr-code` client-side.
 - **API**:
   - `GET /api/v1/orders/:id/qris` → `{ qrString, amount, expiresAt }`
-  - `POST /api/v1/orders/:id/qris/simulate-paid` → set status PAID + paidAt (dev/mock only — production akan diganti webhook PSP)
+  - `POST /api/v1/orders/:id/qris/simulate-paid` → set status PAID + paidAt (dev/mock only — production akan diganti webhook PSP); gantikan auto-paid di `POST /orders/:id/pay`
 - **UI touch**:
-  - [apps/web/src/app/(buyer)/checkout/page.tsx](apps/web/src/app/(buyer)/checkout/page.tsx) — radio "Metode Bayar"
-  - [apps/web/src/app/(buyer)/pesanan/[id]/bayar/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/bayar/page.tsx) — branching by paymentMethod
+  - [apps/web/src/app/(buyer)/pesanan/[id]/bayar/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/bayar/page.tsx) — branching by paymentMethod: QRIS render QR + countdown
 - **Acceptance**:
   - [ ] User pilih QRIS di checkout → halaman bayar render QR + countdown 15 menit
   - [ ] Tombol simulate-paid → status order PAID, redirect ke detail
   - [ ] Setelah 15 menit, status order EXPIRED (cron atau lazy-check)
-  - [ ] Bank transfer flow lama tetap jalan tanpa regresi
+  - [ ] Bank transfer & COD flow lama tetap jalan tanpa regresi
 - **Effort**: S
 
 ---
@@ -622,6 +623,248 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 ---
 
+## B. Hasil audit vs Tokopedia — M13–M15 (ditambahkan 2026-07-03)
+
+> Gap terhadap fitur Tokopedia yang **belum ada di kode dan belum tercakup M7–M12**. Fitur yang sudah ternyata ada (mode libur toko, share produk, COD, QRIS mock) tidak dibuatkan item. Fitur out-of-scope (payment gateway real, live shopping, TopAds, koin/loyalty, afiliasi) tetap di luar lingkup sesuai scope guard.
+
+### M13-A1. Follow / Favorit Toko ⭐
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Buyer bisa follow toko dari halaman toko, lihat daftar toko yang di-follow di `/akun/toko-favorit`, unfollow. Halaman toko tampilkan jumlah follower. Pilar retensi utama Tokopedia yang belum ada sama sekali.
+- **Schema**:
+  ```
+  model ShopFollower {
+    shopId    String
+    userId    String
+    createdAt DateTime @default(now())
+    shop      Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+    user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@id([shopId, userId])
+    @@index([userId, createdAt])
+  }
+  ```
+- **API**:
+  - `POST /api/v1/shops/:slug/follow` · `DELETE /api/v1/shops/:slug/follow`
+  - `GET /api/v1/users/me/following?page=&limit=` → list toko + followerCount
+  - `GET /api/v1/shops/:slug` — include `followerCount` + `isFollowing` (jika login)
+- **UI touch**:
+  - [apps/web/src/app/(buyer)/toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) — tombol Follow/Following + follower count di header toko
+  - Baru: `apps/web/src/app/(buyer)/akun/toko-favorit/page.tsx` — grid toko
+- **Acceptance**:
+  - [ ] Logged-out klik Follow → redirect `/masuk` dengan return URL (pola sama M7-A1)
+  - [ ] Toggle optimistic, follower count update tanpa reload
+  - [ ] Unfollow dari halaman `/akun/toko-favorit` langsung remove dari grid
+- **Effort**: S
+
+---
+
+### M13-A2. Invoice Pesanan (Buyer)
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Buyer bisa lihat & cetak invoice per pesanan — halaman printable ala `seller/pesanan/[id]/print` yang sudah ada (bukan PDF generator, cukup print-to-PDF browser).
+- **Schema**: tidak ada — semua data sudah di `Order` (orderNumber, snapshot alamat, items, total).
+- **API**: pakai `GET /api/v1/orders/:id` existing (guard: hanya buyer pemilik order).
+- **UI touch**:
+  - Baru: `apps/web/src/app/(buyer)/pesanan/[id]/invoice/page.tsx` — layout print-friendly (logo, nomor invoice = orderNumber, rincian item, ongkir, diskon, total, metode bayar)
+  - [apps/web/src/app/(buyer)/pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx) — tombol "Lihat Invoice" (muncul setelah PAID)
+- **Acceptance**:
+  - [ ] Invoice hanya bisa diakses buyer pemilik order
+  - [ ] Tombol muncul hanya untuk status ≥ PAID
+  - [ ] `window.print()` menghasilkan 1 halaman A4 rapi (media query print)
+- **Effort**: S
+
+---
+
+### M13-B1. Harga Grosir (Tiered Pricing)
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Seller set harga bertingkat per kuantitas (beli ≥10 lebih murah). Fitur khas Tokopedia yang pas untuk UMKM semi-B2B. BuyBox render tabel harga grosir, harga di cart/checkout mengikuti qty.
+- **Schema**:
+  ```
+  model ProductWholesaleTier {
+    id        String  @id @default(cuid())
+    productId String
+    minQty    Int
+    price     Int
+    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+    @@unique([productId, minQty])
+  }
+  ```
+- **API**:
+  - Include `wholesaleTiers` di product detail & seller product form (nested create/update)
+  - Helper `getUnitPrice(product, qty)` di shared package — dipakai cart, checkout, dan `OrderItem.priceAtPurchase`
+- **UI touch**:
+  - [apps/web/src/components/product/BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx) — tabel harga grosir + harga berubah saat qty naik
+  - Seller product form ([apps/web/src/app/seller/produk/baru](apps/web/src/app/seller/produk/baru/page.tsx) & edit) — section "Harga Grosir" (max 5 tier)
+- **Acceptance**:
+  - [ ] Validasi: minQty naik monoton, price turun monoton, max 5 tier
+  - [ ] Ubah qty di BuyBox/cart → harga satuan & subtotal update sesuai tier
+  - [ ] `OrderItem.priceAtPurchase` menyimpan harga tier saat checkout
+  - [ ] Interaksi dengan sale price (M9-B3): pakai `min(effectivePrice, tierPrice)` — dokumentasikan di helper
+- **Effort**: M
+
+---
+
+### M13-B2. Broadcast Promo ke Follower
+- **Status**: ⚪ BLOCKED (butuh M13-A1) · **Owner**: _belum di-klaim_
+- **Scope**: Seller kirim pengumuman/promo ke semua follower tokonya via notifikasi in-app (bukan chat massal). Rate-limited supaya tidak jadi spam.
+- **Schema**:
+  ```
+  model ShopBroadcast {
+    id        String   @id @default(cuid())
+    shopId    String
+    title     String
+    body      String
+    productId String?  // opsional: link ke produk
+    sentAt    DateTime @default(now())
+    @@index([shopId, sentAt])
+  }
+  ```
+- **API**:
+  - `POST /api/v1/seller/broadcast` — buat broadcast + fan-out `Notification` ke follower (batch insert; tipe baru `SHOP_BROADCAST`)
+  - `GET /api/v1/seller/broadcast` — riwayat
+- **UI touch**: Baru section "Broadcast" di [apps/web/src/app/seller/pengaturan/page.tsx](apps/web/src/app/seller/pengaturan/page.tsx) atau halaman sendiri `apps/web/src/app/seller/broadcast/page.tsx`
+- **Acceptance**:
+  - [ ] Rate limit: max 1 broadcast per toko per 24 jam
+  - [ ] Follower dapat notif in-app, klik → halaman toko atau produk terkait
+  - [ ] Fan-out 1000 follower tidak block response (> batch/async)
+- **Effort**: M
+
+---
+
+### M14-A1. Login dengan Google (OAuth)
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Tombol "Masuk dengan Google" di `/masuk` & `/daftar`. Akun Google baru → auto-register; email sama dengan akun existing → link.
+- **Schema diff**: `User.googleId String? @unique`, `User.passwordHash` jadi nullable (akun OAuth-only).
+- **Library**: `google-auth-library` (verifikasi ID token) — flow: Google Identity Services di client → kirim credential ke API → verify → issue JWT pair existing.
+- **API**: `POST /api/v1/auth/google` body `{ credential }` → response sama dengan login biasa (access+refresh token).
+- **UI touch**: [apps/web/src/app/(auth)/masuk/page.tsx](apps/web/src/app/(auth)/masuk/page.tsx) & daftar — tombol Google di atas form.
+- **ENV**: `GOOGLE_CLIENT_ID` (API + web `NEXT_PUBLIC_`).
+- **Acceptance**:
+  - [ ] Login Google akun baru → user terbuat, langsung masuk
+  - [ ] Email Google = email akun password existing → login ke akun itu (set `googleId`)
+  - [ ] Akun OAuth-only tidak bisa login via form password (error jelas)
+- **Effort**: M
+
+---
+
+### M14-A2. Email Transaksional Real
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Ganti OTP mock dengan email sungguhan + email event penting: OTP register, reset password, order dibuat (buyer), order dibayar (seller), order dikirim (buyer).
+- **Library**: `nodemailer` via SMTP (Resend/Brevo free tier untuk prod; MailHog di docker-compose untuk dev).
+- **Schema**: tidak wajib (opsional `EmailLog` untuk debug).
+- **Implementation**: service `email.service.ts` dengan template sederhana (HTML inline), dipanggil dari event yang sudah ada (auth OTP, order status transition — titik yang sama dengan trigger `Notification`).
+- **ENV**: `SMTP_HOST/PORT/USER/PASS`, `EMAIL_FROM`.
+- **Acceptance**:
+  - [ ] Dev: email tertangkap di MailHog (service baru di docker-compose)
+  - [ ] Kirim email tidak block response (fire-and-forget + error di-log)
+  - [ ] OTP register & reset password terkirim real, flow mock lama dihapus
+- **Effort**: M
+
+---
+
+### M14-B1. Badge Reputasi Toko
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Versi ringan Power Merchant / Official Store Tokopedia. Badge otomatis dari performa + flag Official Store yang di-set admin. Tampil di ProductCard, halaman produk, dan halaman toko. Sinergi dengan filter `officialStoreOnly` di M10-A10.
+- **Schema diff**: `Shop.isOfficialStore Boolean @default(false)` (di-set admin). Badge performa **derived, bukan kolom** — helper di shared package.
+- **Logic**: `getShopBadge(shop)` → `OFFICIAL` (isOfficialStore) > `STAR_PLUS` (ktpVerified + ratingAvg ≥ 4.5 + totalSold ≥ 100) > `STAR` (ktpVerified + ratingAvg ≥ 4 + totalSold ≥ 10) > `NONE`.
+- **API**: include `badge` di response product list/detail & shop detail; admin toggle `isOfficialStore` di `PUT /api/v1/admin/shops/:id`.
+- **UI touch**:
+  - [apps/web/src/components/product/ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx) — icon badge kecil di samping nama toko
+  - [apps/web/src/app/(buyer)/toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) — badge besar di header
+  - Admin toko: toggle Official Store
+- **Acceptance**:
+  - [ ] Badge berubah otomatis saat kriteria terpenuhi (tanpa cron — dihitung saat read)
+  - [ ] Admin set Official Store → badge OFFICIAL menang atas badge performa
+  - [ ] Tooltip badge menjelaskan artinya
+- **Effort**: M
+
+---
+
+### M14-B2. Bulk Edit Stok & Harga
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Mode edit inline di tabel produk seller — ubah harga/stok/status aktif banyak produk sekaligus, simpan sekali klik. (Bulk import CSV tetap out-of-scope; ini edit inline saja.)
+- **Schema**: tidak ada.
+- **API**: `PATCH /api/v1/seller/products/bulk` body `[{ id, price?, stock?, isActive? }]` — validasi kepemilikan semua id, transaksi tunggal.
+- **UI touch**: [apps/web/src/app/seller/produk/page.tsx](apps/web/src/app/seller/produk/page.tsx) — tombol "Edit Massal" → cell harga/stok jadi input, checkbox aktif, tombol Simpan/Batal sticky.
+- **Acceptance**:
+  - [ ] Edit 20 produk → 1 request, 1 transaksi DB
+  - [ ] Produk milik toko lain di payload → 403, tidak ada yang tersimpan
+  - [ ] Validasi client: harga ≥ 100, stok ≥ 0
+- **Effort**: S
+
+---
+
+### M15-C1. Flash Sale (Event Terjadwal)
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Admin buat event flash sale (nama, periode, slot produk dengan harga khusus + kuota). Homepage render section countdown + produk flash sale; halaman `/flash-sale`. Beda dari M9-B3 (sale price per produk oleh seller): ini event terpusat dengan kuota, dikurasi admin.
+- **Schema**:
+  ```
+  model FlashSale {
+    id       String   @id @default(cuid())
+    name     String
+    startAt  DateTime
+    endAt    DateTime
+    isActive Boolean  @default(true)
+    items    FlashSaleItem[]
+    @@index([startAt, endAt])
+  }
+  model FlashSaleItem {
+    id          String @id @default(cuid())
+    flashSaleId String
+    productId   String
+    salePrice   Int
+    quota       Int
+    soldCount   Int    @default(0)
+    flashSale   FlashSale @relation(fields: [flashSaleId], references: [id], onDelete: Cascade)
+    @@unique([flashSaleId, productId])
+  }
+  ```
+- **API**:
+  - Admin CRUD: `GET/POST/PUT/DELETE /api/v1/admin/flash-sales` + kelola items
+  - Public: `GET /api/v1/flash-sales/active` → event berjalan + items (product nested, sisa kuota)
+  - Checkout: kalau produk ada di flash sale aktif & kuota sisa → pakai `salePrice`, increment `soldCount` dalam transaksi (guard race: `UPDATE ... WHERE soldCount < quota`)
+- **UI touch**:
+  - Homepage — section "⚡ Flash Sale" dengan countdown + progress bar kuota per produk
+  - Baru: `apps/web/src/app/(buyer)/flash-sale/page.tsx`
+  - Baru: `apps/web/src/app/admin/flash-sale/page.tsx`
+- **Acceptance**:
+  - [ ] Kuota habis → produk tampil "Habis" di section, checkout pakai harga normal
+  - [ ] Dua buyer rebutan kuota terakhir → hanya 1 dapat harga flash (uji race)
+  - [ ] Event lewat `endAt` → section hilang dari homepage tanpa intervensi
+  - [ ] Prioritas harga: flash sale > sale price (M9-B3) > harga grosir (M13-B1) — dokumentasikan di helper harga shared
+- **Effort**: L
+
+---
+
+### M15-B1. Pre-Order
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Produk made-by-order (makanan, kerajinan) bisa ditandai pre-order dengan lead time X hari. Badge di card & BuyBox, SLA proses order menyesuaikan.
+- **Schema diff**: `Product.isPreorder Boolean @default(false)`, `Product.preorderDays Int?` (1–90).
+- **API**: include di product response; validasi `preorderDays` wajib jika `isPreorder`.
+- **UI touch**:
+  - [apps/web/src/components/product/ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx) & [BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx) — badge "Pre-Order · X hari"
+  - Seller product form — toggle + input hari
+  - Order detail — info estimasi proses untuk item pre-order
+- **Acceptance**:
+  - [ ] Badge tampil konsisten di card, detail, cart, checkout
+  - [ ] Checkout campur produk ready + pre-order → estimasi pakai lead time terlama
+  - [ ] Toggle off → `preorderDays` di-clear
+- **Effort**: S–M
+
+---
+
+### M15-D1. PWA (Manifest + Installable)
+- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Scope**: Web app installable di Android/desktop — manifest, ikon, theme color. Pelengkap Mobile Bottom Nav (M12-A11). Service worker/offline **tidak** termasuk (cukup installable).
+- **Files**:
+  - Baru: `apps/web/src/app/manifest.ts` (Next 14 metadata route) — name, icons 192/512, `display: standalone`, theme color brand
+  - Ikon dari favicon brand existing (commit `3dfd290`) di-export ke ukuran PWA
+- **Acceptance**:
+  - [ ] Chrome Android tampilkan prompt "Add to Home Screen"
+  - [ ] Lighthouse PWA installable check pass
+  - [ ] Ikon & splash tampil benar saat launch dari home screen
+- **Effort**: S
+
+---
+
 ## 🛠️ OPS — DevOps & Reliability
 
 > Bukan fitur produk, tapi fondasi CI/CD & keandalan produksi. Deploy live: **https://toko.emha.space** (Docker Compose + Caddy + HTTPS).
@@ -647,7 +890,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 | ID | Fitur | Alasan |
 |---|---|---|
-| `A5-legacy` | Multi payment (VA, e-wallet, kartu, paylater) | Lingkup MVP hanya MANUAL_BANK_TRANSFER + QRIS |
+| `A5-legacy` | Multi payment (VA, e-wallet, kartu, paylater) | Lingkup MVP hanya COD + TRANSFER_MANUAL + QRIS_MOCK |
+| `AUDIT-koin` | Koin / cashback loyalty & program afiliasi (ala Tokopedia) | Butuh ekosistem payment real dulu |
+| `AUDIT-kurir` | Integrasi kurir real-time (cek ongkir JNE/SiCepat API) | Ongkir per zona adalah keputusan sadar MVP |
 | `A12` | Web Push Notifications | In-app notif sudah cukup |
 | `B5` | Bulk import CSV produk | Overhead vs nilai MVP |
 | `D1` | TopUp & Tagihan real (provider integration) | Optional — UI di HeroCard tetap mock atau "Coming Soon" |
@@ -664,6 +909,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 | **M10 — Komplain & QRIS** | Operasional | A7 · **A5 (QRIS)** · A10 | ~3 hari |
 | **M11 — Seller Tools & Variant** | Power-seller | B1 · B4 · A8 | ~4 hari |
 | **M12 — Mobile, SEO, Audit** | Polish | A11 · D3 · D4 · C3 | ~2 hari |
+| **M13 — Loyalitas & Toko** | Retensi | A1 · A2 · B1 · B2 | ~3 hari |
+| **M14 — Akun & Kepercayaan** | Trust & onboarding | A1 · A2 · B1 · B2 | ~3–4 hari |
+| **M15 — Event & Polish Mobile** | Konversi & event | C1 · B1 · D1 | ~4 hari |
 
 Estimasi asumsi **1 orang full-time per milestone**. Bisa diparalelkan antar-orang dalam satu milestone selama tidak sentuh file yang sama.
 
@@ -688,6 +936,9 @@ Estimasi asumsi **1 orang full-time per milestone**. Bisa diparalelkan antar-ora
 - **M7-A2 ProductView** → dipakai di M11-B4 Statistik Produk & M7-D2 For-You — schema A2 harus ada lebih dulu.
 - **M9-A4 Voucher Picker** ⇄ **M9-B2 Toko Voucher** & **M9-C1 Voucher Platform** — picker baru bermanfaat penuh setelah B2 & C1 ready, tapi bisa rilis bertahap.
 - **M11-A8 Variant Multi-Axis** — sentuh data layer luas, lakukan di akhir milestone supaya tidak block fitur lain.
+- **M13-A1 Follow Toko** → prasyarat **M13-B2 Broadcast Promo** (fan-out ke follower).
+- **M14-B1 Badge Reputasi** ⇄ **M10-A10 Filter Search** — filter `officialStoreOnly` butuh flag `Shop.isOfficialStore` dari B1; kerjakan B1 dulu atau stub flag-nya.
+- **Prioritas harga** (helper shared, urutan menang): Flash Sale (M15-C1) > Sale Price (M9-B3) > Harga Grosir (M13-B1) > harga normal — siapa pun yang mengerjakan duluan membuat helper `getUnitPrice`, yang berikutnya extend.
 
 ### Quality gate sebelum merge
 - [ ] `npx tsc --noEmit` zero error
