@@ -15,10 +15,12 @@ function Logo() {
         style={{ boxShadow: '0 2px 6px rgba(31,164,99,0.35)' }}
         aria-hidden
       >
-        <span
-          className="block w-3 h-3 bg-white"
-          style={{ borderRadius: '50% 50% 50% 2px', transform: 'rotate(45deg)' }}
-        />
+        <svg viewBox="0 0 32 32" width="19" height="19" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(16 16) scale(0.64) translate(-16 -16)">
+            <path d="M11 13 v-1.6 a5 5 0 0 1 10 0 V13" fill="none" stroke="#ffffff" strokeWidth="2.7" strokeLinecap="round" />
+            <rect x="6.4" y="12" width="19.2" height="15.4" rx="4.4" fill="#ffffff" />
+          </g>
+        </svg>
       </span>
       <span className="font-extrabold text-[21px] tracking-tight text-ink leading-none">
         toko<span className="text-primary">pudidi</span>
