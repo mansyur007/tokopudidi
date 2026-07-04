@@ -8,6 +8,7 @@ interface Props {
   stroke?: number;
   className?: string;
   style?: CSSProperties;
+  filled?: boolean;
 }
 
 const PATHS: Record<string, React.ReactNode> = {
@@ -31,14 +32,14 @@ const PATHS: Record<string, React.ReactNode> = {
   dots:          (<><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>),
 };
 
-export function Icon({ name, size = 18, stroke = 1.8, className, style }: Props) {
+export function Icon({ name, size = 18, stroke = 1.8, className, style, filled }: Props) {
   const path = PATHS[name];
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth={stroke}
       strokeLinecap="round"

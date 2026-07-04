@@ -103,6 +103,9 @@ model User {
   buyerRooms    ChatRoom[]      @relation("BuyerRoom")
   refundRequests RefundRequest[]
   paymentVerifs PaymentProof[]  @relation("VerifiedBy")
+  wishlists     Wishlist[]
+  productViews  ProductView[]
+  searchHistory SearchHistory[]
 
   @@index([phone])
   @@index([referralCode])
@@ -250,6 +253,8 @@ model Product {
   cartItems  CartItem[]
   reviews    Review[]
   orderItems OrderItem[]
+  wishlistedBy Wishlist[]
+  views      ProductView[]
   // searchVector dikelola via raw SQL trigger di migration
 
   @@index([shopId])
@@ -510,6 +515,49 @@ model RefundRequest {
   resolvedAt     DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+// ============= WISHLIST =============
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt])
+}
+
+// ============= RECENTLY VIEWED =============
+
+model ProductView {
+  id         String   @id @default(uuid())
+  userId     String?
+  sessionKey String?
+  productId  String
+  viewedAt   DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@unique([sessionKey, productId])
+  @@index([userId, viewedAt])
+  @@index([sessionKey, viewedAt])
+}
+
+// ============= SEARCH HISTORY =============
+
+model SearchHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  query      String
+  searchedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, searchedAt])
 }
 
 // ============= WITHDRAWAL (seller payout) =============

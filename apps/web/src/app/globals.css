@@ -115,6 +115,15 @@
   .pcard:hover .quick-add {
     @apply opacity-100 translate-y-0;
   }
+  .wish-btn {
+    @apply absolute top-2 right-2 w-[30px] h-[30px] rounded-lg bg-white/95 border border-line text-ink-muted grid place-items-center cursor-pointer transition-all shadow-sm opacity-100 md:opacity-0;
+  }
+  .pcard:hover .wish-btn {
+    @apply md:opacity-100;
+  }
+  .wish-btn[data-active="true"] {
+    @apply text-red-500 border-red-200;
+  }
 
   /* ===== Load more ===== */
   .load-more {

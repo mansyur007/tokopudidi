@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
+import { useWishlistStore } from '@/store/wishlist';
 import { trackView } from '@/lib/api/products';
 import type { ProductDetail } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
@@ -18,21 +19,25 @@ interface Props { product: ProductDetail }
 export function BuyBox({ product }: Props) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.tokens?.accessToken);
   const add = useCartStore((s) => s.add);
+  const wishlisted = useWishlistStore((s) => s.has(product.id));
+  const toggleWishlist = useWishlistStore((s) => s.toggle);
 
   const [variantId, setVariantId] = useState<string | undefined>(product.variants[0]?.id);
   const [qty, setQty] = useState<number>(product.minOrderQty);
   const [busy, setBusy] = useState(false);
+  const [wishBusy, setWishBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   // Track view sekali per produk per session.
   useEffect(() => {
     const key = `viewed:${product.id}`;
     if (!sessionStorage.getItem(key)) {
-      trackView(product.id).catch(() => undefined);
+      trackView(product.id, token).catch(() => undefined);
       sessionStorage.setItem(key, '1');
     }
-  }, [product.id]);
+  }, [product.id, token]);
 
   const selectedVariant = product.variants.find((v) => v.id === variantId);
   const stockLeft = selectedVariant?.stock ?? product.stock;
@@ -56,6 +61,19 @@ export function BuyBox({ product }: Props) {
       setMsg(err instanceof ApiClientError ? err.message : 'Gagal tambah ke keranjang');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleWishlist() {
+    if (!user) { router.push('/masuk'); return; }
+    if (wishBusy) return;
+    setWishBusy(true);
+    try {
+      await toggleWishlist(product.id);
+    } catch (err) {
+      setMsg(err instanceof ApiClientError ? err.message : 'Gagal update wishlist');
+    } finally {
+      setWishBusy(false);
     }
   }
 
@@ -161,8 +179,14 @@ export function BuyBox({ product }: Props) {
         >
           <Icon name="chat" size={16} /> Chat
         </Link>
-        <button type="button" className="flex items-center gap-1.5 ghost-btn" aria-label="Tambah wishlist">
-          <Icon name="heart" size={16} /> Wishlist
+        <button
+          type="button"
+          onClick={handleWishlist}
+          disabled={wishBusy}
+          className={clsx('flex items-center gap-1.5 ghost-btn', wishlisted && 'text-red-500')}
+          aria-label={wishlisted ? 'Hapus dari wishlist' : 'Tambah wishlist'}
+        >
+          <Icon name="heart" size={16} filled={wishlisted} /> {wishlisted ? 'Tersimpan' : 'Wishlist'}
         </button>
         <button
           type="button"

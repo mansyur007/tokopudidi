@@ -2,11 +2,14 @@ import { Router } from 'express';
 import { productListQuerySchema } from '@tokopudidi/shared';
 import { ok } from '../../lib/response';
 import { NotFoundError } from '../../lib/errors';
+import { optionalAuth } from '../../middleware/optionalAuth';
+import { sessionCookie } from '../../middleware/sessionCookie';
+import { recordProductView } from '../recentlyViewed/recentlyViewed.service';
 import {
   listProducts,
   getProductBySlug,
   getRelatedProducts,
-  searchSuggestions,
+  getForYouProducts,
   incrementViewCount,
 } from './product.service';
 
@@ -23,12 +26,12 @@ productRouter.get('/', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/products/suggest?q=...
-productRouter.get('/suggest', async (req, res, next) => {
+// GET /api/v1/products/for-you?limit=30
+productRouter.get('/for-you', optionalAuth, async (req, res, next) => {
   try {
-    const q = String(req.query.q ?? '');
-    const suggestions = await searchSuggestions(q);
-    return ok(res, { suggestions });
+    const limit = Math.min(Number(req.query.limit ?? '30'), 50);
+    const items = await getForYouProducts(req.user?.sub, limit);
+    return ok(res, items);
   } catch (err) {
     next(err);
   }
@@ -55,10 +58,11 @@ productRouter.get('/:id/related', async (req, res, next) => {
   }
 });
 
-// POST /api/v1/products/:id/view — increment view count (debounced di FE)
-productRouter.post('/:id/view', async (req, res, next) => {
+// POST /api/v1/products/:id/view — increment view count + catat "Baru Dilihat" (debounced di FE)
+productRouter.post('/:id/view', optionalAuth, sessionCookie, async (req, res, next) => {
   try {
     await incrementViewCount(req.params.id);
+    await recordProductView({ userId: req.user?.sub, sessionKey: req.sessionKey }, req.params.id);
     return ok(res, null);
   } catch (err) {
     next(err);

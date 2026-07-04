@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { formatRupiah } from '@tokopudidi/shared';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
+import { useWishlistStore } from '@/store/wishlist';
 import { Icon } from '@/components/shell/Icon';
 import type { ProductCard as ProductCardType } from '@/lib/api/products';
 
@@ -20,12 +21,30 @@ export function ProductCard({ product, variant = 'grid', onAdded }: Props) {
   const router = useRouter();
   const add = useCartStore((s) => s.add);
   const user = useAuthStore((s) => s.user);
+  const wishlisted = useWishlistStore((s) => s.has(product.id));
+  const toggleWishlist = useWishlistStore((s) => s.toggle);
+  const [wishBusy, setWishBusy] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const widthClass = variant === 'horizontal' ? 'w-40 shrink-0' : 'w-full';
 
   function openDetail() {
     router.push(`/produk/${product.slug}`);
+  }
+
+  async function handleWishlist(e: React.MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!user) { router.push('/masuk'); return; }
+    if (wishBusy) return;
+    setWishBusy(true);
+    try {
+      await toggleWishlist(product.id);
+    } catch {
+      // diam-diam — jangan interupsi feed
+    } finally {
+      setWishBusy(false);
+    }
   }
 
   async function quickAdd(e: React.MouseEvent) {
@@ -71,6 +90,16 @@ export function ProductCard({ product, variant = 'grid', onAdded }: Props) {
           aria-label={`Tambah ${product.name} ke keranjang`}
         >
           <Icon name="plus" size={16} />
+        </button>
+        <button
+          type="button"
+          className="wish-btn"
+          data-active={wishlisted}
+          onClick={handleWishlist}
+          disabled={wishBusy}
+          aria-label={wishlisted ? `Hapus ${product.name} dari wishlist` : `Simpan ${product.name} ke wishlist`}
+        >
+          <Icon name="heart" size={16} filled={wishlisted} />
         </button>
       </div>
 

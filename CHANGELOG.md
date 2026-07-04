@@ -3,6 +3,26 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — Milestone 7: Wishlist, Recently Viewed & Discovery
+
+### Added
+- **Wishlist / Favorit** (`M7-A1`) — heart toggle di `ProductCard` (hover di desktop, selalu tampil di mobile) dan `BuyBox`, halaman `/wishlist` (grid + pagination), badge jumlah di header.
+  - Schema: model `Wishlist` (`userId`+`productId` unik).
+  - API: `GET/POST/DELETE /api/v1/users/me/wishlist(/:productId)`, plus `/count` dan `/ids` (ringan, untuk cek status di FE tanpa fetch penuh).
+  - FE: `store/wishlist.ts` (Zustand, optimistic toggle, mirip pola `store/cart.ts`).
+- **Recently Viewed / "Baru Dilihat"** (`M7-A2`) — section horizontal di beranda (tersembunyi jika kosong) dan halaman penuh `/baru-dilihat` dengan hapus per-item.
+  - Schema: model `ProductView` (`userId` opsional + `sessionKey` opsional, guest tetap ke-track via cookie).
+  - API: `GET/DELETE /api/v1/users/me/recent-products`, endpoint `POST /api/v1/products/:id/view` sekarang juga mencatat `ProductView`.
+  - Middleware baru: `optionalAuth` (Bearer opsional) dan `sessionCookie` (cookie `tk_session` httpOnly 30 hari untuk guest).
+- **Search Suggestions / Autocomplete** (`M7-A9`) — dropdown pencarian di header (`SearchBar`), debounce 250ms, section Produk/Kategori/Toko + riwayat pencarian (login).
+  - Schema: model `SearchHistory`.
+  - API: modul `search` baru — `GET /api/v1/search/suggest`, `GET/POST/DELETE /api/v1/search/history`. Menggantikan `GET /api/v1/products/suggest` lama (belum dipakai FE).
+- **Personalized "Untuk Anda"** (`M7-D2`) — tab "For You" di beranda kini personalized untuk user login: top-3 kategori dari `ProductView` (30 hari) + riwayat order, exclude produk yang sudah dibeli/dilihat 1 jam terakhir, fallback bestseller global untuk guest atau user tanpa riwayat.
+  - API: `GET /api/v1/products/for-you`.
+
+### Changed
+- `apps/web/src/lib/api/client.ts`: `apiFetch` kirim `credentials: 'include'` supaya cookie `tk_session` ikut terkirim ke API (beda origin, `cors({ credentials: true })` sudah mendukung ini).
+
 ## [Unreleased] — Admin Tools: Scraper Tokopedia
 
 ### Added

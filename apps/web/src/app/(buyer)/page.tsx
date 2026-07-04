@@ -3,6 +3,7 @@ import { listProducts } from '@/lib/api/products';
 import { BannerCarousel } from '@/components/home/BannerCarousel';
 import { HeroCard } from '@/components/home/HeroCard';
 import { ProductFeed } from '@/components/home/ProductFeed';
+import { RecentlyViewed } from '@/components/home/RecentlyViewed';
 
 const FALLBACK = { items: [], total: 0, page: 1, limit: 30 };
 
@@ -22,6 +23,8 @@ export default async function HomePage() {
       <div className="mt-5">
         <HeroCard categories={categories} />
       </div>
+
+      <RecentlyViewed />
 
       <ProductFeed
         forYou={forYou.items}
