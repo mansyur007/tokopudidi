@@ -4,6 +4,9 @@
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
+    // DOM diperlukan untuk callback Playwright page.evaluate/$$eval yang
+    // berjalan di konteks browser (mengakses document, HTMLAnchorElement, dsb).
+    "lib": ["ES2022", "DOM"],
     "paths": {
       "@/*": ["src/*"]
     }

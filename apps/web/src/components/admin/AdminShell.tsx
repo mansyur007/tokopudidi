@@ -14,6 +14,7 @@ const NAV = [
   { href: '/admin/refund',   label: 'Refund',     emoji: '↩️' },
   { href: '/admin/banner',   label: 'Banner',     emoji: '🖼️' },
   { href: '/admin/kategori', label: 'Kategori',   emoji: '🗂️' },
+  { href: '/scrap',          label: 'Scraper',    emoji: '🔎' },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

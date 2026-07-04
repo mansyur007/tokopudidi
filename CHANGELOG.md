@@ -3,6 +3,16 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — Admin Tools: Scraper Tokopedia
+
+### Added
+- **Scraper Tokopedia** (khusus admin) — ambil data produk dari halaman toko (mis. `https://www.tokopedia.com/xiaomi`) atau satu URL produk, tampilkan hasil, dan unduh JSON dalam format yang **selaras dengan form produk Tokopudidi** (siap dipakai untuk impor).
+  - Backend: `POST /api/v1/admin/scrape` (guard `requireRole('ADMIN')`), headless Chromium via **Playwright**. Strategi tahan-banting: utamakan baca **JSON-LD** (`schema.org/Product` + `BreadcrumbList`) yang stabil, fallback ke meta `og:` + DOM. Deteksi blokir anti-bot → error yang jelas. Dibatasi `maxProducts` (default 20, maks 40) untuk jaga beban VPS 2-vCPU.
+  - Frontend: halaman `/scrap` (guard admin, tautan di sidebar admin) — input URL + jumlah maks, grid hasil, tombol download JSON siap-impor.
+  - `packages/shared`: `scrapeRequestSchema`, tipe `ScrapedProduct/ScrapedShop/ScrapeResult` (subset field selaras `productCreateSchema`).
+  - `Dockerfile` (stage `api`): pasang Chromium + system deps via `npx playwright install --with-deps chromium`. **Dev lokal**: jalankan `npx playwright install chromium` sekali sebelum memakai fitur.
+  - `apps/api/tsconfig.json`: tambah lib `DOM` untuk callback `page.evaluate/$$eval` (konteks browser).
+
 ## [Unreleased] — DevOps: Deploy & CI/CD
 
 ### Added
