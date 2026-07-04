@@ -10,6 +10,7 @@ const MENU = [
   { href: '/pesanan',         label: 'Riwayat Pesanan',  emoji: '📦' },
   { href: '/chat',            label: 'Chat',             emoji: '💬' },
   { href: '/wishlist',        label: 'Wishlist',         emoji: '❤️' },
+  { href: '/baru-dilihat',    label: 'Baru Dilihat',     emoji: '👀' },
   { href: '/akun/referral',   label: 'Kode Referral',    emoji: '🎁' },
   { href: '/seller',          label: 'Daftar Jadi Penjual', emoji: '🏪' },
   { href: '/bantuan',         label: 'Bantuan',          emoji: '❓' },

@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
+import { useWishlistStore } from '@/store/wishlist';
 import { NotifBell } from './NotifBell';
 import { Icon } from './Icon';
+import { SearchBar } from './SearchBar';
 
 function Logo() {
   return (
@@ -33,10 +35,12 @@ export function Header() {
   const user = useAuthStore((s) => s.user);
   const refreshCart = useCartStore((s) => s.refresh);
   const cartCount = useCartStore((s) => s.totalQuantity());
+  const refreshWishlist = useWishlistStore((s) => s.refresh);
+  const wishlistCount = useWishlistStore((s) => s.ids.size);
 
   useEffect(() => {
-    if (user) refreshCart();
-  }, [user, refreshCart]);
+    if (user) { refreshCart(); refreshWishlist(); }
+  }, [user, refreshCart, refreshWishlist]);
 
   return (
     <header className="sticky top-0 z-40 bg-white" style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
@@ -64,11 +68,12 @@ export function Header() {
         <button type="button" className="hidden md:inline-flex ghost-btn items-center gap-1.5 font-semibold text-sm">
           <Icon name="menu" size={18} /> Kategori
         </button>
-        <form action="/cari" method="get" className="search-box">
-          <Icon name="search" size={18} className="text-ink-muted" />
-          <input type="search" name="q" placeholder="Cari di Tokopudidi" aria-label="Cari produk" />
-        </form>
+        <SearchBar />
         <div className="flex items-center gap-1 shrink-0">
+          <Link href="/wishlist" className="icon-btn hidden md:inline-grid" aria-label={`Wishlist ${wishlistCount} item`}>
+            <Icon name="heart" size={22} />
+            {wishlistCount > 0 && <span className="icon-badge">{wishlistCount > 99 ? '99+' : wishlistCount}</span>}
+          </Link>
           <Link href="/keranjang" className="icon-btn" aria-label={`Keranjang ${cartCount} item`}>
             <Icon name="cart" size={22} />
             {cartCount > 0 && <span className="icon-badge">{cartCount > 99 ? '99+' : cartCount}</span>}

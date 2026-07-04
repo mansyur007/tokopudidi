@@ -28,6 +28,7 @@ export async function apiFetch<T>(path: string, opts: ApiClientOptions = {}): Pr
       ...headers,
     },
     cache: 'no-store',
+    credentials: 'include', // kirim cookie tk_session (guest recently-viewed)
   });
 
   let body: ApiResponse<T>;

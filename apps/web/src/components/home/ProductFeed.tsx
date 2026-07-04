@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { ProductCard } from '@/components/product/ProductCard';
 import { Icon } from '@/components/shell/Icon';
+import { useAuthStore } from '@/store/auth';
+import { getForYou } from '@/lib/api/products';
 import type { ProductCard as ProductCardType } from '@/lib/api/products';
 
 interface Props {
@@ -25,9 +27,18 @@ export function ProductFeed(props: Props) {
   const [tab, setTab] = useState<TabKey>('forYou');
   const [count, setCount] = useState(INITIAL);
   const [toast, setToast] = useState<string | null>(null);
+  const token = useAuthStore((s) => s.tokens?.accessToken);
+  // Default ke bestseller (SSR, guest); diganti hasil personalized begitu login diketahui.
+  const [forYou, setForYou] = useState(props.forYou);
 
   // Reset jumlah yang ditampilkan saat pindah tab.
   useEffect(() => { setCount(INITIAL); }, [tab]);
+
+  // Personalisasi tab "For You" untuk user login — fallback bestseller SSR tetap tampil dulu.
+  useEffect(() => {
+    if (!token) return;
+    getForYou({ token }).then(setForYou).catch(() => undefined);
+  }, [token]);
 
   // Auto-hilang toast.
   useEffect(() => {
@@ -36,7 +47,7 @@ export function ProductFeed(props: Props) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const source = props[tab] ?? [];
+  const source = tab === 'forYou' ? forYou : (props[tab] ?? []);
   const visible = source.slice(0, count);
   const hasMore = count < source.length;
 

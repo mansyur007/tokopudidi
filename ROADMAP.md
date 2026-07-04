@@ -53,8 +53,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ## A. Milestone M7–M12
 
 ### M7-A1. Wishlist / Favorit ⭐
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
 - **Scope**: User bisa simpan produk ke favorit dari ProductCard (hover heart) atau BuyBox, lihat semua wishlist di `/akun/wishlist`, hapus item, lihat badge count di header.
 - **Schema** (Prisma):
   ```
@@ -89,8 +89,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M7-A2. Recently Viewed ("Baru Dilihat") ⭐
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
 - **Scope**: Track produk yang dilihat user (atau guest via cookie), tampilkan section "Baru Dilihat" di homepage + halaman `/akun/baru-dilihat`.
 - **Schema**:
   ```
@@ -123,8 +123,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M7-A9. Search Suggestions / Autocomplete
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
 - **Scope**: Dropdown saat user ketik di search bar — section produk top match, kategori match, toko match, plus riwayat pencarian (login).
 - **Schema**:
   ```
@@ -153,8 +153,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M7-D2. Personalized "Untuk Anda"
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
 - **Scope**: Tab "Untuk Anda" di ProductFeed homepage sekarang = bestseller global. Ganti jadi personalized berdasarkan kategori yang sering dilihat user.
 - **API**:
   - `GET /api/v1/products/for-you?limit=30` →

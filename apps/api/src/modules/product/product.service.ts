@@ -144,20 +144,81 @@ export async function getRelatedProducts(productId: string, limit = 6): Promise<
   }));
 }
 
-export async function searchSuggestions(q: string, limit = 8): Promise<string[]> {
-  if (q.length < 2) return [];
+export async function getForYouProducts(userId: string | undefined, limit = 30): Promise<ProductCard[]> {
+  const fallback = () => listProducts({ sort: 'bestseller', page: 1, limit }).then((r) => r.items);
+
+  if (!userId) return fallback();
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+  const [recentViews, orderItems, recentHourViews] = await Promise.all([
+    prisma.productView.findMany({
+      where: { userId, viewedAt: { gte: thirtyDaysAgo } },
+      select: { productId: true },
+    }),
+    prisma.orderItem.findMany({
+      where: { order: { buyerId: userId } },
+      select: { productId: true },
+    }),
+    prisma.productView.findMany({
+      where: { userId, viewedAt: { gte: oneHourAgo } },
+      select: { productId: true },
+    }),
+  ]);
+
+  const purchasedIds = orderItems.map((o) => o.productId);
+  const historyIds = Array.from(new Set([...recentViews.map((v) => v.productId), ...purchasedIds]));
+  const excludeIds = Array.from(new Set([...purchasedIds, ...recentHourViews.map((v) => v.productId)]));
+
+  if (historyIds.length === 0) return fallback();
+
+  const historyProducts = await prisma.product.findMany({
+    where: { id: { in: historyIds } },
+    select: { categoryId: true },
+  });
+  const categoryCounts = new Map<string, number>();
+  for (const p of historyProducts) {
+    categoryCounts.set(p.categoryId, (categoryCounts.get(p.categoryId) ?? 0) + 1);
+  }
+  const topCategoryIds = Array.from(categoryCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([categoryId]) => categoryId);
+
+  if (topCategoryIds.length === 0) return fallback();
+
   const rows = await prisma.product.findMany({
     where: {
       isActive: true,
       deletedAt: null,
-      name: { contains: q, mode: 'insensitive' },
+      stock: { gt: 0 },
+      categoryId: { in: topCategoryIds },
+      id: { notIn: excludeIds },
     },
-    select: { name: true },
-    orderBy: [{ soldCount: 'desc' }],
+    orderBy: [{ soldCount: 'desc' }, { ratingAvg: 'desc' }],
     take: limit,
+    include: {
+      images: { orderBy: { order: 'asc' }, take: 1 },
+      shop: { select: { id: true, name: true, slug: true, city: true } },
+    },
   });
-  // Dedupe & trim — untuk autocomplete yang ringkas.
-  return Array.from(new Set(rows.map((r) => r.name)));
+
+  const items: ProductCard[] = rows.map((p) => ({
+    id: p.id, slug: p.slug, name: p.name, price: p.price,
+    imageUrl: p.images[0]?.url ?? null,
+    ratingAvg: p.ratingAvg, ratingCount: p.ratingCount, soldCount: p.soldCount,
+    shop: p.shop,
+  }));
+
+  // Kalau hasil personalized kurang dari limit, lengkapi dengan bestseller global (tanpa duplikat).
+  if (items.length < limit) {
+    const have = new Set(items.map((i) => i.id));
+    const padding = (await fallback()).filter((p) => !have.has(p.id));
+    items.push(...padding.slice(0, limit - items.length));
+  }
+
+  return items;
 }
 
 export async function incrementViewCount(productId: string): Promise<void> {

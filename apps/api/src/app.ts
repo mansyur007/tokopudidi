@@ -25,8 +25,10 @@ import { notificationRouter } from './modules/notification/notification.routes';
 import { orderRouter } from './modules/order/order.routes';
 import { productRouter } from './modules/product/product.routes';
 import { promoRouter } from './modules/promo/promo.routes';
+import { recentlyViewedRouter } from './modules/recentlyViewed/recentlyViewed.routes';
 import { reviewRouter } from './modules/review/review.routes';
 import { scraperRouter } from './modules/scraper/scraper.routes';
+import { searchRouter } from './modules/search/search.routes';
 import { sellerDashboardRouter } from './modules/seller/seller.dashboard.routes';
 import { sellerFinanceRouter } from './modules/seller/seller.finance.routes';
 import { sellerOrderRouter } from './modules/seller/seller.order.routes';
@@ -35,6 +37,7 @@ import { sellerProductRouter } from './modules/seller/seller.product.routes';
 import { sellerShopRouter } from './modules/seller/seller.shop.routes';
 import { shippingRouter } from './modules/shipping/shipping.routes';
 import { shopRouter } from './modules/shop/shop.routes';
+import { wishlistRouter } from './modules/wishlist/wishlist.routes';
 
 export function createApp(): Application {
   const app = express();
@@ -71,9 +74,12 @@ export function createApp(): Application {
   app.use('/api/v1/products', productRouter);
   app.use('/api/v1/promo', promoRouter);
   app.use('/api/v1/reviews', reviewRouter);
+  app.use('/api/v1/search', searchRouter);
   app.use('/api/v1/shipping', shippingRouter);
   app.use('/api/v1/shops', shopRouter);
   app.use('/api/v1/users/me/addresses', addressRouter);
+  app.use('/api/v1/users/me/wishlist', wishlistRouter);
+  app.use('/api/v1/users/me/recent-products', recentlyViewedRouter);
 
   // Seller panel
   app.use('/api/v1/users/me', sellerShopRouter);  // /upgrade-to-seller

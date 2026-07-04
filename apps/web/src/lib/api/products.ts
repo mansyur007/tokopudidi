@@ -75,10 +75,11 @@ export function getRelated(productId: string): Promise<ProductCard[]> {
   return apiFetch<ProductCard[]>(`/api/v1/products/${productId}/related`);
 }
 
-export function suggestSearch(q: string): Promise<{ suggestions: string[] }> {
-  return apiFetch<{ suggestions: string[] }>(`/api/v1/products/suggest?q=${encodeURIComponent(q)}`);
+export function getForYou(params: { token?: string; limit?: number } = {}): Promise<ProductCard[]> {
+  const { token, limit = 30 } = params;
+  return apiFetch<ProductCard[]>(`/api/v1/products/for-you?limit=${limit}`, { token });
 }
 
-export function trackView(productId: string): Promise<unknown> {
-  return apiFetch(`/api/v1/products/${productId}/view`, { method: 'POST' });
+export function trackView(productId: string, token?: string): Promise<unknown> {
+  return apiFetch(`/api/v1/products/${productId}/view`, { method: 'POST', token });
 }
