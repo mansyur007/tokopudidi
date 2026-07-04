@@ -26,6 +26,7 @@ import { orderRouter } from './modules/order/order.routes';
 import { productRouter } from './modules/product/product.routes';
 import { promoRouter } from './modules/promo/promo.routes';
 import { reviewRouter } from './modules/review/review.routes';
+import { scraperRouter } from './modules/scraper/scraper.routes';
 import { sellerDashboardRouter } from './modules/seller/seller.dashboard.routes';
 import { sellerFinanceRouter } from './modules/seller/seller.finance.routes';
 import { sellerOrderRouter } from './modules/seller/seller.order.routes';
@@ -91,6 +92,7 @@ export function createApp(): Application {
   app.use('/api/v1/admin/refunds', adminRefundRouter);
   app.use('/api/v1/admin/banners', adminBannerRouter);
   app.use('/api/v1/admin/categories', adminCategoryRouter);
+  app.use('/api/v1/admin/scrape', scraperRouter);
 
   // 404 + error
   app.use(notFound);

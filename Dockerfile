@@ -40,6 +40,8 @@ RUN find . -name '*.tsbuildinfo' -not -path '*/node_modules/*' -delete \
 # bisa menjalankan `prisma migrate deploy` dan seed dari container ini.
 FROM base AS api
 ENV NODE_ENV=production
+# Browser Playwright dipasang ke path tetap agar mudah di-cache & ditemukan runtime.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/package-lock.json ./package-lock.json
@@ -47,6 +49,10 @@ COPY --from=build /app/tsconfig.base.json ./tsconfig.base.json
 COPY --from=build /app/packages/shared ./packages/shared
 COPY --from=build /app/packages/database ./packages/database
 COPY --from=build /app/apps/api ./apps/api
+# Install Chromium + dependency sistem untuk fitur scraper (/admin/scrape).
+# --with-deps memasang lib apt yang dibutuhkan headless Chromium di bookworm-slim.
+RUN npx playwright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
 EXPOSE 4000
 WORKDIR /app/apps/api
 # tsx (esbuild) tersedia di node_modules (devDep api). Transpile-only, tanpa type-check.
