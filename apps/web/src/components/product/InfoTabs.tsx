@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { ProductDetail } from '@/lib/api/products';
+import { DiscussionThread } from './DiscussionThread';
 
-const TABS = ['Detail Produk', 'Spesifikasi', 'Info Penting'] as const;
+const TABS = ['Detail Produk', 'Spesifikasi', 'Info Penting', 'Diskusi'] as const;
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -100,6 +101,8 @@ export function InfoTabs({ product }: { product: ProductDetail }) {
             halaman pesanan setelah barang sampai.
           </p>
         )}
+
+        {tab === 3 && <DiscussionThread productId={product.id} />}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import { bannerRouter } from './modules/banner/banner.routes';
 import { cartRouter } from './modules/cart/cart.routes';
 import { categoryRouter } from './modules/category/category.routes';
 import { chatRouter } from './modules/chat/chat.routes';
+import { discussionRouter } from './modules/discussion/discussion.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { notificationRouter } from './modules/notification/notification.routes';
 import { orderRouter } from './modules/order/order.routes';
@@ -69,6 +70,7 @@ export function createApp(): Application {
   app.use('/api/v1/cart', cartRouter);
   app.use('/api/v1/categories', categoryRouter);
   app.use('/api/v1/chats', chatRouter);
+  app.use('/api/v1/discussions', discussionRouter);
   app.use('/api/v1/notifications', notificationRouter);
   app.use('/api/v1/orders', orderRouter);
   app.use('/api/v1/products', productRouter);

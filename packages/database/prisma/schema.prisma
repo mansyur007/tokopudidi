@@ -51,6 +51,7 @@ enum NotificationType {
   NEW_MESSAGE
   PROMO
   SYSTEM
+  NEW_QUESTION
 }
 
 enum BannerPlacement {
@@ -106,6 +107,8 @@ model User {
   wishlists     Wishlist[]
   productViews  ProductView[]
   searchHistory SearchHistory[]
+  discussions   Discussion[]
+  discussionHelpfuls DiscussionHelpful[]
 
   @@index([phone])
   @@index([referralCode])
@@ -255,6 +258,7 @@ model Product {
   orderItems OrderItem[]
   wishlistedBy Wishlist[]
   views      ProductView[]
+  discussions Discussion[]
   // searchVector dikelola via raw SQL trigger di migration
 
   @@index([shopId])
@@ -575,4 +579,37 @@ model Withdrawal {
   note          String?
 
   @@index([shopId])
+}
+
+// ============= DISCUSSION (Tanya Jawab Publik di halaman produk) =============
+
+model Discussion {
+  id            String    @id @default(uuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  parentId      String?
+  parent        Discussion?  @relation("DiscussionReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Discussion[] @relation("DiscussionReplies")
+  message       String    @db.Text
+  isSellerReply Boolean   @default(false)
+  helpfulCount  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
+
+  helpfuls      DiscussionHelpful[]
+
+  @@index([productId, parentId, createdAt])
+}
+
+model DiscussionHelpful {
+  discussionId String
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@id([discussionId, userId])
+  @@index([userId])
 }

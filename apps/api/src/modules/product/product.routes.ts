@@ -1,10 +1,13 @@
 import { Router } from 'express';
-import { productListQuerySchema } from '@tokopudidi/shared';
-import { ok } from '../../lib/response';
+import { productListQuerySchema, createDiscussionSchema, discussionSortValues, type DiscussionSort } from '@tokopudidi/shared';
+import { ok, created } from '../../lib/response';
 import { NotFoundError } from '../../lib/errors';
+import { requireAuth } from '../../middleware/auth';
 import { optionalAuth } from '../../middleware/optionalAuth';
 import { sessionCookie } from '../../middleware/sessionCookie';
+import { validateBody } from '../../middleware/validate';
 import { recordProductView } from '../recentlyViewed/recentlyViewed.service';
+import { listDiscussions, createQuestion } from '../discussion/discussion.service';
 import {
   listProducts,
   getProductBySlug,
@@ -64,6 +67,35 @@ productRouter.post('/:id/view', optionalAuth, sessionCookie, async (req, res, ne
     await incrementViewCount(req.params.id);
     await recordProductView({ userId: req.user?.sub, sessionKey: req.sessionKey }, req.params.id);
     return ok(res, null);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/products/:id/discussions?sort=newest|helpful&page= — Diskusi (M8-A3)
+productRouter.get('/:id/discussions', optionalAuth, async (req, res, next) => {
+  try {
+    const sortParam = String(req.query.sort ?? 'newest');
+    const sort: DiscussionSort = (discussionSortValues as readonly string[]).includes(sortParam)
+      ? (sortParam as DiscussionSort)
+      : 'newest';
+    const result = await listDiscussions(req.params.id, {
+      sort,
+      page: Math.max(1, Number(req.query.page ?? 1)),
+      limit: Math.min(20, Number(req.query.limit ?? 10)),
+      userId: req.user?.sub,
+    });
+    return ok(res, result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/products/:id/discussions — ajukan pertanyaan (login)
+productRouter.post('/:id/discussions', requireAuth, validateBody(createDiscussionSchema), async (req, res, next) => {
+  try {
+    const d = await createQuestion(req.params.id, req.user!.sub, req.body.message);
+    return created(res, d, 'Pertanyaan terkirim');
   } catch (err) {
     next(err);
   }
