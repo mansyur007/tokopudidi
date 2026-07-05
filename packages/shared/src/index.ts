@@ -4,6 +4,7 @@ export * from './schemas/auth';
 export * from './schemas/cart';
 export * from './schemas/chat';
 export * from './schemas/common';
+export * from './schemas/discussion';
 export * from './schemas/order';
 export * from './schemas/product';
 export * from './schemas/review';

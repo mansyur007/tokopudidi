@@ -3,6 +3,15 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M8-A3: Diskusi Produk (Tanya Jawab Publik)
+
+### Added
+- **Diskusi Produk** (`M8-A3`) — tab "Diskusi" ke-4 di halaman produk (`InfoTabs`): pertanyaan publik + balasan 1 level, penjual ditandai badge **"Penjual"** otomatis (kalau penulis = pemilik toko), tombol **Membantu** (toggle, optimistic), sort **Terbaru / Paling Membantu**, hapus = **soft delete** (tampil "[Pesan dihapus]").
+  - Schema: model `Discussion` (self-relation `parentId` untuk balasan) + `DiscussionHelpful` (`@@id([discussionId, userId])`); enum `NotificationType` tambah `NEW_QUESTION`.
+  - API: `GET/POST /api/v1/products/:id/discussions` (list `optionalAuth` untuk `myHelpful`/`isMine`; create login), `POST /api/v1/discussions/:id/reply`, `POST /api/v1/discussions/:id/helpful` (toggle), `DELETE /api/v1/discussions/:id` (pemilik / admin / penjual produk).
+  - Notifikasi: `NEW_QUESTION` ke pemilik toko saat pertanyaan baru, dan ke penanya saat pertanyaannya dibalas.
+  - FE: `components/product/DiscussionThread.tsx` + client `lib/api/discussions.ts`.
+
 ## [Unreleased] — Milestone 7: Wishlist, Recently Viewed & Discovery
 
 ### Added

@@ -173,8 +173,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M8-A3. Diskusi Produk (Tanya Jawab Publik) ⭐
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
+- **Deliver notes**: tab "Diskusi" jadi tab ke-4 di `InfoTabs` (bukan komponen terpisah `DiscussionThread.tsx` di bawah — komponennya ada, tapi dirender di dalam tab). Count ditampilkan di header thread ("Diskusi Produk (N)"), bukan badge di label tab. Notifikasi `NEW_QUESTION` juga dikirim ke penanya saat pertanyaannya dibalas.
 - **Scope**: Tab "Diskusi" di halaman produk — pertanyaan publik dengan reply (1 level), penjual ditandai khusus, helpful count, sort newest/most-helpful.
 - **Schema**:
   ```
