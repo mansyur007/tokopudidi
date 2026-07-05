@@ -1,7 +1,9 @@
 # 🗺️ Tokopudidi — Roadmap M7–M15
 
-> **Status dokumen**: Draft 2 · Terakhir di-update: **2026-07-03**
+> **Status dokumen**: Draft 2 · Terakhir di-update: **2026-07-05**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
+>
+> **Progress terbaru (2026-07-05)** — **M7 selesai & merged ke `main`** ([PR #16](https://github.com/mansyur007/tokopudidi/pull/16)): A1 Wishlist, A2 Recently Viewed, A9 Search Autocomplete, D2 "Untuk Anda" personalized. Catatan: halaman final di-deliver ke `/wishlist` & `/baru-dilihat` (bukan di bawah `/akun/...` seperti rencana awal). Milestone berikutnya yang bebas di-klaim: **M8**.
 >
 > **Perubahan Draft 2 (2026-07-03)** — hasil audit kode vs fitur Tokopedia:
 > - Koreksi item basi: COD + QRIS mock + timeline order + input resi **sudah terimplementasi** sejak M3/M4 — scope M8-A6 & M10-A5 dipersempit jadi delta yang tersisa.
@@ -27,9 +29,9 @@
 
 ---
 
-## Konteks: yang sudah ada (M1–M6)
+## Konteks: yang sudah ada (M1–M7)
 
-Auth, katalog + search + kategori, cart, checkout (1-order-per-toko), payment **COD / transfer manual / QRIS mock** + bukti bayar, alamat, ongkir per zona (REGULAR/SAME_DAY), promo code, riwayat order + cancel, timeline status order + input/display nomor resi dasar, seller panel (produk/order/keuangan/withdrawal/ulasan), mode libur toko (`Shop.isOpen` + `closedReason` + auto-reply chat saat tutup), share produk (Web Share API di BuyBox), chat realtime, ulasan, notifikasi, admin (user/shop/KTP/produk-takedown/refund/banner/kategori).
+Auth, katalog + search + kategori, cart, checkout (1-order-per-toko), payment **COD / transfer manual / QRIS mock** + bukti bayar, alamat, ongkir per zona (REGULAR/SAME_DAY), promo code, riwayat order + cancel, timeline status order + input/display nomor resi dasar, seller panel (produk/order/keuangan/withdrawal/ulasan), mode libur toko (`Shop.isOpen` + `closedReason` + auto-reply chat saat tutup), share produk (Web Share API di BuyBox), chat realtime, ulasan, notifikasi, admin (user/shop/KTP/produk-takedown/refund/banner/kategori). **M7:** wishlist/favorit (model `Wishlist`), "Baru Dilihat" (model `ProductView`, guest via cookie `tk_session`), autocomplete pencarian (model `SearchHistory`, modul `search`), feed "Untuk Anda" personalized (`GET /products/for-you`). Plus alat admin **Scraper Tokopedia** (`/scrap`, Playwright).
 
 Riwayat detail per milestone di [CHANGELOG.md](CHANGELOG.md).
 
@@ -55,7 +57,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ### M7-A1. Wishlist / Favorit ⭐
 - **Status**: 🟢 DONE
 - **Owner**: Claude
-- **Scope**: User bisa simpan produk ke favorit dari ProductCard (hover heart) atau BuyBox, lihat semua wishlist di `/akun/wishlist`, hapus item, lihat badge count di header.
+- **Scope**: User bisa simpan produk ke favorit dari ProductCard (hover heart) atau BuyBox, lihat semua wishlist di `/wishlist` _(deliver: bukan `/akun/wishlist`)_, hapus item, lihat badge count di header.
 - **Schema** (Prisma):
   ```
   model Wishlist {
@@ -77,13 +79,13 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **UI touch**:
   - [apps/web/src/components/product/ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx) — tombol heart top-right, on-hover desktop, always visible mobile
   - [apps/web/src/components/product/BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx#L164-L166) — tombol Wishlist jadi toggle aktif
-  - Baru: `apps/web/src/app/(buyer)/akun/wishlist/page.tsx` — grid feed
+  - Deliver: `apps/web/src/app/(buyer)/wishlist/page.tsx` — grid feed
   - Baru: `apps/web/src/store/wishlist.ts` — Zustand store mirror pattern cart
 - **Acceptance**:
-  - [ ] Logged-out user klik heart → redirect ke `/masuk` dengan return URL
-  - [ ] Logged-in user klik heart → optimistic toggle, badge update tanpa reload
-  - [ ] Halaman `/akun/wishlist` paginated 20/page, empty state ada CTA "Cari Produk"
-  - [ ] Hapus dari wishlist langsung remove dari grid tanpa reload
+  - [x] Logged-out user klik heart → redirect ke `/masuk` dengan return URL
+  - [x] Logged-in user klik heart → optimistic toggle, badge update tanpa reload
+  - [x] Halaman `/wishlist` paginated 20/page, empty state ada CTA "Cari Produk"
+  - [x] Hapus dari wishlist langsung remove dari grid tanpa reload
 - **Effort**: S
 
 ---
@@ -91,7 +93,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ### M7-A2. Recently Viewed ("Baru Dilihat") ⭐
 - **Status**: 🟢 DONE
 - **Owner**: Claude
-- **Scope**: Track produk yang dilihat user (atau guest via cookie), tampilkan section "Baru Dilihat" di homepage + halaman `/akun/baru-dilihat`.
+- **Scope**: Track produk yang dilihat user (atau guest via cookie), tampilkan section "Baru Dilihat" di homepage + halaman `/baru-dilihat` _(deliver: bukan `/akun/baru-dilihat`)_.
 - **Schema**:
   ```
   model ProductView {
@@ -112,12 +114,12 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Guest: middleware set cookie `tk_session` (UUID, httpOnly, 30 hari) saat first request.
 - **UI touch**:
   - [apps/web/src/app/(buyer)/page.tsx](apps/web/src/app/(buyer)/page.tsx) — tambah section di atas ProductFeed (hidden jika kosong)
-  - Baru: `apps/web/src/app/(buyer)/akun/baru-dilihat/page.tsx` — list lengkap dengan bulk-delete
+  - Deliver: `apps/web/src/app/(buyer)/baru-dilihat/page.tsx` — list lengkap dengan hapus per-item
 - **Acceptance**:
-  - [ ] Buka produk → muncul di "Baru Dilihat" homepage
-  - [ ] Maksimal 10 di homepage section, link "Lihat Semua"
-  - [ ] Guest tetap dapat track via cookie, hilang setelah cookie expire
-  - [ ] User bisa hapus per-item di halaman lengkap
+  - [x] Buka produk → muncul di "Baru Dilihat" homepage
+  - [x] Maksimal 10 di homepage section, link "Lihat Semua"
+  - [x] Guest tetap dapat track via cookie, hilang setelah cookie expire
+  - [x] User bisa hapus per-item di halaman lengkap
 - **Effort**: S–M
 
 ---
@@ -143,11 +145,11 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - [apps/web/src/components/shell/Header.tsx](apps/web/src/components/shell/Header.tsx#L65-L68) — ganti `<form>` jadi client component `<SearchBar>` baru
   - Baru: `apps/web/src/components/shell/SearchBar.tsx` — input + dropdown absolute
 - **Acceptance**:
-  - [ ] Debounce 250ms, fetch saat q.length >= 2
-  - [ ] Dropdown 3 section, max 11 items total
-  - [ ] Klik suggestion produk → `/produk/[slug]`; kategori → `/kategori/[slug]`; toko → `/toko/[slug]`
-  - [ ] Logged-in: 5 riwayat terakhir di atas, bisa hapus per-item
-  - [ ] ESC / blur → tutup dropdown
+  - [x] Debounce 250ms, fetch saat q.length >= 2
+  - [x] Dropdown 3 section, max 11 items total
+  - [x] Klik suggestion produk → `/produk/[slug]`; kategori → `/kategori/[slug]`; toko → `/toko/[slug]`
+  - [x] Logged-in: 5 riwayat terakhir di atas, bisa hapus per-item
+  - [x] ESC / blur → tutup dropdown
 - **Effort**: S
 
 ---
@@ -163,9 +165,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **UI touch**:
   - [apps/web/src/app/(buyer)/page.tsx](apps/web/src/app/(buyer)/page.tsx#L15) — ganti fetch `forYou` dari `listProducts({sort:'bestseller'})` ke endpoint baru
 - **Acceptance**:
-  - [ ] Logged-in user dengan history → produk yang muncul ada di kategori yang sering dilihat
-  - [ ] Guest → fallback bestseller global, tidak error
-  - [ ] Response time < 300ms p95 dengan 1k products
+  - [x] Logged-in user dengan history → produk yang muncul ada di kategori yang sering dilihat
+  - [x] Guest → fallback bestseller global, tidak error
+  - [x] Response time < 300ms p95 dengan 1k products
 - **Effort**: S
 
 ---
@@ -903,7 +905,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 | Milestone | Fokus | Isi | Estimasi |
 |---|---|---|---|
-| **M7 — Wishlist & Discovery** | Engagement | A1 · A2 · A9 · D2 | ~3 hari |
+| 🟢 **M7 — Wishlist & Discovery** | Engagement | A1 · A2 · A9 · D2 | **DONE** (PR #16) |
 | **M8 — Trust & Communication** | Transparansi | A3 · A6 · C2 · B6 | ~3–4 hari |
 | **M9 — Voucher & Promo Lengkap** | Konversi | A4 · B2 · B3 · C1 | ~2–3 hari |
 | **M10 — Komplain & QRIS** | Operasional | A7 · **A5 (QRIS)** · A10 | ~3 hari |

@@ -2,7 +2,7 @@
 
 Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederhana, tanpa iklan, tanpa fitur premium yang bikin lemot.
 
-> **Status:** Milestone 6 (Admin Panel) — moderasi pengguna/toko/produk, verifikasi KTP, arbitrase refund, kelola banner & kategori.
+> **Status:** Milestone 7 (Wishlist & Discovery) — wishlist/favorit, "Baru Dilihat", autocomplete pencarian, feed "Untuk Anda" personalized. Plus alat admin **Scraper Tokopedia**.
 
 ---
 
@@ -14,6 +14,8 @@ Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederh
 - **Milestone 4 — Seller Panel:** dashboard, kelola produk/pesanan, verifikasi bayar, keuangan & pencairan.
 - **Milestone 5 — Chat, Ulasan & Notifikasi:** chat realtime (Socket.IO), ulasan produk, notifikasi.
 - **Milestone 6 — Admin Panel:** dashboard platform, moderasi pengguna & toko, verifikasi KTP, takedown produk, arbitrase refund (buyer bisa ajukan refund), CRUD banner & kategori.
+- **Milestone 7 — Wishlist & Discovery:** wishlist/favorit (heart toggle + halaman `/wishlist`), "Baru Dilihat" (`/baru-dilihat`, guest ke-track via cookie), autocomplete pencarian (produk/kategori/toko + riwayat), feed "Untuk Anda" personalized.
+- **Alat admin — Scraper Tokopedia:** halaman `/scrap` (khusus admin) untuk ambil data produk dari URL toko/produk Tokopedia via headless browser, hasil bisa diunduh JSON siap-impor.
 
 Riwayat lengkap tiap milestone ada di [CHANGELOG.md](CHANGELOG.md).
 
