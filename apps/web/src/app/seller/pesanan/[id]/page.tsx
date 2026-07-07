@@ -16,6 +16,7 @@ import {
 } from '@/lib/api/seller';
 import { ApiClientError } from '@/lib/api/client';
 import { STATUS_LABEL, STATUS_COLOR } from '@/lib/orderStatus';
+import { COURIERS } from '@/lib/couriers';
 import type { OrderStatus } from '@/lib/api/orders';
 
 export default function SellerOrderDetailPage() {
@@ -26,6 +27,7 @@ export default function SellerOrderDetailPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [trackInput, setTrackInput] = useState('');
+  const [courierInput, setCourierInput] = useState('');
 
   const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -46,9 +48,10 @@ export default function SellerOrderDetailPage() {
 
   async function handleShip() {
     if (!tokens?.accessToken || !order) return;
+    if (!courierInput) { setMsg('Pilih kurir dulu'); return; }
     if (trackInput.trim().length < 3) { setMsg('Nomor resi minimal 3 karakter'); return; }
     setBusy(true); setMsg(null);
-    try { await shipOrder(tokens.accessToken, order.id, trackInput.trim()); await load(); }
+    try { await shipOrder(tokens.accessToken, order.id, trackInput.trim(), courierInput); await load(); }
     catch (err) { setMsg(err instanceof ApiClientError ? err.message : 'Gagal'); }
     finally { setBusy(false); }
   }
@@ -145,7 +148,9 @@ export default function SellerOrderDetailPage() {
           <span>Total</span><span className="text-primary">{formatRupiah(order.total)}</span>
         </div>
         {order.trackingNumber && (
-          <p className="text-xs text-gray-600 pt-2">No resi: {order.trackingNumber}</p>
+          <p className="text-xs text-gray-600 pt-2">
+            No resi: {order.trackingNumber}{order.courierName ? ` · ${order.courierName}` : ''}
+          </p>
         )}
       </section>
 
@@ -165,7 +170,17 @@ export default function SellerOrderDetailPage() {
         )}
         {order.status === 'PROCESSING' && (
           <>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                className="input sm:w-44"
+                value={courierInput}
+                onChange={(e) => setCourierInput(e.target.value)}
+              >
+                <option value="">Pilih kurir...</option>
+                {COURIERS.map((c) => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </select>
               <input
                 className="input flex-1"
                 placeholder="Masukkan nomor resi..."

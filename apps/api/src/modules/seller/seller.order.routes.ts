@@ -66,7 +66,7 @@ sellerOrderRouter.post('/:id/process', async (req, res, next) => {
     }
     const updated = await prisma.order.update({
       where: { id: order.id },
-      data: { status: 'PROCESSING' },
+      data: { status: 'PROCESSING', processedAt: new Date() },
     });
     await prisma.notification.create({
       data: {
@@ -96,6 +96,7 @@ sellerOrderRouter.post('/:id/ship', validateBody(shipOrderSchema), async (req, r
       data: {
         status: 'SHIPPED',
         trackingNumber: req.body.trackingNumber,
+        courierName: req.body.courierName,
         shippedAt: new Date(),
       },
     });
@@ -109,7 +110,7 @@ sellerOrderRouter.post('/:id/ship', validateBody(shipOrderSchema), async (req, r
         userId: order.buyerId,
         type: 'ORDER_UPDATE',
         title: 'Pesananmu sudah dikirim!',
-        body: `No resi: ${req.body.trackingNumber}. Lacak di halaman pesanan.`,
+        body: `Dikirim via ${req.body.courierName}. No resi: ${req.body.trackingNumber}. Lacak di halaman pesanan.`,
         linkUrl: `/pesanan/${order.id}`,
       },
     });

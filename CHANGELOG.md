@@ -3,6 +3,15 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M8-A6: Order Tracking Timeline + AWB (penyempurnaan)
+
+### Added
+- **Order Tracking penyempurnaan** (`M8-A6`) — nama kurir + timestamp per stage di timeline pesanan buyer.
+  - Schema: `Order.courierName String?` + `Order.processedAt DateTime?` (migration `m8_a6_order_courier_processed`).
+  - API: `POST /seller/orders/:id/process` kini set `processedAt`; `POST /seller/orders/:id/ship` wajib menerima `courierName` (validasi `shipOrderSchema`), notifikasi kirim menyebut kurir.
+  - FE buyer (`/pesanan/[id]`): timeline tampilkan **tanggal + jam** per stage (`formatTanggalWaktu` baru di shared), stage "Diproses seller" pakai `processedAt` (fallback `paidAt` untuk order lama), tombol **Salin resi** (clipboard), link **"Lacak di situs kurir"** berdasarkan `courierName` (pola URL publik di `lib/couriers.ts`).
+  - FE seller (`/seller/pesanan/[id]`): dropdown **pilih kurir** (10 opsi: JNE, J&T, SiCepat, AnterAja, Ninja, ID Express, Pos, GoSend, GrabExpress, Kurir Toko) di samping input resi; resi + kurir tampil di detail.
+
 ## [Unreleased] — M8-A3: Diskusi Produk (Tanya Jawab Publik)
 
 ### Added

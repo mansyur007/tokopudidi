@@ -49,6 +49,7 @@ export const productUpdateSchema = productCreateSchema.partial();
 
 export const shipOrderSchema = z.object({
   trackingNumber: z.string().trim().min(3, 'Nomor resi minimal 3 karakter').max(60),
+  courierName: z.string().trim().min(2, 'Pilih kurir dulu').max(40),
 });
 
 export const rejectOrderSchema = z.object({

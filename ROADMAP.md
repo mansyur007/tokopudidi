@@ -210,17 +210,18 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Baru: `apps/web/src/components/product/DiscussionThread.tsx`
 - **Notif**: trigger `NotificationType.NEW_QUESTION` ke shop owner saat pertanyaan baru (root-level, bukan reply).
 - **Acceptance**:
-  - [ ] Logged-out user lihat diskusi tapi tidak bisa tanya/reply
-  - [ ] Pertanyaan dari shop owner ditandai badge "Penjual"
-  - [ ] Helpful count bertambah tepat 1× per user
-  - [ ] Hapus = soft delete, comment muncul "[Pesan dihapus]"
+  - [x] Logged-out user lihat diskusi tapi tidak bisa tanya/reply
+  - [x] Pertanyaan dari shop owner ditandai badge "Penjual"
+  - [x] Helpful count bertambah tepat 1× per user
+  - [x] Hapus = soft delete, comment muncul "[Pesan dihapus]"
 - **Effort**: M
 
 ---
 
 ### M8-A6. Order Tracking Timeline + AWB — penyempurnaan
-- **Status**: 🔵 TODO (scope dipersempit 2026-07-03 — sebagian besar sudah ada)
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
+- **Deliver notes** (2026-07-07): kurir jadi dropdown 10 opsi di seller (daftar + pola URL lacak di `apps/web/src/lib/couriers.ts`), `courierName` wajib saat input resi (`shipOrderSchema`). Timeline buyer pakai `formatTanggalWaktu` baru (shared). GoSend/GrabExpress/Kurir Toko tidak punya link lacak (tanpa URL publik).
 - **Sudah ada** (M3/M4): timeline visual status di buyer order detail, `Order.trackingNumber` + input resi di seller order detail, timestamp `paidAt/shippedAt/deliveredAt/completedAt/cancelledAt` di schema.
 - **Scope (delta)**: tambah nama kurir + timestamp `processedAt`, tampilkan timestamp tanggal+jam per stage di timeline, tombol copy resi, link lacak kurir.
 - **Schema diff**:
@@ -234,9 +235,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - [apps/web/src/app/(buyer)/pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx) — timeline existing: tambah timestamp per stage, tombol copy resi, link kurir
   - [apps/web/src/app/seller/pesanan/[id]/page.tsx](apps/web/src/app/seller/pesanan/[id]/page.tsx) — form resi existing: tambah dropdown nama kurir
 - **Acceptance**:
-  - [ ] Stage selesai tampilkan timestamp tanggal+jam
-  - [ ] Nomor resi tampil dengan tombol copy
-  - [ ] Link kurir berdasarkan `courierName` (mock URL pattern)
+  - [x] Stage selesai tampilkan timestamp tanggal+jam
+  - [x] Nomor resi tampil dengan tombol copy
+  - [x] Link kurir berdasarkan `courierName` (mock URL pattern)
 - **Effort**: S (turun dari M — fondasi sudah ada)
 
 ---
