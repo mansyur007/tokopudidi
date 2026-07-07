@@ -9,6 +9,7 @@ import {
   listDiscussions, askQuestion, replyDiscussion, toggleHelpful, deleteDiscussion,
 } from '@/lib/api/discussions';
 import { ApiClientError } from '@/lib/api/client';
+import { ReportButton } from '@/components/report/ReportButton';
 
 function SellerBadge() {
   return (
@@ -145,6 +146,7 @@ export function DiscussionThread({ productId }: { productId: string }) {
                 Hapus
               </button>
             )}
+            {!d.isMine && <ReportButton targetType="DISCUSSION" targetId={d.id} compact />}
           </div>
         )}
       </div>

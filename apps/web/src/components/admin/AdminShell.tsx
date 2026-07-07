@@ -12,6 +12,7 @@ const NAV = [
   { href: '/admin/toko',     label: 'Toko',       emoji: '🏪' },
   { href: '/admin/produk',   label: 'Produk',     emoji: '📦' },
   { href: '/admin/refund',   label: 'Refund',     emoji: '↩️' },
+  { href: '/admin/laporan',  label: 'Laporan',    emoji: '🚩' },
   { href: '/admin/banner',   label: 'Banner',     emoji: '🖼️' },
   { href: '/admin/kategori', label: 'Kategori',   emoji: '🗂️' },
   { href: '/scrap',          label: 'Scraper',    emoji: '🔎' },

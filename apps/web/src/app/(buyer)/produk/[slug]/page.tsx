@@ -9,6 +9,7 @@ import { InfoTabs } from '@/components/product/InfoTabs';
 import { BuyBox } from '@/components/product/BuyBox';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import { ProductCard } from '@/components/product/ProductCard';
+import { ReportButton } from '@/components/report/ReportButton';
 import { Icon } from '@/components/shell/Icon';
 
 interface Props { params: { slug: string } }
@@ -72,6 +73,8 @@ export default async function ProductDetailPage({ params }: Props) {
                 <span className="text-ink font-semibold ml-0.5">{product.ratingAvg.toFixed(1)}</span>
               </span>
               <span>({product.ratingCount} rating)</span>
+              <span>•</span>
+              <ReportButton targetType="PRODUCT" targetId={product.id} targetLabel={product.name} />
             </div>
 
             <div>

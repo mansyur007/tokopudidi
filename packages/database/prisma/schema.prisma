@@ -109,6 +109,7 @@ model User {
   searchHistory SearchHistory[]
   discussions   Discussion[]
   discussionHelpfuls DiscussionHelpful[]
+  reports       Report[]
 
   @@index([phone])
   @@index([referralCode])
@@ -614,4 +615,40 @@ model DiscussionHelpful {
 
   @@id([discussionId, userId])
   @@index([userId])
+}
+
+// ============= REPORT / PELAPORAN (M8-C2) =============
+
+enum ReportTargetType {
+  PRODUCT
+  REVIEW
+  SHOP
+  DISCUSSION
+  USER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  ACTIONED
+  DISMISSED
+}
+
+model Report {
+  id           String           @id @default(uuid())
+  reporterId   String
+  reporter     User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType   ReportTargetType
+  targetId     String
+  reason       String
+  description  String?          @db.Text
+  evidenceUrls String[]
+  status       ReportStatus     @default(OPEN)
+  adminNote    String?
+  createdAt    DateTime         @default(now())
+  resolvedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+  @@index([reporterId])
 }
