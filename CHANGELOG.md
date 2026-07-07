@@ -3,6 +3,14 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M8-B6: Template Reply Chat
+
+### Added
+- **Template Reply Chat** (`M8-B6`) — seller punya snippet template di composer chat, insert sekali klik, kelola di pengaturan. Menutup **M8** (A3 + A6 + C2 + B6 semua selesai).
+  - Schema: model `ChatTemplate` (`shopId`, `label`, `body`, `order`), migration `m8_b6_chat_template`.
+  - API: `GET/POST/PUT/DELETE /api/v1/seller/chat-templates` — guard shop owner, max **20 template/toko**, kepemilikan dicek per id (cross-shop → 404).
+  - FE: tombol **📋** di composer chat seller → dropdown template, klik = replace isi composer (prop baru `templates` di `ChatRoom`; quick replies statis tetap ada). Section **"Template Chat"** di `/seller/pengaturan` (`ChatTemplateManager`): tambah/edit/hapus + reorder ▲▼.
+
 ## [Unreleased] — M8-C2: Report / Pelaporan
 
 ### Added

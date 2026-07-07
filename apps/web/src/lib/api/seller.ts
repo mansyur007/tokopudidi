@@ -228,3 +228,28 @@ export const listCategoriesFlat = async (): Promise<CategoryFlat[]> => {
   }
   return flat;
 };
+
+// ===== Chat Templates (M8-B6) =====
+export interface ChatTemplateRow {
+  id: string;
+  label: string;
+  body: string;
+  order: number;
+  createdAt: string;
+}
+
+export const listChatTemplates = (token: string) =>
+  apiFetch<ChatTemplateRow[]>('/api/v1/seller/chat-templates', { token });
+
+export const createChatTemplate = (token: string, body: { label: string; body: string; order?: number }) =>
+  apiFetch<ChatTemplateRow>('/api/v1/seller/chat-templates', {
+    method: 'POST', token, body: JSON.stringify(body),
+  });
+
+export const updateChatTemplate = (token: string, id: string, body: Partial<{ label: string; body: string; order: number }>) =>
+  apiFetch<ChatTemplateRow>(`/api/v1/seller/chat-templates/${id}`, {
+    method: 'PUT', token, body: JSON.stringify(body),
+  });
+
+export const deleteChatTemplate = (token: string, id: string) =>
+  apiFetch(`/api/v1/seller/chat-templates/${id}`, { method: 'DELETE', token });

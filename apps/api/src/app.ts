@@ -32,6 +32,7 @@ import { reportRouter } from './modules/report/report.routes';
 import { reviewRouter } from './modules/review/review.routes';
 import { scraperRouter } from './modules/scraper/scraper.routes';
 import { searchRouter } from './modules/search/search.routes';
+import { sellerChatTemplateRouter } from './modules/seller/seller.chatTemplate.routes';
 import { sellerDashboardRouter } from './modules/seller/seller.dashboard.routes';
 import { sellerFinanceRouter } from './modules/seller/seller.finance.routes';
 import { sellerOrderRouter } from './modules/seller/seller.order.routes';
@@ -94,6 +95,7 @@ export function createApp(): Application {
   app.use('/api/v1/seller/orders', sellerOrderRouter);
   app.use('/api/v1/seller/payments', sellerPaymentRouter);
   app.use('/api/v1/seller/finance', sellerFinanceRouter);
+  app.use('/api/v1/seller/chat-templates', sellerChatTemplateRouter);
 
   // Admin panel
   app.use('/api/v1/admin', adminDashboardRouter);          // /dashboard
