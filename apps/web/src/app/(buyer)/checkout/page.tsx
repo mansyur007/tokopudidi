@@ -13,6 +13,7 @@ import { validatePromo, type PromoApplied } from '@/lib/api/promo';
 import { checkoutOrder } from '@/lib/api/orders';
 import type { CartGroup } from '@/lib/api/cart';
 import { ApiClientError } from '@/lib/api/client';
+import { VoucherPicker } from '@/components/checkout/VoucherPicker';
 
 type ShippingMethod = 'REGULAR' | 'SAME_DAY' | 'PICKUP_SENDIRI';
 type PaymentMethod = 'COD' | 'TRANSFER_MANUAL' | 'QRIS_MOCK';
@@ -53,6 +54,7 @@ export default function CheckoutPage() {
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState<PromoApplied | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +180,14 @@ export default function CheckoutPage() {
       setPromoApplied(null);
       setPromoError(err instanceof ApiClientError ? err.message : 'Kode promo tidak valid');
     }
+  }
+
+  // Dipakai VoucherPicker (M9-A4) — validasi server-side lalu apply; throw kalau gagal.
+  async function applyVoucherCode(code: string) {
+    if (!tokens?.accessToken) return;
+    const result = await validatePromo(tokens.accessToken, code, totalSubtotal);
+    setPromoApplied(result);
+    setPromoError(null);
   }
 
   async function handleSubmit() {
@@ -332,29 +342,45 @@ export default function CheckoutPage() {
         );
       })}
 
-      {/* Step 4: Promo */}
+      {/* Step 4: Promo / Voucher */}
       <section className="card p-4">
-        <h2 className="font-semibold mb-2">🎟️ Kode Promo</h2>
+        <h2 className="font-semibold mb-2">🎟️ Voucher & Kode Promo</h2>
         {promoApplied ? (
           <div className="flex items-center justify-between gap-2 bg-primary-50 px-3 py-2 rounded">
             <div>
               <p className="text-sm font-medium text-primary">{promoApplied.code} terpakai</p>
               <p className="text-xs text-primary">Hemat {formatRupiah(promoApplied.discountAmount)}</p>
             </div>
-            <button onClick={() => setPromoApplied(null)} className="text-xs text-red-600">Hapus</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setPickerOpen(true)} className="text-xs text-primary">Ganti</button>
+              <button onClick={() => setPromoApplied(null)} className="text-xs text-red-600">Hapus</button>
+            </div>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <input
-              className="input flex-1 uppercase"
-              placeholder="HEMAT10K / DISKON5 / GRATISONGKIR"
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-            />
-            <button onClick={applyPromo} className="btn-outline">Pakai</button>
+          <div className="space-y-2">
+            <button onClick={() => setPickerOpen(true)} className="btn-outline w-full text-primary font-semibold">
+              🎟️ Pakai Voucher
+            </button>
+            <div className="flex gap-2">
+              <input
+                className="input flex-1 uppercase"
+                placeholder="Atau masukkan kode promo manual"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              />
+              <button onClick={applyPromo} className="btn-outline">Pakai</button>
+            </div>
           </div>
         )}
         {promoError && <p className="text-xs text-red-600 mt-1">{promoError}</p>}
+        {pickerOpen && (
+          <VoucherPicker
+            subtotal={totalSubtotal}
+            currentCode={promoApplied?.code ?? null}
+            onApply={applyVoucherCode}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
       </section>
 
       {/* Step 5: Metode bayar */}

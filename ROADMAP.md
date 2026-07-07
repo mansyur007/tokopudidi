@@ -316,8 +316,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M9-A4. Voucher Picker di Checkout
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
+- **Deliver notes** (2026-07-07): endpoint pakai `GET /promo/available?subtotal=` (param `shopId` sudah disiapkan, efektif setelah M9-B2). Apply dari picker tetap divalidasi server-side via `POST /promo/validate` (sumber kebenaran satu). Tag jenis voucher = "Potongan Rp X" / "Diskon X%" (jenis Cashback belum ada di schema PromoCode). Input manual pindah ke bawah tombol "Pakai Voucher" + tersedia juga di dalam modal.
 - **Scope**: Modal "Pakai Voucher" di checkout, list voucher tersedia dengan tag jenis (Cashback/Diskon/Gratis Ongkir), validasi otomatis.
 - **API**:
   - `GET /api/v1/promo/available?subtotal=&shopId=` → `{ eligible: [...], ineligible: [{ promo, reason }] }`
@@ -325,10 +326,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - [apps/web/src/app/(buyer)/checkout/page.tsx](apps/web/src/app/(buyer)/checkout/page.tsx) — tombol "Pakai Voucher" → modal `<VoucherPicker>`
   - Baru: `apps/web/src/components/checkout/VoucherPicker.tsx`
 - **Acceptance**:
-  - [ ] Voucher eligible di atas, ineligible di bawah dengan alasan
-  - [ ] Radio select → preview perubahan total
-  - [ ] Voucher dari toko hanya muncul untuk order toko tsb
-  - [ ] Input manual kode tetap tersedia sebagai fallback
+  - [x] Voucher eligible di atas, ineligible di bawah dengan alasan
+  - [x] Radio select → preview perubahan total
+  - [ ] Voucher dari toko hanya muncul untuk order toko tsb _(menunggu M9-B2 — belum ada voucher toko)_
+  - [x] Input manual kode tetap tersedia sebagai fallback
 - **Effort**: S
 
 ---
