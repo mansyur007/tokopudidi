@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { timeAgo } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import { listChatRooms, type ChatRoomSeller } from '@/lib/api/chat';
+import { listChatTemplates, type ChatTemplateRow } from '@/lib/api/seller';
 import { ChatRoom } from '@/components/chat/ChatRoom';
 
 const QUICK_REPLIES_SELLER = [
@@ -19,6 +20,12 @@ export default function SellerChatPage() {
   const { tokens } = useAuthStore();
   const [rooms, setRooms] = useState<ChatRoomSeller[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<ChatTemplateRow[]>([]);
+
+  useEffect(() => {
+    if (!tokens?.accessToken) return;
+    listChatTemplates(tokens.accessToken).then(setTemplates).catch(() => undefined);
+  }, [tokens?.accessToken]);
 
   useEffect(() => {
     if (!tokens?.accessToken) return;
@@ -80,6 +87,7 @@ export default function SellerChatPage() {
               title={active.buyer.fullName}
               subtitle="Pembeli"
               quickReplies={QUICK_REPLIES_SELLER}
+              templates={templates}
             />
           </>
         ) : (

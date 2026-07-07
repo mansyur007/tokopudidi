@@ -9,6 +9,7 @@ import {
   type SellerShop,
 } from '@/lib/api/seller';
 import { ApiClientError } from '@/lib/api/client';
+import { ChatTemplateManager } from '@/components/seller/ChatTemplateManager';
 
 export default function SellerSettingsPage() {
   const { tokens } = useAuthStore();
@@ -136,6 +137,8 @@ export default function SellerSettingsPage() {
           placeholder="Contoh: Halo kak, toko lagi tutup. Pesan akan dibalas besok pagi ya."
         />
       </section>
+
+      <ChatTemplateManager />
 
       {msg && <p className="text-sm text-primary">{msg}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}

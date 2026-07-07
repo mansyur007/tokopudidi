@@ -19,14 +19,17 @@ interface Props {
   subtitle?: string;
   // Quick reply templates berbeda untuk buyer vs seller.
   quickReplies?: string[];
+  // Template chat custom seller (M8-B6) — dropdown 📋 di composer.
+  templates?: { id: string; label: string; body: string }[];
 }
 
-export function ChatRoom({ roomId, title, subtitle, quickReplies = [] }: Props) {
+export function ChatRoom({ roomId, title, subtitle, quickReplies = [], templates = [] }: Props) {
   const { user, tokens } = useAuthStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [peerTyping, setPeerTyping] = useState(false);
+  const [tplOpen, setTplOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Initial load.
@@ -159,11 +162,40 @@ export function ChatRoom({ roomId, title, subtitle, quickReplies = [] }: Props) 
         </div>
       )}
 
-      <div className="px-3 py-2 border-t flex gap-2 items-center shrink-0">
+      <div className="px-3 py-2 border-t flex gap-2 items-center shrink-0 relative">
         <label aria-label="Kirim gambar" className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer">
           📎
           <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
         </label>
+        {templates.length > 0 && (
+          <>
+            <button
+              type="button"
+              aria-label="Template chat"
+              title="Template chat"
+              onClick={() => setTplOpen((v) => !v)}
+              className={clsx('p-2 rounded-lg hover:bg-gray-100', tplOpen && 'bg-gray-100')}
+            >
+              📋
+            </button>
+            {tplOpen && (
+              <div className="absolute bottom-full left-3 mb-1 w-72 max-h-64 overflow-y-auto bg-white border rounded-lg shadow-lg z-10">
+                <p className="px-3 py-2 text-xs font-semibold text-gray-500 border-b sticky top-0 bg-white">Template Chat</p>
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => { setDraft(t.body); setTplOpen(false); }}
+                    className="block w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                  >
+                    <span className="text-xs font-semibold text-primary">{t.label}</span>
+                    <span className="block text-xs text-gray-600 line-clamp-2">{t.body}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
         <input
           className="input flex-1 min-h-[40px]"
           placeholder="Tulis pesan..."

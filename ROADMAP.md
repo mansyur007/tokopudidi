@@ -3,7 +3,9 @@
 > **Status dokumen**: Draft 2 · Terakhir di-update: **2026-07-05**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
 >
-> **Progress terbaru (2026-07-05)** — **M7 selesai & merged ke `main`** ([PR #16](https://github.com/mansyur007/tokopudidi/pull/16)): A1 Wishlist, A2 Recently Viewed, A9 Search Autocomplete, D2 "Untuk Anda" personalized. Catatan: halaman final di-deliver ke `/wishlist` & `/baru-dilihat` (bukan di bawah `/akun/...` seperti rencana awal). Milestone berikutnya yang bebas di-klaim: **M8**.
+> **Progress terbaru (2026-07-07)** — **M8 selesai & merged ke `main`**: A3 Diskusi Produk ([PR #18](https://github.com/mansyur007/tokopudidi/pull/18)), A6 Order Tracking + AWB ([PR #21](https://github.com/mansyur007/tokopudidi/pull/21)), C2 Report/Pelaporan ([PR #22](https://github.com/mansyur007/tokopudidi/pull/22)), B6 Template Reply Chat. Milestone berikutnya yang bebas di-klaim: **M9**.
+>
+> **Progress (2026-07-05)** — **M7 selesai & merged ke `main`** ([PR #16](https://github.com/mansyur007/tokopudidi/pull/16)): A1 Wishlist, A2 Recently Viewed, A9 Search Autocomplete, D2 "Untuk Anda" personalized. Catatan: halaman final di-deliver ke `/wishlist` & `/baru-dilihat` (bukan di bawah `/akun/...` seperti rencana awal).
 >
 > **Perubahan Draft 2 (2026-07-03)** — hasil audit kode vs fitur Tokopedia:
 > - Koreksi item basi: COD + QRIS mock + timeline order + input resi **sudah terimplementasi** sejak M3/M4 — scope M8-A6 & M10-A5 dipersempit jadi delta yang tersisa.
@@ -285,8 +287,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M8-B6. Template Reply Chat
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
+- **Deliver notes** (2026-07-07): reorder pakai tombol ▲▼ (swap `order`), bukan drag-and-drop. Composer chat seller dapat tombol 📋 → dropdown template (prop baru `templates` di `ChatRoom`, quick replies statis tetap ada). Manajemen template di section "Template Chat" halaman pengaturan seller (komponen `ChatTemplateManager`).
 - **Scope**: Seller punya snippet template di chat composer, bisa insert sekali klik, manage list di settings.
 - **Schema**:
   ```
@@ -305,9 +308,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Seller chat composer: tombol icon → dropdown list template
   - Baru: section "Template Chat" di [apps/web/src/app/seller/pengaturan/page.tsx](apps/web/src/app/seller/pengaturan/page.tsx)
 - **Acceptance**:
-  - [ ] Max 20 template per toko
-  - [ ] Klik template → insert body ke composer (replace, bukan append)
-  - [ ] Drag-and-drop reorder (atau input order angka)
+  - [x] Max 20 template per toko
+  - [x] Klik template → insert body ke composer (replace, bukan append)
+  - [x] Drag-and-drop reorder (atau input order angka) — deliver: tombol ▲▼
 - **Effort**: S
 
 ---
@@ -909,7 +912,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 | Milestone | Fokus | Isi | Estimasi |
 |---|---|---|---|
 | 🟢 **M7 — Wishlist & Discovery** | Engagement | A1 · A2 · A9 · D2 | **DONE** (PR #16) |
-| **M8 — Trust & Communication** | Transparansi | A3 · A6 · C2 · B6 | ~3–4 hari |
+| 🟢 **M8 — Trust & Communication** | Transparansi | A3 · A6 · C2 · B6 | **DONE** (PR #18, #21, #22, B6) |
 | **M9 — Voucher & Promo Lengkap** | Konversi | A4 · B2 · B3 · C1 | ~2–3 hari |
 | **M10 — Komplain & QRIS** | Operasional | A7 · **A5 (QRIS)** · A10 | ~3 hari |
 | **M11 — Seller Tools & Variant** | Power-seller | B1 · B4 · A8 | ~4 hari |

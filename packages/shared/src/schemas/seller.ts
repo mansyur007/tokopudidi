@@ -64,3 +64,13 @@ export const verifyPaymentSchema = z.object({
 export const withdrawSchema = z.object({
   amount: z.number().int().min(10000, 'Minimal tarik dana Rp 10.000'),
 });
+
+// ===== Template chat seller (M8-B6) =====
+export const chatTemplateSchema = z.object({
+  label: z.string().trim().min(2, 'Label minimal 2 karakter').max(40),
+  body: z.string().trim().min(2, 'Isi template minimal 2 karakter').max(500),
+  order: z.number().int().min(0).default(0),
+});
+export type ChatTemplateInput = z.infer<typeof chatTemplateSchema>;
+
+export const chatTemplateUpdateSchema = chatTemplateSchema.partial();

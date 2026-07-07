@@ -201,6 +201,7 @@ model Shop {
   reviews   Review[]
   chatRooms ChatRoom[]
   withdrawals Withdrawal[]
+  chatTemplates ChatTemplate[]
 
   @@index([slug])
   @@index([city])
@@ -651,4 +652,18 @@ model Report {
   @@index([status, createdAt])
   @@index([targetType, targetId])
   @@index([reporterId])
+}
+
+// ============= CHAT TEMPLATE (M8-B6) =============
+
+model ChatTemplate {
+  id        String   @id @default(uuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  label     String
+  body      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([shopId, order])
 }
