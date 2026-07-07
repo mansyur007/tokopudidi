@@ -7,6 +7,7 @@ export * from './schemas/common';
 export * from './schemas/discussion';
 export * from './schemas/order';
 export * from './schemas/product';
+export * from './schemas/report';
 export * from './schemas/review';
 export * from './schemas/scraper';
 export * from './schemas/seller';

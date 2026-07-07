@@ -243,8 +243,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M8-C2. Report / Pelaporan
-- **Status**: 🔵 TODO
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE
+- **Owner**: Claude
+- **Deliver notes** (2026-07-07): entry point bukan kebab menu di ProductCard, tapi tombol/ikon "🚩 Laporkan" di: halaman detail produk (baris rating), item ulasan (ikon), header halaman toko, dan item diskusi (ikon, hanya bukan milik sendiri) — komponen reusable `ReportButton`/`ReportModal`. ACTIONED otomatis: PRODUCT → takedown, REVIEW → `isHidden`, DISCUSSION → soft delete; SHOP/USER ditindak manual via panel existing. Guard anti-spam: 1 laporan OPEN per user per target. Enum `REVIEWING` ada di schema tapi belum dipakai UI.
 - **Scope**: User bisa laporkan produk/ulasan/toko/diskusi via kebab menu, admin punya queue untuk arbitrase.
 - **Schema**:
   ```
@@ -275,10 +276,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Review item & toko card sama
   - Baru: `apps/web/src/app/admin/laporan/page.tsx` — queue + detail
 - **Acceptance**:
-  - [ ] Form lapor: 5 reason picker + description optional + upload max 3 file
-  - [ ] Admin queue filter by status/type
-  - [ ] Action "ACTIONED" untuk produk → otomatis takedown produk
-  - [ ] User yang laporkan dapat notif keputusan admin
+  - [x] Form lapor: 5 reason picker + description optional + upload max 3 file
+  - [x] Admin queue filter by status/type
+  - [x] Action "ACTIONED" untuk produk → otomatis takedown produk
+  - [x] User yang laporkan dapat notif keputusan admin
 - **Effort**: M
 
 ---

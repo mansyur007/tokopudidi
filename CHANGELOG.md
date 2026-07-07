@@ -3,6 +3,15 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M8-C2: Report / Pelaporan
+
+### Added
+- **Report / Pelaporan** (`M8-C2`) — user bisa melaporkan produk/ulasan/toko/diskusi, admin punya queue arbitrase di `/admin/laporan`.
+  - Schema: model `Report` + enum `ReportTargetType` (PRODUCT/REVIEW/SHOP/DISCUSSION/USER) & `ReportStatus` (OPEN/REVIEWING/ACTIONED/DISMISSED), migration `m8_c2_report`.
+  - API: `POST /api/v1/reports` (login; validasi target ada, anti-spam 1 laporan OPEN per user per target, laporan REVIEW set `Review.isReported`), `GET /api/v1/admin/reports?status=&type=&page=` (dengan ringkasan target per tipe), `POST /api/v1/admin/reports/:id/resolve` `{ action, note? }`.
+  - Resolve ACTIONED otomatis: PRODUCT → takedown (`isActive=false`) + notif ke pemilik toko; REVIEW → `isHidden`; DISCUSSION → soft delete. Pelapor selalu dapat notif keputusan (ACTIONED/DISMISSED).
+  - FE: `ReportModal` + `ReportButton` reusable (5 alasan baku `REPORT_REASONS` di shared, deskripsi opsional, bukti max 3 foto @2MB data-URL) — dipasang di detail produk, item ulasan, header toko, item diskusi. Admin: `/admin/laporan` (filter status + tipe, pagination, link ke target) + item sidebar "Laporan".
+
 ## [Unreleased] — M8-A6: Order Tracking Timeline + AWB (penyempurnaan)
 
 ### Added

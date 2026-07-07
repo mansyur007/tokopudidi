@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { timeAgo } from '@tokopudidi/shared';
 import { listProductReviews, type ReviewItem } from '@/lib/api/reviews';
 import { Icon } from '@/components/shell/Icon';
+import { ReportButton } from '@/components/report/ReportButton';
 
 interface Props {
   productId: string;
@@ -260,6 +261,7 @@ export function ProductReviews({ productId, ratingAvg, ratingCount }: Props) {
                   <button className="ghost-btn flex items-center gap-1.5">
                     <Icon name="heart" size={14} /> Membantu
                   </button>
+                  <ReportButton targetType="REVIEW" targetId={r.id} compact />
                 </div>
               </article>
             ))}

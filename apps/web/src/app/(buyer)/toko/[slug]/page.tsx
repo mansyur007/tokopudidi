@@ -5,6 +5,7 @@ import { listProducts } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
 import { formatTanggal } from '@tokopudidi/shared';
 import { ProductGrid } from '@/components/product/ProductGrid';
+import { ReportButton } from '@/components/report/ReportButton';
 
 interface Props { params: { slug: string } }
 
@@ -49,6 +50,7 @@ export default async function TokoDetailPage({ params }: Props) {
               <span>{shop.totalSold} terjual</span>
             </div>
           </div>
+          <ReportButton targetType="SHOP" targetId={shop.id} targetLabel={shop.name} />
         </div>
         {shop.description && (
           <p className="wrap text-sm text-ink-soft mt-3">{shop.description}</p>
