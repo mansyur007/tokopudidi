@@ -3,6 +3,13 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M9-A4: Voucher Picker di Checkout
+
+### Added
+- **Voucher Picker** (`M9-A4`) — modal "Pakai Voucher" di checkout: voucher eligible di atas (dengan preview "Hemat Rp X"), ineligible di bawah dengan alasan (belum berlaku / kuota habis / min. belanja), radio select, tombol apply menampilkan preview hemat.
+  - API: `GET /api/v1/promo/available?subtotal=` (login) → `{ eligible, ineligible: [{ promo, reason }] }`; param `shopId` disiapkan untuk voucher toko (M9-B2). Apply tetap lewat `POST /promo/validate` existing (validasi server-side tunggal).
+  - FE: `components/checkout/VoucherPicker.tsx`; section promo checkout jadi "Voucher & Kode Promo" — tombol **🎟️ Pakai Voucher** + input kode manual tetap ada (fallback, juga tersedia di dalam modal), voucher terpakai dapat tombol **Ganti**.
+
 ## [Unreleased] — M8-B6: Template Reply Chat
 
 ### Added
