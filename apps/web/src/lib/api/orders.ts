@@ -37,9 +37,11 @@ export interface OrderDetail extends OrderListItem {
   promoCode: string | null;
   notes: string | null;
   trackingNumber: string | null;
+  courierName: string | null;
   buyerAddress: unknown;
   shopAddress: unknown;
   paidAt: string | null;
+  processedAt: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
   completedAt: string | null;

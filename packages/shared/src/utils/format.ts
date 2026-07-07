@@ -15,6 +15,14 @@ export function formatTanggal(input: Date | string): string {
   return `${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// Format tanggal + jam Indonesia: "12 Mei 2026, 14.30"
+export function formatTanggalWaktu(input: Date | string): string {
+  const d = input instanceof Date ? input : new Date(input);
+  const jam = String(d.getHours()).padStart(2, '0');
+  const menit = String(d.getMinutes()).padStart(2, '0');
+  return `${formatTanggal(d)}, ${jam}.${menit}`;
+}
+
 // "5 menit yang lalu", "kemarin", dll. Untuk display ringan di UI.
 export function timeAgo(input: Date | string): string {
   const d = input instanceof Date ? input : new Date(input);

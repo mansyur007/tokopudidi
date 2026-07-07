@@ -335,11 +335,13 @@ model Order {
   paymentMethod  PaymentMethod
   shippingMethod ShippingMethod
   trackingNumber String?
+  courierName    String?
   buyerAddress   Json     // snapshot
   shopAddress    Json     // snapshot
   notes          String?
   promoCode      String?
   paidAt         DateTime?
+  processedAt    DateTime?
   shippedAt      DateTime?
   deliveredAt    DateTime?
   completedAt    DateTime?

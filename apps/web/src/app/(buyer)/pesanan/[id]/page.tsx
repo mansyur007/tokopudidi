@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { formatRupiah, formatTanggal } from '@tokopudidi/shared';
+import { formatRupiah, formatTanggal, formatTanggalWaktu } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
   getOrder,
@@ -16,6 +16,7 @@ import {
 } from '@/lib/api/orders';
 import { ApiClientError } from '@/lib/api/client';
 import { STATUS_LABEL, STATUS_COLOR } from '@/lib/orderStatus';
+import { getCourierTrackUrl } from '@/lib/couriers';
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!user) { router.push('/masuk'); return; }
@@ -93,6 +95,17 @@ export default function OrderDetailPage() {
     } finally { setBusy(false); }
   }
 
+  async function handleCopyResi() {
+    if (!order?.trackingNumber) return;
+    try {
+      await navigator.clipboard.writeText(order.trackingNumber);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard tidak tersedia (http non-secure) — abaikan
+    }
+  }
+
   if (!user) return null;
   if (loading) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat pesanan...</div>;
   if (!order) return <div className="px-4 py-8 text-center">Pesanan tidak ditemukan.</div>;
@@ -124,7 +137,8 @@ export default function OrderDetailPage() {
           {[
             { label: 'Pesanan dibuat',  at: order.createdAt },
             { label: 'Dibayar',         at: order.paidAt },
-            { label: 'Diproses seller', at: order.status === 'PROCESSING' || order.shippedAt ? order.paidAt : null },
+            // processedAt baru ada sejak M8-A6 — fallback ke paidAt untuk order lama.
+            { label: 'Diproses seller', at: order.processedAt ?? (order.status === 'PROCESSING' || order.shippedAt ? order.paidAt : null) },
             { label: 'Dikirim',         at: order.shippedAt },
             { label: 'Sampai tujuan',   at: order.deliveredAt },
             { label: 'Selesai',         at: order.completedAt },
@@ -132,7 +146,7 @@ export default function OrderDetailPage() {
             <li key={i} className={`flex gap-2 ${s.at ? 'text-gray-900' : 'text-gray-400'}`}>
               <span aria-hidden>{s.at ? '●' : '○'}</span>
               <span className="flex-1">{s.label}</span>
-              {s.at && <span className="text-xs text-gray-500">{formatTanggal(s.at)}</span>}
+              {s.at && <span className="text-xs text-gray-500">{formatTanggalWaktu(s.at)}</span>}
             </li>
           ))}
           {order.status === 'CANCELLED' && (
@@ -148,7 +162,25 @@ export default function OrderDetailPage() {
       {order.tracking && (
         <section className="card p-4">
           <h2 className="font-semibold mb-2">Pelacakan Pengiriman</h2>
-          <p className="text-xs text-gray-500 mb-2">No resi: {order.trackingNumber}</p>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <p className="text-xs text-gray-500">
+              {order.courierName ? `${order.courierName} · ` : ''}No resi: {order.trackingNumber}
+            </p>
+            <button
+              onClick={handleCopyResi}
+              className="text-xs px-2 py-0.5 rounded border border-gray-300 hover:bg-gray-50"
+            >
+              {copied ? '✓ Tersalin' : '📋 Salin resi'}
+            </button>
+            {(() => {
+              const url = getCourierTrackUrl(order.courierName, order.trackingNumber);
+              return url ? (
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">
+                  Lacak di situs kurir ↗
+                </a>
+              ) : null;
+            })()}
+          </div>
           <ol className="text-sm space-y-1">
             {order.tracking.map((t, i) => (
               <li key={i} className={`flex gap-2 ${t.reached ? 'text-gray-900' : 'text-gray-400'}`}>

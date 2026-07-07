@@ -132,7 +132,9 @@ export interface SellerOrderDetail extends SellerOrderRow {
   shippingCost: number;
   discountAmount: number;
   buyerAddress: unknown;
+  courierName: string | null;
   paidAt: string | null;
+  processedAt: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
   paymentProof: { id: string; bankName: string; accountName: string; transferAmount: number; proofImageUrl: string; uploadedAt: string; verifiedAt: string | null; rejectedAt: string | null; rejectReason: string | null } | null;
@@ -150,9 +152,9 @@ export const getSellerOrder = (token: string, id: string) =>
 export const processOrder = (token: string, id: string) =>
   apiFetch(`/api/v1/seller/orders/${id}/process`, { method: 'POST', token });
 
-export const shipOrder = (token: string, id: string, trackingNumber: string) =>
+export const shipOrder = (token: string, id: string, trackingNumber: string, courierName: string) =>
   apiFetch(`/api/v1/seller/orders/${id}/ship`, {
-    method: 'POST', token, body: JSON.stringify({ trackingNumber }),
+    method: 'POST', token, body: JSON.stringify({ trackingNumber, courierName }),
   });
 
 export const rejectOrder = (token: string, id: string, reason: string) =>
