@@ -22,16 +22,22 @@ function computeDiscount(
   return discount;
 }
 
-// GET /api/v1/promo/available?subtotal= — daftar voucher untuk Voucher Picker (M9-A4).
-// Param `shopId` disiapkan untuk voucher toko (M9-B2) — saat ini semua promo platform-wide.
+// GET /api/v1/promo/available?subtotal=&shopId= — daftar voucher untuk Voucher Picker (M9-A4).
+// Voucher toko (shopId terisi, M9-B2) hanya muncul kalau query shopId cocok.
 promoRouter.get('/available', requireAuth, async (req, res, next) => {
   try {
     const subtotal = Math.max(0, Number(req.query.subtotal ?? 0) || 0);
+    const shopId = typeof req.query.shopId === 'string' && req.query.shopId ? req.query.shopId : null;
     const now = new Date();
 
     const promos = await prisma.promoCode.findMany({
-      where: { isActive: true, validUntil: { gte: now } },
-      orderBy: { validUntil: 'asc' },
+      where: {
+        isActive: true,
+        validUntil: { gte: now },
+        OR: [{ shopId: null }, ...(shopId ? [{ shopId }] : [])],
+      },
+      orderBy: [{ shopId: { sort: 'desc', nulls: 'last' } }, { validUntil: 'asc' }],
+      include: { shop: { select: { name: true } } },
     });
 
     const eligible = [];
@@ -44,6 +50,7 @@ promoRouter.get('/available', requireAuth, async (req, res, next) => {
         minPurchase: p.minPurchase,
         maxDiscount: p.maxDiscount,
         validUntil: p.validUntil,
+        shopName: p.shop?.name ?? null, // terisi = voucher toko
       };
       let reason: string | null = null;
       if (now < p.validFrom) reason = 'Belum mulai berlaku';
@@ -61,14 +68,22 @@ promoRouter.get('/available', requireAuth, async (req, res, next) => {
 const validateSchema = z.object({
   code: z.string().trim().toUpperCase().min(1),
   subtotal: z.number().int().min(0),
+  // shopId toko dalam checkout — wajib cocok untuk voucher toko (M9-B2).
+  shopId: z.string().uuid().optional(),
 });
 
 // POST /api/v1/promo/validate
 promoRouter.post('/validate', validateBody(validateSchema), async (req, res, next) => {
   try {
-    const { code, subtotal } = req.body;
-    const promo = await prisma.promoCode.findUnique({ where: { code } });
+    const { code, subtotal, shopId } = req.body;
+    const promo = await prisma.promoCode.findUnique({
+      where: { code },
+      include: { shop: { select: { name: true } } },
+    });
     if (!promo || !promo.isActive) throw new BadRequestError('Kode promo tidak valid');
+    if (promo.shopId && promo.shopId !== shopId) {
+      throw new BadRequestError(`Voucher ini khusus belanja di toko ${promo.shop?.name ?? 'tertentu'}`);
+    }
 
     const now = new Date();
     if (now < promo.validFrom || now > promo.validUntil) {

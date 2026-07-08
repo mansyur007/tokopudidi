@@ -13,16 +13,31 @@ function generateOrderNumber(): string {
 export interface PromoApplied {
   code: string;
   discountAmount: number;
+  // Terisi kalau voucher khusus toko (M9-B2) — diskon hanya dipotong ke order toko ini.
+  shopId: string | null;
 }
 
 async function validatePromo(
   code: string,
   totalSubtotal: number,
+  shopSubtotals: Map<string, number>,
 ): Promise<PromoApplied | null> {
   if (!code) return null;
-  const promo = await prisma.promoCode.findUnique({ where: { code } });
+  const promo = await prisma.promoCode.findUnique({
+    where: { code },
+    include: { shop: { select: { name: true } } },
+  });
   if (!promo || !promo.isActive) {
     throw new BadRequestError('Kode promo tidak valid');
+  }
+  // Voucher toko: basis diskon & min belanja = subtotal toko tsb saja.
+  let baseSubtotal = totalSubtotal;
+  if (promo.shopId) {
+    const shopSubtotal = shopSubtotals.get(promo.shopId);
+    if (shopSubtotal === undefined) {
+      throw new BadRequestError(`Voucher ini khusus belanja di toko ${promo.shop?.name ?? 'tertentu'}`);
+    }
+    baseSubtotal = shopSubtotal;
   }
   const now = new Date();
   if (now < promo.validFrom || now > promo.validUntil) {
@@ -31,7 +46,7 @@ async function validatePromo(
   if (promo.usageLimit && promo.usedCount >= promo.usageLimit) {
     throw new BadRequestError('Kuota promo sudah habis');
   }
-  if (totalSubtotal < promo.minPurchase) {
+  if (baseSubtotal < promo.minPurchase) {
     throw new BadRequestError(
       `Minimal belanja Rp ${promo.minPurchase.toLocaleString('id-ID')} untuk pakai promo ini`,
     );
@@ -39,12 +54,12 @@ async function validatePromo(
 
   let discount =
     promo.discountType === 'PERCENTAGE'
-      ? Math.floor((totalSubtotal * promo.discountValue) / 100)
+      ? Math.floor((baseSubtotal * promo.discountValue) / 100)
       : promo.discountValue;
   if (promo.maxDiscount && discount > promo.maxDiscount) discount = promo.maxDiscount;
-  if (discount > totalSubtotal) discount = totalSubtotal;
+  if (discount > baseSubtotal) discount = baseSubtotal;
 
-  return { code: promo.code, discountAmount: discount };
+  return { code: promo.code, discountAmount: discount, shopId: promo.shopId };
 }
 
 export async function checkout(userId: string, input: CheckoutInput) {
@@ -142,16 +157,20 @@ export async function checkout(userId: string, input: CheckoutInput) {
     });
   }
 
-  // 4. Validasi promo (di-apply ke combined subtotal, dipotong proporsional per order).
-  const promoApplied = await validatePromo(input.promoCode ?? '', combinedSubtotal);
+  // 4. Validasi promo. Voucher platform → combined subtotal (dipotong proporsional per order);
+  //    voucher toko (M9-B2) → hanya subtotal & order toko tsb.
+  const shopSubtotals = new Map(shopOrders.map((so) => [so.shopId, so.subtotal]));
+  const promoApplied = await validatePromo(input.promoCode ?? '', combinedSubtotal, shopSubtotals);
 
   // 5. Buat order dalam transaksi tunggal.
   const created = await prisma.$transaction(async (tx) => {
     const orderRecords = [];
     for (const so of shopOrders) {
-      // Discount proporsional berdasarkan share subtotal.
+      // Voucher toko: diskon penuh ke order toko tsb; platform: proporsional per share subtotal.
       let discount = 0;
-      if (promoApplied && combinedSubtotal > 0) {
+      if (promoApplied && promoApplied.shopId) {
+        discount = promoApplied.shopId === so.shopId ? promoApplied.discountAmount : 0;
+      } else if (promoApplied && combinedSubtotal > 0) {
         discount = Math.floor((promoApplied.discountAmount * so.subtotal) / combinedSubtotal);
       }
       const total = so.subtotal + so.shippingCost - discount;

@@ -3,6 +3,16 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M9-B2: Toko Voucher
+
+### Added
+- **Voucher Toko** (`M9-B2`) — seller bikin voucher khusus tokonya (potongan Rp / diskon %), set min. belanja, kuota total, maks. diskon, dan periode; bisa pause/resume.
+  - Schema: `PromoCode.shopId String?` + relasi `Shop.promoCodes` + index `(shopId, isActive)` (migration `m9_b2_promocode_shopid`). `shopId` null = voucher platform.
+  - API: `GET/POST/PUT/DELETE /api/v1/seller/voucher` (guard shop owner; kode unik global; PUT `isActive` = pause/resume). Schema shared `voucherCreateSchema`/`voucherUpdateSchema` (dipakai ulang M9-C1).
+  - Scoping: `GET /promo/available?shopId=` menyertakan voucher toko tsb (+`shopName` untuk tag 🏪 di picker); `POST /promo/validate` menolak voucher toko tanpa `shopId` cocok; checkout service memotong diskon voucher toko **penuh ke order toko tsb** (basis min. belanja = subtotal toko itu), voucher platform tetap proporsional.
+  - FE: halaman `/seller/promo` (list + form modal + pause/resume + hapus) + item sidebar "Voucher Toko"; checkout kirim `shopId` saat 1 toko; picker render tag toko.
+  - Catatan: kuota per user deferred (butuh model redemption per-user).
+
 ## [Unreleased] — M9-A4: Voucher Picker di Checkout
 
 ### Added

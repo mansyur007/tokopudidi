@@ -202,6 +202,7 @@ model Shop {
   chatRooms ChatRoom[]
   withdrawals Withdrawal[]
   chatTemplates ChatTemplate[]
+  promoCodes PromoCode[]
 
   @@index([slug])
   @@index([city])
@@ -493,6 +494,9 @@ model Banner {
 model PromoCode {
   id           String       @id @default(uuid())
   code         String       @unique
+  // null = voucher platform (berlaku semua toko); terisi = voucher khusus toko (M9-B2).
+  shopId       String?
+  shop         Shop?        @relation(fields: [shopId], references: [id], onDelete: Cascade)
   discountType DiscountType
   discountValue Int
   minPurchase  Int          @default(0)
@@ -506,6 +510,7 @@ model PromoCode {
   updatedAt    DateTime     @updatedAt
 
   @@index([code])
+  @@index([shopId, isActive])
 }
 
 // ============= REFUND =============

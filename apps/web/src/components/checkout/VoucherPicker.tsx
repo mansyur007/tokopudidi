@@ -7,6 +7,8 @@ import { listAvailableVouchers, type AvailableVouchers, type VoucherInfo } from 
 
 interface VoucherPickerProps {
   subtotal: number;
+  // Terisi kalau checkout hanya berisi 1 toko — voucher toko ikut ditampilkan (M9-B2).
+  shopId?: string;
   currentCode: string | null;
   onApply: (code: string) => Promise<void>; // parent validasi via /promo/validate
   onClose: () => void;
@@ -16,7 +18,7 @@ function voucherTag(v: VoucherInfo): string {
   return v.discountType === 'PERCENTAGE' ? `Diskon ${v.discountValue}%` : `Potongan ${formatRupiah(v.discountValue)}`;
 }
 
-export function VoucherPicker({ subtotal, currentCode, onApply, onClose }: VoucherPickerProps) {
+export function VoucherPicker({ subtotal, shopId, currentCode, onApply, onClose }: VoucherPickerProps) {
   const { tokens } = useAuthStore();
   const [data, setData] = useState<AvailableVouchers | null>(null);
   const [selected, setSelected] = useState<string | null>(currentCode);
@@ -26,10 +28,10 @@ export function VoucherPicker({ subtotal, currentCode, onApply, onClose }: Vouch
 
   useEffect(() => {
     if (!tokens?.accessToken) return;
-    listAvailableVouchers(tokens.accessToken, subtotal)
+    listAvailableVouchers(tokens.accessToken, subtotal, shopId)
       .then(setData)
       .catch(() => setData({ eligible: [], ineligible: [] }));
-  }, [tokens?.accessToken, subtotal]);
+  }, [tokens?.accessToken, subtotal, shopId]);
 
   async function handleApply(code: string | null) {
     if (!code) return;
@@ -99,6 +101,11 @@ export function VoucherPicker({ subtotal, currentCode, onApply, onClose }: Vouch
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-100 text-primary font-semibold">
                           {voucherTag(v)}
                         </span>
+                        {v.shopName && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-semibold">
+                            🏪 {v.shopName}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {v.minPurchase > 0 ? `Min. belanja ${formatRupiah(v.minPurchase)} · ` : ''}
