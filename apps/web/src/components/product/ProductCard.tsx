@@ -106,8 +106,20 @@ export function ProductCard({ product, variant = 'grid', onAdded }: Props) {
       {/* body */}
       <div className="px-2.5 pt-2.5 pb-3 flex flex-col gap-1">
         <h3 className="pcard-name">{product.name}</h3>
-        <div className="text-[15.5px] font-extrabold text-ink tracking-tight mt-0.5">
-          {formatRupiah(product.price)}
+        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+          <span className="text-[15.5px] font-extrabold text-ink tracking-tight">
+            {formatRupiah(product.price)}
+          </span>
+          {product.discountPct != null && product.originalPrice != null && (
+            <>
+              <span className="text-[10.5px] font-bold text-red-600 bg-red-50 rounded px-1 py-0.5">
+                -{product.discountPct}%
+              </span>
+              <span className="text-[11.5px] text-ink-muted line-through">
+                {formatRupiah(product.originalPrice)}
+              </span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1.5 text-[11.5px] text-ink-muted mt-0.5">
           <span className="inline-flex items-center gap-0.5 text-star">

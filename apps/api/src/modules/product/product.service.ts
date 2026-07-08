@@ -1,4 +1,5 @@
 import { prisma, Prisma } from '@tokopudidi/database';
+import { getEffectivePrice, getDiscountPct } from '@tokopudidi/shared';
 import type { ProductListQuery } from '@tokopudidi/shared';
 
 // Output ringkas untuk listing card. Hindari send semua relasi supaya payload kecil.
@@ -6,12 +7,42 @@ export interface ProductCard {
   id: string;
   slug: string;
   name: string;
-  price: number;
+  price: number;                 // harga efektif saat ini (sudah termasuk sale M9-B3)
+  originalPrice: number | null;  // harga coret — terisi hanya saat sale aktif
+  discountPct: number | null;    // persen diskon — terisi hanya saat sale aktif
+  saleEndAt: Date | null;        // untuk countdown di FE
   imageUrl: string | null;
   ratingAvg: number;
   ratingCount: number;
   soldCount: number;
   shop: { id: string; name: string; slug: string; city: string };
+}
+
+export type CardRow = {
+  id: string; slug: string; name: string;
+  price: number; salePrice: number | null; saleStartAt: Date | null; saleEndAt: Date | null;
+  ratingAvg: number; ratingCount: number; soldCount: number;
+  images: { url: string }[];
+  shop: { id: string; name: string; slug: string; city: string };
+};
+
+export function toProductCard(p: CardRow): ProductCard {
+  const effective = getEffectivePrice(p);
+  const discountPct = getDiscountPct(p);
+  return {
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    price: effective,
+    originalPrice: discountPct != null ? p.price : null,
+    discountPct,
+    saleEndAt: discountPct != null ? p.saleEndAt : null,
+    imageUrl: p.images[0]?.url ?? null,
+    ratingAvg: p.ratingAvg,
+    ratingCount: p.ratingCount,
+    soldCount: p.soldCount,
+    shop: p.shop,
+  };
 }
 
 function buildOrderBy(sort: ProductListQuery['sort']): Prisma.ProductOrderByWithRelationInput[] {
@@ -76,17 +107,7 @@ export async function listProducts(query: ProductListQuery): Promise<{
     }),
   ]);
 
-  const items: ProductCard[] = rows.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    price: p.price,
-    imageUrl: p.images[0]?.url ?? null,
-    ratingAvg: p.ratingAvg,
-    ratingCount: p.ratingCount,
-    soldCount: p.soldCount,
-    shop: p.shop,
-  }));
+  const items: ProductCard[] = rows.map(toProductCard);
 
   return { items, total, page: query.page, limit: query.limit };
 }
@@ -136,12 +157,7 @@ export async function getRelatedProducts(productId: string, limit = 6): Promise<
     },
   });
 
-  return rows.map((p) => ({
-    id: p.id, slug: p.slug, name: p.name, price: p.price,
-    imageUrl: p.images[0]?.url ?? null,
-    ratingAvg: p.ratingAvg, ratingCount: p.ratingCount, soldCount: p.soldCount,
-    shop: p.shop,
-  }));
+  return rows.map(toProductCard);
 }
 
 export async function getForYouProducts(userId: string | undefined, limit = 30): Promise<ProductCard[]> {
@@ -204,12 +220,7 @@ export async function getForYouProducts(userId: string | undefined, limit = 30):
     },
   });
 
-  const items: ProductCard[] = rows.map((p) => ({
-    id: p.id, slug: p.slug, name: p.name, price: p.price,
-    imageUrl: p.images[0]?.url ?? null,
-    ratingAvg: p.ratingAvg, ratingCount: p.ratingCount, soldCount: p.soldCount,
-    shop: p.shop,
-  }));
+  const items: ProductCard[] = rows.map(toProductCard);
 
   // Kalau hasil personalized kurang dari limit, lengkapi dengan bestseller global (tanpa duplikat).
   if (items.length < limit) {

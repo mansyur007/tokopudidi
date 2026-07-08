@@ -1,4 +1,5 @@
 import { prisma } from '@tokopudidi/database';
+import { toProductCard } from '../product/product.service';
 import type { ProductCard } from '../product/product.service';
 
 export interface Viewer {
@@ -44,17 +45,7 @@ export async function getRecentProducts(viewer: Viewer, limit = 10): Promise<Pro
 
   return rows
     .filter((v) => v.product && !v.product.deletedAt)
-    .map((v) => ({
-      id: v.product.id,
-      slug: v.product.slug,
-      name: v.product.name,
-      price: v.product.price,
-      imageUrl: v.product.images[0]?.url ?? null,
-      ratingAvg: v.product.ratingAvg,
-      ratingCount: v.product.ratingCount,
-      soldCount: v.product.soldCount,
-      shop: v.product.shop,
-    }));
+    .map((v) => toProductCard(v.product));
 }
 
 export async function removeRecentProduct(viewer: Viewer, productId: string): Promise<void> {

@@ -30,11 +30,15 @@ const variantInput = z.object({
   stock: z.number().int().min(0),
 });
 
-export const productCreateSchema = z.object({
+const productBaseSchema = z.object({
   name: z.string().trim().min(3, 'Nama produk minimal 3 karakter').max(120),
   description: z.string().trim().min(10, 'Deskripsi minimal 10 karakter').max(5000),
   categoryId: z.string().uuid('Pilih kategori dulu'),
   price: z.number().int().min(100, 'Harga minimal Rp 100'),
+  // Diskon periodik (M9-B3) — ketiganya diisi bersama; salePrice harus < price.
+  salePrice: z.number().int().min(100).nullable().optional(),
+  saleStartAt: z.string().datetime().nullable().optional(),
+  saleEndAt: z.string().datetime().nullable().optional(),
   stock: z.number().int().min(0),
   minOrderQty: z.number().int().min(1).default(1),
   weight: z.number().int().min(1, 'Berat minimal 1 gram'),
@@ -43,9 +47,25 @@ export const productCreateSchema = z.object({
   imageUrls: z.array(z.string().min(5)).min(1, 'Minimal 1 foto produk').max(5, 'Maksimal 5 foto'),
   variants: z.array(variantInput).max(20).optional(),
 });
+
+export const productCreateSchema = productBaseSchema
+  .refine((v) => v.salePrice == null || v.salePrice < v.price, {
+    message: 'Harga diskon harus lebih murah dari harga normal',
+    path: ['salePrice'],
+  })
+  .refine((v) => v.salePrice == null || (!!v.saleStartAt && !!v.saleEndAt), {
+    message: 'Periode diskon wajib diisi',
+    path: ['saleStartAt'],
+  })
+  .refine((v) => !v.saleStartAt || !v.saleEndAt || new Date(v.saleStartAt) < new Date(v.saleEndAt), {
+    message: 'Tanggal berakhir harus setelah tanggal mulai',
+    path: ['saleEndAt'],
+  });
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 
-export const productUpdateSchema = productCreateSchema.partial();
+// Partial dari base (tanpa refinement create) — konsistensi salePrice vs price
+// divalidasi di route update karena price bisa tidak ikut dikirim.
+export const productUpdateSchema = productBaseSchema.partial();
 
 export const shipOrderSchema = z.object({
   trackingNumber: z.string().trim().min(3, 'Nomor resi minimal 3 karakter').max(60),

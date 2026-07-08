@@ -93,6 +93,9 @@ sellerProductRouter.post('/', validateBody(productCreateSchema), async (req, res
           slug,
           description: req.body.description,
           price: req.body.price,
+          salePrice: req.body.salePrice ?? null,
+          saleStartAt: req.body.saleStartAt ? new Date(req.body.saleStartAt) : null,
+          saleEndAt: req.body.saleEndAt ? new Date(req.body.saleEndAt) : null,
           stock: req.body.stock,
           minOrderQty: req.body.minOrderQty,
           weight: req.body.weight,
@@ -131,6 +134,21 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
     if (!existing) throw new NotFoundError('Produk tidak ditemukan');
 
     const { imageUrls, variants, ...rest } = req.body;
+
+    // Konsistensi diskon periodik (M9-B3) — gabungan payload + data existing.
+    const nextPrice = rest.price ?? existing.price;
+    const nextSalePrice = rest.salePrice !== undefined ? rest.salePrice : existing.salePrice;
+    if (nextSalePrice != null) {
+      const start = rest.saleStartAt !== undefined ? rest.saleStartAt : existing.saleStartAt;
+      const end = rest.saleEndAt !== undefined ? rest.saleEndAt : existing.saleEndAt;
+      if (nextSalePrice >= nextPrice) throw new BadRequestError('Harga diskon harus lebih murah dari harga normal');
+      if (!start || !end) throw new BadRequestError('Periode diskon wajib diisi');
+      if (new Date(start) >= new Date(end)) throw new BadRequestError('Tanggal berakhir harus setelah tanggal mulai');
+    } else if (rest.salePrice === null) {
+      // Hapus diskon → bersihkan periodenya juga.
+      rest.saleStartAt = null;
+      rest.saleEndAt = null;
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       await tx.product.update({ where: { id: existing.id }, data: rest });

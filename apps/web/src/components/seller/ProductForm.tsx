@@ -42,6 +42,19 @@ interface FormState {
   isActive: boolean;
   imageUrls: string[];
   variants: VariantState[];
+  // Diskon periodik (M9-B3) — tanggal dalam format input datetime-local.
+  saleEnabled: boolean;
+  salePrice: number;
+  saleStartAt: string;
+  saleEndAt: string;
+}
+
+// ISO → format input datetime-local ("YYYY-MM-DDTHH:mm", waktu lokal).
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function initialFromProduct(p?: SellerProductDetail): FormState {
@@ -57,6 +70,10 @@ function initialFromProduct(p?: SellerProductDetail): FormState {
     isActive:    p?.isActive    ?? true,
     imageUrls:   p?.images.map((img) => img.url) ?? [],
     variants:    p?.variants.map((v) => ({ id: v.id, name: v.name, priceModifier: v.priceModifier, stock: v.stock })) ?? [],
+    saleEnabled: p?.salePrice != null,
+    salePrice:   p?.salePrice   ?? 0,
+    saleStartAt: toLocalInput(p?.saleStartAt),
+    saleEndAt:   toLocalInput(p?.saleEndAt),
   };
 }
 
@@ -116,7 +133,14 @@ export function ProductForm({ initial, productId }: Props) {
     if (!tokens?.accessToken) return;
     setError(null);
 
-    const parsed = productCreateSchema.safeParse(state);
+    const { saleEnabled, salePrice, saleStartAt, saleEndAt, ...base } = state;
+    const candidate = {
+      ...base,
+      salePrice: saleEnabled ? salePrice : null,
+      saleStartAt: saleEnabled && saleStartAt ? new Date(saleStartAt).toISOString() : null,
+      saleEndAt: saleEnabled && saleEndAt ? new Date(saleEndAt).toISOString() : null,
+    };
+    const parsed = productCreateSchema.safeParse(candidate);
     if (!parsed.success) {
       setError(parsed.error.errors[0]?.message ?? 'Ada field yang belum valid');
       return;
@@ -201,6 +225,57 @@ export function ProductForm({ initial, productId }: Props) {
             required
           />
         </div>
+      </div>
+
+      {/* Diskon Periodik (M9-B3) */}
+      <div className="border rounded-lg p-3 space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={state.saleEnabled}
+            onChange={(e) => setField('saleEnabled', e.target.checked)}
+          />
+          <span className="font-medium text-sm">🏷️ Diskon Periodik</span>
+          <span className="text-xs text-gray-500">— harga coret + badge persen selama periode</span>
+        </label>
+        {state.saleEnabled && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="label">Harga Diskon (Rp)</label>
+              <input
+                type="number"
+                className="input"
+                value={state.salePrice}
+                min={100}
+                max={Math.max(100, state.price - 1)}
+                onChange={(e) => setField('salePrice', Number(e.target.value))}
+              />
+              {state.salePrice > 0 && state.price > 0 && state.salePrice < state.price && (
+                <p className="text-xs text-red-600 mt-1">
+                  -{Math.round(((state.price - state.salePrice) / state.price) * 100)}% dari {formatRupiah(state.price)}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="label">Mulai</label>
+              <input
+                type="datetime-local"
+                className="input"
+                value={state.saleStartAt}
+                onChange={(e) => setField('saleStartAt', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label">Berakhir</label>
+              <input
+                type="datetime-local"
+                className="input"
+                value={state.saleEndAt}
+                onChange={(e) => setField('saleEndAt', e.target.value)}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -1,5 +1,6 @@
 import { prisma } from '@tokopudidi/database';
 import { NotFoundError } from '../../lib/errors';
+import { toProductCard } from '../product/product.service';
 import type { ProductCard } from '../product/product.service';
 
 export async function addToWishlist(userId: string, productId: string): Promise<void> {
@@ -54,17 +55,7 @@ export async function listWishlist(
 
   const items: ProductCard[] = rows
     .filter((w) => w.product && !w.product.deletedAt)
-    .map((w) => ({
-      id: w.product.id,
-      slug: w.product.slug,
-      name: w.product.name,
-      price: w.product.price,
-      imageUrl: w.product.images[0]?.url ?? null,
-      ratingAvg: w.product.ratingAvg,
-      ratingCount: w.product.ratingCount,
-      soldCount: w.product.soldCount,
-      shop: w.product.shop,
-    }));
+    .map((w) => toProductCard(w.product));
 
   return { items, total, page, limit };
 }

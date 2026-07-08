@@ -3,7 +3,9 @@
 > **Status dokumen**: Draft 2 · Terakhir di-update: **2026-07-05**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
 >
-> **Progress terbaru (2026-07-07)** — **M8 selesai & merged ke `main`**: A3 Diskusi Produk ([PR #18](https://github.com/mansyur007/tokopudidi/pull/18)), A6 Order Tracking + AWB ([PR #21](https://github.com/mansyur007/tokopudidi/pull/21)), C2 Report/Pelaporan ([PR #22](https://github.com/mansyur007/tokopudidi/pull/22)), B6 Template Reply Chat. Milestone berikutnya yang bebas di-klaim: **M9**.
+> **Progress terbaru (2026-07-08)** — **M9 selesai & merged ke `main`**: A4 Voucher Picker ([PR #24](https://github.com/mansyur007/tokopudidi/pull/24)), B2 Toko Voucher ([PR #25](https://github.com/mansyur007/tokopudidi/pull/25)), C1 Voucher Platform ([PR #26](https://github.com/mansyur007/tokopudidi/pull/26)), B3 Sale Price ([PR #27](https://github.com/mansyur007/tokopudidi/pull/27)). Milestone berikutnya yang bebas di-klaim: **M10**.
+>
+> **Progress (2026-07-07)** — **M8 selesai & merged ke `main`**: A3 Diskusi Produk ([PR #18](https://github.com/mansyur007/tokopudidi/pull/18)), A6 Order Tracking + AWB ([PR #21](https://github.com/mansyur007/tokopudidi/pull/21)), C2 Report/Pelaporan ([PR #22](https://github.com/mansyur007/tokopudidi/pull/22)), B6 Template Reply Chat ([PR #23](https://github.com/mansyur007/tokopudidi/pull/23)).
 >
 > **Progress (2026-07-05)** — **M7 selesai & merged ke `main`** ([PR #16](https://github.com/mansyur007/tokopudidi/pull/16)): A1 Wishlist, A2 Recently Viewed, A9 Search Autocomplete, D2 "Untuk Anda" personalized. Catatan: halaman final di-deliver ke `/wishlist` & `/baru-dilihat` (bukan di bawah `/akun/...` seperti rencana awal).
 >
@@ -350,7 +352,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M9-B3. Sale Price (Diskon Produk Periodik)
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-08): helper `getEffectivePrice`/`getDiscountPct`/`getSaleRemainingMs` di `packages/shared/src/utils/price.ts` — dipakai API (product list/related/for-you/wishlist/recent via `toProductCard`, cart, checkout) & FE (detail page, BuyBox). Response card kirim `price` = harga efektif + `originalPrice`/`discountPct`/`saleEndAt` saat sale aktif; detail endpoint kirim raw fields (FE hitung via helper). Snapshot harga tersimpan di `OrderItem.price` (kolom existing — bukan `priceAtPurchase`). Catatan: sort "termurah" tetap pakai kolom `price` DB (harga normal) — mismatch kecil selama sale, diterima. Prioritas harga lintas-milestone terdokumentasi di helper.
 - **Scope**: Produk punya harga coret + sale price dengan periode. Card render badge "-XX%", detail render countdown jika sale berakhir < 24 jam.
 - **Schema diff**: `Product.salePrice Int?` `Product.saleStartAt DateTime?` `Product.saleEndAt DateTime?`
 - **API**: helper `getEffectivePrice(product, now)` di shared package, sertakan `originalPrice` + `discountPct` di response.
@@ -359,10 +362,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - [apps/web/src/components/product/BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx) — subtotal pakai effective price + countdown component
   - Seller product form: section "Diskon Periodik"
 - **Acceptance**:
-  - [ ] Badge "-25%" muncul saat `salePrice` aktif & dalam periode
-  - [ ] Setelah `saleEndAt` lewat, fallback ke `price` original tanpa intervensi
-  - [ ] Countdown muncul kalau sisa < 24 jam
-  - [ ] Order yang dibuat selama sale menyimpan harga effective di `OrderItem.priceAtPurchase`
+  - [x] Badge "-25%" muncul saat `salePrice` aktif & dalam periode
+  - [x] Setelah `saleEndAt` lewat, fallback ke `price` original tanpa intervensi
+  - [x] Countdown muncul kalau sisa < 24 jam
+  - [x] Order yang dibuat selama sale menyimpan harga effective di `OrderItem.price` (kolom existing)
 - **Effort**: M
 
 ---
@@ -916,7 +919,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 |---|---|---|---|
 | 🟢 **M7 — Wishlist & Discovery** | Engagement | A1 · A2 · A9 · D2 | **DONE** (PR #16) |
 | 🟢 **M8 — Trust & Communication** | Transparansi | A3 · A6 · C2 · B6 | **DONE** (PR #18, #21, #22, B6) |
-| **M9 — Voucher & Promo Lengkap** | Konversi | A4 · B2 · B3 · C1 | ~2–3 hari |
+| 🟢 **M9 — Voucher & Promo Lengkap** | Konversi | A4 · B2 · B3 · C1 | **DONE** (PR #24–#27) |
 | **M10 — Komplain & QRIS** | Operasional | A7 · **A5 (QRIS)** · A10 | ~3 hari |
 | **M11 — Seller Tools & Variant** | Power-seller | B1 · B4 · A8 | ~4 hari |
 | **M12 — Mobile, SEO, Audit** | Polish | A11 · D3 · D4 · C3 | ~2 hari |

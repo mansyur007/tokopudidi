@@ -1,4 +1,5 @@
 import { prisma } from '@tokopudidi/database';
+import { getEffectivePrice } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
 
 // Cart dijamin ada (auto-create di register). Tapi defensive: upsert kalau belum ada.
@@ -21,6 +22,7 @@ export async function getCartForUser(userId: string) {
           product: {
             select: {
               id: true, name: true, slug: true, price: true, stock: true,
+              salePrice: true, saleStartAt: true, saleEndAt: true,
               isActive: true, weight: true,
               images: { orderBy: { order: 'asc' }, take: 1 },
               shop:   { select: { id: true, name: true, slug: true, isOpen: true } },
@@ -33,9 +35,9 @@ export async function getCartForUser(userId: string) {
   });
   if (!cart) return { items: [], grouped: [] };
 
-  // Effective price (base + variant modifier).
+  // Effective price (base termasuk sale M9-B3 + variant modifier).
   const items = cart.items.map((it) => {
-    const effectivePrice = it.product.price + (it.variant?.priceModifier ?? 0);
+    const effectivePrice = getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0);
     return {
       id: it.id,
       productId: it.productId,

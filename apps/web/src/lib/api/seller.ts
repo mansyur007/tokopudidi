@@ -90,6 +90,9 @@ export interface SellerProductDetail extends SellerProductRow {
   minOrderQty: number;
   condition: 'NEW' | 'USED';
   categoryId: string;
+  salePrice: number | null;
+  saleStartAt: string | null;
+  saleEndAt: string | null;
   variants: { id: string; name: string; priceModifier: number; stock: number }[];
 }
 

@@ -241,6 +241,10 @@ model Product {
   slug         String   @unique
   description  String   @db.Text
   price        Int
+  // Sale price periodik (M9-B3) — aktif kalau salePrice terisi & now di dalam periode.
+  salePrice    Int?
+  saleStartAt  DateTime?
+  saleEndAt    DateTime?
   stock        Int
   minOrderQty  Int      @default(1)
   weight       Int      // gram
