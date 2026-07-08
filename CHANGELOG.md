@@ -3,6 +3,18 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M9-B3: Sale Price (Diskon Produk Periodik)
+
+### Added
+- **Sale Price / Diskon Periodik** (`M9-B3`) — produk punya harga coret + harga diskon dengan periode; menutup **M9** (A4 + B2 + C1 + B3 semua selesai).
+  - Schema: `Product.salePrice Int?` + `saleStartAt`/`saleEndAt DateTime?` (migration `m9_b3_product_sale_price`).
+  - Shared: helper `getEffectivePrice`/`isSaleActive`/`getDiscountPct`/`getSaleRemainingMs` di `utils/price.ts` — prioritas harga lintas-milestone (flash sale > sale price > grosir) terdokumentasi di sini.
+  - API: response card produk (list/related/for-you/wishlist/baru-dilihat via `toProductCard`) kirim `price` **efektif** + `originalPrice`/`discountPct`/`saleEndAt` saat sale aktif; cart & checkout hitung pakai harga efektif → snapshot tersimpan di `OrderItem.price`; validasi seller (`salePrice < price`, periode wajib & konsisten, clear salePrice → clear periode).
+  - FE: badge **-XX%** + harga coret di `ProductCard` & halaman detail; BuyBox pakai harga efektif + **countdown** saat sisa < 24 jam; seller `ProductForm` dapat section "🏷️ Diskon Periodik" (checkbox + harga + periode, preview persen).
+
+### Changed
+- Sort "termurah" tetap berdasarkan harga normal (kolom `price` DB) — mismatch kecil saat produk sedang sale, diterima untuk MVP.
+
 ## [Unreleased] — M9-C1: Voucher Platform Global
 
 ### Added

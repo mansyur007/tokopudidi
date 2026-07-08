@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getProduct, getRelated, listProducts } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
-import { formatRupiah } from '@tokopudidi/shared';
+import { formatRupiah, getEffectivePrice, getDiscountPct } from '@tokopudidi/shared';
 import { ProductGallery } from '@/components/product/ProductGallery';
 import { InfoTabs } from '@/components/product/InfoTabs';
 import { BuyBox } from '@/components/product/BuyBox';
@@ -78,8 +78,20 @@ export default async function ProductDetailPage({ params }: Props) {
             </div>
 
             <div>
-              <div className="text-[28px] font-extrabold tracking-tight text-ink leading-none">
-                {formatRupiah(product.price)}
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <div className="text-[28px] font-extrabold tracking-tight text-ink leading-none">
+                  {formatRupiah(getEffectivePrice(product))}
+                </div>
+                {getDiscountPct(product) != null && (
+                  <>
+                    <span className="text-xs font-bold text-red-600 bg-red-50 rounded px-1.5 py-0.5">
+                      -{getDiscountPct(product)}%
+                    </span>
+                    <span className="text-sm text-ink-muted line-through">
+                      {formatRupiah(product.price)}
+                    </span>
+                  </>
+                )}
               </div>
               {!product.shop.isOpen && (
                 <div className="text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded mt-2 inline-block">

@@ -9,9 +9,32 @@ import { useWishlistStore } from '@/store/wishlist';
 import { trackView } from '@/lib/api/products';
 import type { ProductDetail } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
-import { formatRupiah } from '@tokopudidi/shared';
+import { formatRupiah, getEffectivePrice, getSaleRemainingMs } from '@tokopudidi/shared';
 import { Icon } from '@/components/shell/Icon';
 import { clsx } from 'clsx';
+
+// Countdown "berakhir dalam HH:MM:SS" — hanya render kalau sisa sale < 24 jam (M9-B3).
+function SaleCountdown({ product }: { product: ProductDetail }) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    const tick = () => setRemaining(getSaleRemainingMs(product));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [product]);
+
+  if (remaining == null || remaining <= 0 || remaining >= 24 * 3600 * 1000) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const h = Math.floor(remaining / 3600000);
+  const m = Math.floor((remaining % 3600000) / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+  return (
+    <p className="text-[12px] text-red-600 font-semibold mb-2">
+      ⏰ Diskon berakhir dalam {pad(h)}:{pad(m)}:{pad(s)}
+    </p>
+  );
+}
 
 interface Props { product: ProductDetail }
 
@@ -41,7 +64,8 @@ export function BuyBox({ product }: Props) {
 
   const selectedVariant = product.variants.find((v) => v.id === variantId);
   const stockLeft = selectedVariant?.stock ?? product.stock;
-  const effectivePrice = product.price + (selectedVariant?.priceModifier ?? 0);
+  // Harga efektif termasuk sale periodik (M9-B3) + variant modifier.
+  const effectivePrice = getEffectivePrice(product) + (selectedVariant?.priceModifier ?? 0);
 
   function clamp(n: number) {
     if (n < product.minOrderQty) return product.minOrderQty;
@@ -143,6 +167,7 @@ export function BuyBox({ product }: Props) {
       )}
 
       {/* Subtotal */}
+      <SaleCountdown product={product} />
       <div className="flex justify-between items-baseline mb-3.5">
         <span className="text-[13px] text-ink-muted">Subtotal</span>
         <span className="font-extrabold text-[19px] text-ink">{formatRupiah(effectivePrice * qty)}</span>

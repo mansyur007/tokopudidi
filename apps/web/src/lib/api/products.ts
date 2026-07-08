@@ -4,7 +4,10 @@ export interface ProductCard {
   id: string;
   slug: string;
   name: string;
-  price: number;
+  price: number;                 // harga efektif (sudah termasuk sale M9-B3)
+  originalPrice: number | null;  // harga coret — hanya saat sale aktif
+  discountPct: number | null;    // persen diskon — hanya saat sale aktif
+  saleEndAt: string | null;      // untuk countdown
   imageUrl: string | null;
   ratingAvg: number;
   ratingCount: number;
@@ -12,7 +15,10 @@ export interface ProductCard {
   shop: { id: string; name: string; slug: string; city: string };
 }
 
-export interface ProductDetail extends ProductCard {
+export interface ProductDetail extends Omit<ProductCard, 'originalPrice' | 'discountPct'> {
+  // Detail endpoint kirim raw fields — FE hitung sendiri via helper shared (getEffectivePrice dkk).
+  salePrice: number | null;
+  saleStartAt: string | null;
   description: string;
   stock: number;
   weight: number;

@@ -1,4 +1,5 @@
 import { prisma, Prisma } from '@tokopudidi/database';
+import { getEffectivePrice } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
 import { quoteShipping, isCodAvailable } from '../shipping/shipping.service';
@@ -134,7 +135,8 @@ export async function checkout(userId: string, input: CheckoutInput) {
     let subtotal = 0;
     let weightGr = 0;
     for (const it of items) {
-      const price = it.product.price + (it.variant?.priceModifier ?? 0);
+      // Harga efektif (termasuk sale M9-B3) — tersimpan di OrderItem.price (snapshot saat beli).
+      const price = getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0);
       subtotal += price * it.quantity;
       weightGr += it.product.weight * it.quantity;
     }
@@ -204,9 +206,9 @@ export async function checkout(userId: string, input: CheckoutInput) {
               productName: it.product.name,
               productImage: it.product.images[0]?.url ?? null,
               variantName: it.variant?.name,
-              price: it.product.price + (it.variant?.priceModifier ?? 0),
+              price: getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0),
               quantity: it.quantity,
-              subtotal: (it.product.price + (it.variant?.priceModifier ?? 0)) * it.quantity,
+              subtotal: (getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0)) * it.quantity,
             })),
           },
         },
