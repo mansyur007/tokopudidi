@@ -3,6 +3,14 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M9-C1: Voucher Platform Global
+
+### Added
+- **Voucher Platform** (`M9-C1`) — admin terbitkan voucher platform-wide (`shopId` null → berlaku semua toko, muncul di Voucher Picker semua user).
+  - API: `GET/POST/PUT/DELETE /api/v1/admin/voucher` (guard ADMIN; `?scope=platform|shop|all`; edit/hapus hanya voucher platform — voucher toko milik seller). Reuse `voucherCreateSchema`/`voucherUpdateSchema` dari M9-B2.
+  - FE: halaman `/admin/voucher` — 3 tab scope (Platform CRUD penuh, Voucher Toko read-only utk monitoring, Semua), form modal, pause/resume, badge 🌐/🏪 + item sidebar "Voucher".
+  - Catatan: target scope kategori (`categoryId`, opsional di rencana) deferred.
+
 ## [Unreleased] — M9-B2: Toko Voucher
 
 ### Added

@@ -192,3 +192,44 @@ export const updateCategory = (token: string, id: string, body: Partial<Category
 
 export const deleteCategory = (token: string, id: string) =>
   apiFetch(`/api/v1/admin/categories/${id}`, { method: 'DELETE', token });
+
+// ===== Voucher Platform (M9-C1) =====
+export interface AdminVoucherRow {
+  id: string;
+  code: string;
+  shopId: string | null;
+  shop: { name: string; slug: string } | null;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  minPurchase: number;
+  maxDiscount: number | null;
+  usageLimit: number | null;
+  usedCount: number;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AdminVoucherInput {
+  code: string;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  minPurchase: number;
+  maxDiscount?: number | null;
+  usageLimit?: number | null;
+  validFrom: string;
+  validUntil: string;
+}
+
+export const listAdminVouchers = (token: string, scope: 'platform' | 'shop' | 'all' = 'platform') =>
+  apiFetch<AdminVoucherRow[]>(`/api/v1/admin/voucher?scope=${scope}`, { token });
+
+export const createAdminVoucher = (token: string, body: AdminVoucherInput) =>
+  apiFetch<AdminVoucherRow>('/api/v1/admin/voucher', { method: 'POST', token, body: JSON.stringify(body) });
+
+export const updateAdminVoucher = (token: string, id: string, body: Partial<AdminVoucherInput> & { isActive?: boolean }) =>
+  apiFetch<AdminVoucherRow>(`/api/v1/admin/voucher/${id}`, { method: 'PUT', token, body: JSON.stringify(body) });
+
+export const deleteAdminVoucher = (token: string, id: string) =>
+  apiFetch(`/api/v1/admin/voucher/${id}`, { method: 'DELETE', token });
