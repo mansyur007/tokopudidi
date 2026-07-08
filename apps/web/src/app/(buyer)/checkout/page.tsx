@@ -170,11 +170,14 @@ export default function CheckoutPage() {
   const allPickup = groups.length > 0 && groups.every((g) => perShop[g.shop.id]?.shippingMethod === 'PICKUP_SENDIRI');
   const needsAddress = !allPickup;
 
+  // Voucher toko hanya relevan kalau checkout berisi tepat 1 toko (M9-B2).
+  const singleShopId = groups.length === 1 ? groups[0].shop.id : undefined;
+
   async function applyPromo() {
     if (!tokens?.accessToken || !promoCode.trim()) return;
     setPromoError(null);
     try {
-      const result = await validatePromo(tokens.accessToken, promoCode.trim().toUpperCase(), totalSubtotal);
+      const result = await validatePromo(tokens.accessToken, promoCode.trim().toUpperCase(), totalSubtotal, singleShopId);
       setPromoApplied(result);
     } catch (err) {
       setPromoApplied(null);
@@ -185,7 +188,7 @@ export default function CheckoutPage() {
   // Dipakai VoucherPicker (M9-A4) — validasi server-side lalu apply; throw kalau gagal.
   async function applyVoucherCode(code: string) {
     if (!tokens?.accessToken) return;
-    const result = await validatePromo(tokens.accessToken, code, totalSubtotal);
+    const result = await validatePromo(tokens.accessToken, code, totalSubtotal, singleShopId);
     setPromoApplied(result);
     setPromoError(null);
   }
@@ -376,6 +379,7 @@ export default function CheckoutPage() {
         {pickerOpen && (
           <VoucherPicker
             subtotal={totalSubtotal}
+            shopId={singleShopId}
             currentCode={promoApplied?.code ?? null}
             onApply={applyVoucherCode}
             onClose={() => setPickerOpen(false)}

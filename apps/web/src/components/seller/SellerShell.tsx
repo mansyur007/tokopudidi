@@ -14,6 +14,7 @@ const NAV = [
   { href: '/seller/pesanan',    label: 'Pesanan',       emoji: '🧾' },
   { href: '/seller/chat',       label: 'Chat',          emoji: '💬' },
   { href: '/seller/ulasan',     label: 'Ulasan',        emoji: '⭐' },
+  { href: '/seller/promo',      label: 'Voucher Toko',  emoji: '🎟️' },
   { href: '/seller/pembayaran', label: 'Verifikasi Bayar', emoji: '💰' },
   { href: '/seller/keuangan',   label: 'Keuangan',      emoji: '💵' },
   { href: '/seller/pengaturan', label: 'Pengaturan Toko', emoji: '⚙️' },

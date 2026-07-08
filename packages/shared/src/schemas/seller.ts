@@ -65,6 +65,39 @@ export const withdrawSchema = z.object({
   amount: z.number().int().min(10000, 'Minimal tarik dana Rp 10.000'),
 });
 
+// ===== Voucher (M9-B2 seller / M9-C1 admin) =====
+export const voucherCreateSchema = z.object({
+  code: z.string().trim().toUpperCase()
+    .min(3, 'Kode minimal 3 karakter').max(20)
+    .regex(/^[A-Z0-9]+$/, 'Kode hanya huruf & angka'),
+  discountType: z.enum(['FIXED', 'PERCENTAGE']),
+  discountValue: z.number().int().min(1, 'Nilai diskon minimal 1'),
+  minPurchase: z.number().int().min(0).default(0),
+  maxDiscount: z.number().int().min(1).nullable().optional(),
+  usageLimit: z.number().int().min(1).nullable().optional(),
+  validFrom: z.string().datetime(),
+  validUntil: z.string().datetime(),
+}).refine((v) => new Date(v.validFrom) < new Date(v.validUntil), {
+  message: 'Tanggal berakhir harus setelah tanggal mulai',
+  path: ['validUntil'],
+}).refine((v) => v.discountType !== 'PERCENTAGE' || v.discountValue <= 100, {
+  message: 'Diskon persen maksimal 100%',
+  path: ['discountValue'],
+});
+export type VoucherCreateInput = z.infer<typeof voucherCreateSchema>;
+
+export const voucherUpdateSchema = z.object({
+  discountType: z.enum(['FIXED', 'PERCENTAGE']).optional(),
+  discountValue: z.number().int().min(1).optional(),
+  minPurchase: z.number().int().min(0).optional(),
+  maxDiscount: z.number().int().min(1).nullable().optional(),
+  usageLimit: z.number().int().min(1).nullable().optional(),
+  validFrom: z.string().datetime().optional(),
+  validUntil: z.string().datetime().optional(),
+  isActive: z.boolean().optional(), // pause / resume
+});
+export type VoucherUpdateInput = z.infer<typeof voucherUpdateSchema>;
+
 // ===== Template chat seller (M8-B6) =====
 export const chatTemplateSchema = z.object({
   label: z.string().trim().min(2, 'Label minimal 2 karakter').max(40),

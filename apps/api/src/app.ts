@@ -39,6 +39,7 @@ import { sellerOrderRouter } from './modules/seller/seller.order.routes';
 import { sellerPaymentRouter } from './modules/seller/seller.payment.routes';
 import { sellerProductRouter } from './modules/seller/seller.product.routes';
 import { sellerShopRouter } from './modules/seller/seller.shop.routes';
+import { sellerVoucherRouter } from './modules/seller/seller.voucher.routes';
 import { shippingRouter } from './modules/shipping/shipping.routes';
 import { shopRouter } from './modules/shop/shop.routes';
 import { wishlistRouter } from './modules/wishlist/wishlist.routes';
@@ -96,6 +97,7 @@ export function createApp(): Application {
   app.use('/api/v1/seller/payments', sellerPaymentRouter);
   app.use('/api/v1/seller/finance', sellerFinanceRouter);
   app.use('/api/v1/seller/chat-templates', sellerChatTemplateRouter);
+  app.use('/api/v1/seller/voucher', sellerVoucherRouter);
 
   // Admin panel
   app.use('/api/v1/admin', adminDashboardRouter);          // /dashboard

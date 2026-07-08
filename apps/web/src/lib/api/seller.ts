@@ -253,3 +253,46 @@ export const updateChatTemplate = (token: string, id: string, body: Partial<{ la
 
 export const deleteChatTemplate = (token: string, id: string) =>
   apiFetch(`/api/v1/seller/chat-templates/${id}`, { method: 'DELETE', token });
+
+// ===== Voucher Toko (M9-B2) =====
+export interface SellerVoucherRow {
+  id: string;
+  code: string;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  minPurchase: number;
+  maxDiscount: number | null;
+  usageLimit: number | null;
+  usedCount: number;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface VoucherFormInput {
+  code: string;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  minPurchase: number;
+  maxDiscount?: number | null;
+  usageLimit?: number | null;
+  validFrom: string;
+  validUntil: string;
+}
+
+export const listSellerVouchers = (token: string) =>
+  apiFetch<SellerVoucherRow[]>('/api/v1/seller/voucher', { token });
+
+export const createSellerVoucher = (token: string, body: VoucherFormInput) =>
+  apiFetch<SellerVoucherRow>('/api/v1/seller/voucher', {
+    method: 'POST', token, body: JSON.stringify(body),
+  });
+
+export const updateSellerVoucher = (token: string, id: string, body: Partial<VoucherFormInput> & { isActive?: boolean }) =>
+  apiFetch<SellerVoucherRow>(`/api/v1/seller/voucher/${id}`, {
+    method: 'PUT', token, body: JSON.stringify(body),
+  });
+
+export const deleteSellerVoucher = (token: string, id: string) =>
+  apiFetch(`/api/v1/seller/voucher/${id}`, { method: 'DELETE', token });

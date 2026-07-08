@@ -328,22 +328,23 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **Acceptance**:
   - [x] Voucher eligible di atas, ineligible di bawah dengan alasan
   - [x] Radio select → preview perubahan total
-  - [ ] Voucher dari toko hanya muncul untuk order toko tsb _(menunggu M9-B2 — belum ada voucher toko)_
+  - [x] Voucher dari toko hanya muncul untuk order toko tsb _(terpenuhi oleh M9-B2)_
   - [x] Input manual kode tetap tersedia sebagai fallback
 - **Effort**: S
 
 ---
 
 ### M9-B2. Toko Voucher
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-08): jenis voucher = potongan Rp / diskon % (cashback & gratis ongkir tidak ada di schema `PromoCode` — konsisten M9-A4). **Kuota per user tidak diimplementasikan** — butuh model redemption per-user (belum ada di schema); kuota total (`usageLimit`) jalan. Voucher toko di picker hanya ditawarkan saat checkout berisi 1 toko; input manual tetap divalidasi server-side (`/promo/validate` + checkout service menolak kalau toko tidak cocok). Diskon voucher toko dipotong penuh ke order toko tsb (bukan proporsional lintas toko), basis min. belanja = subtotal toko itu saja.
 - **Scope**: Seller bikin voucher khusus tokonya (diskon%/Rp / cashback / gratis ongkir), set kuota & periode & min belanja.
 - **Schema diff**: tambah `PromoCode.shopId String?` + index `(shopId, isActive)`.
 - **API**: `GET/POST/PUT/DELETE /api/v1/seller/voucher`
 - **UI touch**: Baru `apps/web/src/app/seller/promo/page.tsx` (list + form modal)
 - **Acceptance**:
-  - [ ] Form: kode, diskon (% atau Rp), min belanja, kuota total, kuota per user, mulai-berakhir
-  - [ ] Voucher hanya muncul di Voucher Picker (M9-A4) untuk order toko ini
-  - [ ] Seller bisa pause/resume voucher
+  - [x] Form: kode, diskon (% atau Rp), min belanja, kuota total, mulai-berakhir _(kuota per user: deferred — butuh model redemption)_
+  - [x] Voucher hanya muncul di Voucher Picker (M9-A4) untuk order toko ini
+  - [x] Seller bisa pause/resume voucher
 - **Effort**: S
 
 ---
