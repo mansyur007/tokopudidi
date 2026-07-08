@@ -368,13 +368,14 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M9-C1. Voucher Platform Global
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-08): reuse `voucherCreateSchema`/`voucherUpdateSchema` dari M9-B2. Halaman admin punya 3 tab scope: Platform (CRUD penuh) / Voucher Toko (read-only, monitoring) / Semua. Route admin hanya bisa edit/hapus voucher platform (`shopId: null`) — voucher toko milik seller. **Target scope kategori (`categoryId`) deferred**: butuh kolom + enforcement per-item di checkout & validate; belum sepadan (opsional di rencana).
 - **Scope**: Admin terbit voucher platform-wide (tanpa `shopId` = berlaku semua toko).
 - **API**: `GET/POST/PUT/DELETE /api/v1/admin/voucher` (extend admin layer)
 - **UI**: Baru `apps/web/src/app/admin/voucher/page.tsx`
 - **Acceptance**:
-  - [ ] Voucher tanpa shopId muncul di Voucher Picker untuk semua user
-  - [ ] Bisa target scope kategori (opsional `categoryId`)
+  - [x] Voucher tanpa shopId muncul di Voucher Picker untuk semua user
+  - [ ] Bisa target scope kategori (opsional `categoryId`) — _deferred, lihat deliver notes_
 - **Effort**: S
 
 ---

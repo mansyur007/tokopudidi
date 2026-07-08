@@ -16,6 +16,7 @@ import { adminRefundRouter } from './modules/admin/admin.refund.routes';
 import { adminReportRouter } from './modules/admin/admin.report.routes';
 import { adminShopRouter } from './modules/admin/admin.shop.routes';
 import { adminUserRouter } from './modules/admin/admin.user.routes';
+import { adminVoucherRouter } from './modules/admin/admin.voucher.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { bannerRouter } from './modules/banner/banner.routes';
 import { cartRouter } from './modules/cart/cart.routes';
@@ -106,6 +107,7 @@ export function createApp(): Application {
   app.use('/api/v1/admin/products', adminProductRouter);
   app.use('/api/v1/admin/refunds', adminRefundRouter);
   app.use('/api/v1/admin/reports', adminReportRouter);
+  app.use('/api/v1/admin/voucher', adminVoucherRouter);
   app.use('/api/v1/admin/banners', adminBannerRouter);
   app.use('/api/v1/admin/categories', adminCategoryRouter);
   app.use('/api/v1/admin/scrape', scraperRouter);
