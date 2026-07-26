@@ -15,6 +15,12 @@ coverage
 prisma/migrations/dev.db*
 uploads/
 
+# Hasil run Playwright (JUnit XML, trace, screenshot) — diunggah ke TestForge,
+# tidak perlu ikut ter-commit.
+e2e-results/
+playwright-report/
+test-results/
+
 # Cloudflare tunnel runtime artifacts (scripts/tunnel.sh)
 tunnel-urls.json
 tunnel.out
