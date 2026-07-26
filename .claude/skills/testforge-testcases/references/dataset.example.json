@@ -1,0 +1,57 @@
+{
+  "suites": [
+    { "path": "Autentikasi & Akun" },
+    { "path": "Autentikasi & Akun/Login" },
+    { "path": "Autentikasi & Akun/Registrasi" }
+  ],
+  "cases": [
+    {
+      "suite": "Autentikasi & Akun/Login",
+      "title": "Login sukses dengan nomor HP terdaftar + password benar",
+      "priority": "HIGH",
+      "type": "FUNCTIONAL",
+      "tags": ["auth", "login", "happy-path"],
+      "preconditions": "User terdaftar dengan phone +6281234567890, password Test1234!",
+      "steps": [
+        { "action": "POST /auth/login dengan {phone: \"+6281234567890\", password: \"Test1234!\"}", "expected": "200 OK, response berisi JWT token" }
+      ],
+      "expectedResult": "Login berhasil, session tersimpan, redirect ke halaman utama"
+    },
+    {
+      "suite": "Autentikasi & Akun/Login",
+      "title": "Login gagal dengan password salah",
+      "priority": "MEDIUM",
+      "type": "FUNCTIONAL",
+      "tags": ["auth", "login", "negative"],
+      "preconditions": "User terdaftar dengan phone +6281234567890",
+      "steps": [
+        { "action": "POST /auth/login dengan password salah", "expected": "401 Unauthorized, tidak ada token diterbitkan" }
+      ],
+      "expectedResult": "Login ditolak dengan pesan error yang jelas, tidak membocorkan apakah nomor HP terdaftar"
+    },
+    {
+      "suite": "Autentikasi & Akun/Login",
+      "title": "Login diblokir setelah 5x percobaan gagal berturut-turut (brute force)",
+      "priority": "CRITICAL",
+      "type": "SECURITY",
+      "tags": ["auth", "login", "security", "rate-limit"],
+      "preconditions": "User terdaftar dengan phone +6281234567890",
+      "steps": [
+        { "action": "POST /auth/login 5x berturut-turut dengan password salah", "expected": "Percobaan ke-6 dikembalikan 429 walaupun password benar" }
+      ],
+      "expectedResult": "Akun terkunci sementara / rate-limited, mencegah brute force"
+    },
+    {
+      "suite": "Autentikasi & Akun/Registrasi",
+      "title": "Registrasi gagal jika nomor HP sudah terdaftar",
+      "priority": "MEDIUM",
+      "type": "FUNCTIONAL",
+      "tags": ["auth", "register", "negative"],
+      "preconditions": "Nomor +6281234567890 sudah terdaftar",
+      "steps": [
+        { "action": "POST /auth/register dengan phone yang sudah dipakai", "expected": "422 Unprocessable Entity, field error pada phone" }
+      ],
+      "expectedResult": "Registrasi ditolak, pesan error spesifik ke field phone"
+    }
+  ]
+}
