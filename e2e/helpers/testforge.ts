@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { APIRequestContext } from '@playwright/test';
 
 // ── Penamaan test → test case TestForge ──────────────────────────────────────
@@ -28,6 +29,30 @@ export const SEED = {
 } as const;
 
 export type Creds = { phone: string; password: string };
+export type Role = keyof typeof SEED;
+
+/**
+ * Token hasil login di global-setup. Ditulis ke folder hasil (gitignored)
+ * karena isinya JWT sungguhan.
+ */
+export const TOKEN_CACHE = 'e2e-results/tokens.json';
+
+/**
+ * Ambil access token yang sudah di-login sekali di global-setup.
+ * JANGAN login ulang per test — `loginLimiter` di API hanya mengizinkan
+ * 5 percobaan per menit per IP dan suite ini akan menembusnya.
+ */
+export function tokenFor(role: Role): string {
+  let cache: Partial<Record<Role, string>>;
+  try {
+    cache = JSON.parse(readFileSync(TOKEN_CACHE, 'utf8'));
+  } catch {
+    throw new Error(`Cache token tidak terbaca (${TOKEN_CACHE}) — global-setup gagal jalan?`);
+  }
+  const token = cache[role];
+  if (!token) throw new Error(`Token untuk peran "${role}" tidak ada di cache.`);
+  return token;
+}
 
 /** Login lewat API, kembalikan access token. Melempar kalau gagal. */
 export async function login(request: APIRequestContext, creds: Creds): Promise<string> {

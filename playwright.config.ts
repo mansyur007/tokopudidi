@@ -10,6 +10,8 @@ const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './e2e',
+  // Login sekali untuk semua spec — API membatasi 5 login/menit/IP.
+  globalSetup: './e2e/global-setup.ts',
   outputDir: './e2e-results/artifacts',
   timeout: 30_000,
   expect: { timeout: 10_000 },

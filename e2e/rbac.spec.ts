@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { tc, V1, SEED, login, auth } from './helpers/testforge';
+import { tc, V1, auth, tokenFor } from './helpers/testforge';
 
 test(tc('124', 'RBAC lintas peran ditegakkan'), async ({ request }) => {
-  const buyer = await login(request, SEED.buyer);
-  const seller = await login(request, SEED.seller);
+  const buyer = tokenFor('buyer');
+  const seller = tokenFor('seller');
 
   // 1. Endpoint /seller/* sebagai BUYER -> 403 (requireShopOwner menolak
   //    role selain SELLER/ADMIN sebelum menyentuh data toko).

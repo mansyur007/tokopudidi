@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
-import { tc, V1, SEED, login, auth, pickBuyableProduct } from './helpers/testforge';
+import { tc, V1, auth, tokenFor, pickBuyableProduct } from './helpers/testforge';
 
+// Token dari global-setup — tidak login ulang di sini (lihat tokenFor()).
+// Dibaca di beforeAll, bukan di level modul: saat `playwright test --list`
+// global-setup tidak dijalankan sehingga cache-nya belum ada.
 let token: string;
 
-test.beforeAll(async ({ playwright }) => {
-  const ctx = await playwright.request.newContext();
-  token = await login(ctx, SEED.buyer);
-  await ctx.dispose();
+test.beforeAll(() => {
+  token = tokenFor('buyer');
 });
 
 /** Kosongkan keranjang supaya tiap test mulai dari kondisi yang diketahui. */

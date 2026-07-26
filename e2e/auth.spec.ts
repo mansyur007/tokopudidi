@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { tc, V1, SEED, randomPhone } from './helpers/testforge';
+import { tc, V1, SEED, auth, tokenFor, randomPhone } from './helpers/testforge';
 
 // Dua case ini berbasis UI karena case manualnya memang menyebut halaman
 // /masuk dan /daftar beserta field-nya.
@@ -63,11 +63,8 @@ test(tc('026', 'Registrasi akun baru berhasil'), async ({ page }) => {
 
 test(tc('114', 'Endpoint admin menolak non-admin'), async ({ request }) => {
   // 1. Akses /admin/* sebagai non-admin (buyer) -> 403.
-  const loginRes = await request.post(`${V1}/auth/login`, { data: SEED.buyer });
-  const token = (await loginRes.json()).data.tokens.accessToken;
-
   const asBuyer = await request.get(`${V1}/admin/dashboard`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: auth(tokenFor('buyer')),
   });
   expect(asBuyer.status()).toBe(403);
 

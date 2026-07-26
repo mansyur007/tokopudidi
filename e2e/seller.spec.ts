@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { tc, V1, SEED, login, auth } from './helpers/testforge';
+import { tc, V1, auth, tokenFor } from './helpers/testforge';
 
 test(tc('097', 'Seller membuat produk baru'), async ({ request }) => {
-  const token = await login(request, SEED.seller);
+  const token = tokenFor('seller');
 
   const catRes = await request.get(`${V1}/categories`);
   const categories = (await catRes.json()).data;
