@@ -27,7 +27,7 @@ const SHIPPING_LABELS: Record<ShippingMethod, string> = {
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   COD: 'Bayar di Tempat (COD)',
   TRANSFER_MANUAL: 'Transfer Bank (BCA / BRI / Mandiri / BNI)',
-  QRIS_MOCK: 'QRIS (otomatis lunas dalam 30 detik)',
+  QRIS_MOCK: 'QRIS (scan & bayar dalam 15 menit)',
 };
 
 interface PerShopState {
