@@ -110,6 +110,7 @@ model User {
   discussions   Discussion[]
   discussionHelpfuls DiscussionHelpful[]
   reports       Report[]
+  complaints    Complaint[]
 
   @@index([phone])
   @@index([referralCode])
@@ -360,6 +361,7 @@ model Order {
   items         OrderItem[]
   paymentProof  PaymentProof?
   refundRequest RefundRequest?
+  complaints    Complaint[]
 
   @@index([buyerId])
   @@index([shopId])
@@ -382,6 +384,7 @@ model OrderItem {
   subtotal     Int
 
   review Review?
+  complaint Complaint?
 
   @@index([orderId])
 }
@@ -532,6 +535,57 @@ model RefundRequest {
   resolvedAt     DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+// ============= KOMPLAIN / RETURN (M10-A7) =============
+
+enum ComplaintType {
+  BROKEN
+  NOT_AS_DESCRIBED
+  MISSING_ITEM
+  OTHER
+}
+
+enum ComplaintResolution {
+  REFUND
+  REPLACEMENT
+}
+
+enum ComplaintStatus {
+  OPEN
+  SELLER_RESPONDED // seller menolak — bola di buyer untuk escalate
+  ESCALATED
+  RESOLVED
+  REJECTED
+}
+
+// Komplain per item pesanan, diajukan dalam 2 hari sejak barang diterima.
+// Berbeda dari RefundRequest (per order, langsung ke admin): komplain lewat
+// seller dulu, dan bisa berujung penggantian barang, bukan hanya uang kembali.
+model Complaint {
+  id             String    @id @default(uuid())
+  orderId        String
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Satu item hanya bisa dikomplain sekali — kelanjutannya lewat escalate.
+  orderItemId    String    @unique
+  orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  buyerId        String
+  buyer          User      @relation(fields: [buyerId], references: [id])
+  type           ComplaintType
+  description    String
+  evidenceUrls   String[]
+  resolutionType ComplaintResolution
+  status         ComplaintStatus @default(OPEN)
+  sellerResponse String?
+  adminDecision  String?
+  createdAt      DateTime  @default(now())
+  respondedAt    DateTime?
+  escalatedAt    DateTime?
+  resolvedAt     DateTime?
+
+  @@index([buyerId, status])
+  @@index([status, createdAt])
+  @@index([orderId])
 }
 
 // ============= WISHLIST =============

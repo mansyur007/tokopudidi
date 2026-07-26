@@ -3,7 +3,9 @@
 > **Status dokumen**: Draft 2 · Terakhir di-update: **2026-07-05**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
 >
-> **Progress terbaru (2026-07-08)** — **M9 selesai & merged ke `main`**: A4 Voucher Picker ([PR #24](https://github.com/mansyur007/tokopudidi/pull/24)), B2 Toko Voucher ([PR #25](https://github.com/mansyur007/tokopudidi/pull/25)), C1 Voucher Platform ([PR #26](https://github.com/mansyur007/tokopudidi/pull/26)), B3 Sale Price ([PR #27](https://github.com/mansyur007/tokopudidi/pull/27)). Milestone berikutnya yang bebas di-klaim: **M10**.
+> **Progress terbaru (2026-07-27)** — **M10 selesai (menunggu review)**: A5 QRIS Mock UX ([PR #30](https://github.com/mansyur007/tokopudidi/pull/30)), A10 Filter Search Lengkap ([PR #31](https://github.com/mansyur007/tokopudidi/pull/31)), A7 Komplain/Return. Ketiganya butuh migration, jadi jalankan `prisma migrate deploy` saat merge. Milestone berikutnya yang bebas di-klaim: **M11**.
+>
+> **Progress (2026-07-08)** — **M9 selesai & merged ke `main`**: A4 Voucher Picker ([PR #24](https://github.com/mansyur007/tokopudidi/pull/24)), B2 Toko Voucher ([PR #25](https://github.com/mansyur007/tokopudidi/pull/25)), C1 Voucher Platform ([PR #26](https://github.com/mansyur007/tokopudidi/pull/26)), B3 Sale Price ([PR #27](https://github.com/mansyur007/tokopudidi/pull/27)). Milestone berikutnya yang bebas di-klaim: **M10**.
 >
 > **Progress (2026-07-07)** — **M8 selesai & merged ke `main`**: A3 Diskusi Produk ([PR #18](https://github.com/mansyur007/tokopudidi/pull/18)), A6 Order Tracking + AWB ([PR #21](https://github.com/mansyur007/tokopudidi/pull/21)), C2 Report/Pelaporan ([PR #22](https://github.com/mansyur007/tokopudidi/pull/22)), B6 Template Reply Chat ([PR #23](https://github.com/mansyur007/tokopudidi/pull/23)).
 >
@@ -405,7 +407,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M10-A7. Komplain / Return Beyond Refund
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-27): id pakai `uuid()` mengikuti model lain (rencana menulis `cuid()`). Ditambahkan `@@unique([orderItemId])` — satu item hanya bisa dikomplain sekali, kelanjutannya lewat escalate; plus timestamp `respondedAt`/`escalatedAt` supaya alurnya bisa diaudit. **Tambahan di luar rencana**: buyer boleh escalate juga kalau seller **diam** lebih dari 2 hari (`COMPLAINT_SELLER_RESPONSE_DAYS`) — tanpa ini komplain menggantung selamanya di status OPEN kalau seller tidak menanggapi. Sisi uang: logika settlement refund (kembalikan stok, tarik saldo seller, set order REFUNDED) diekstrak dari `admin.refund.routes` jadi helper bersama `settleOrderRefund`, lalu dipakai saat komplain berakhir REFUND (seller terima maupun admin menangkan buyer) — jadi aturan saldo hanya hidup di satu tempat. Resolusi REPLACEMENT sengaja tidak menyentuh uang: hanya mencatat keputusan + notifikasi, pengiriman barang pengganti di luar sistem. Endpoint list buyer di `GET /api/v1/complaints` (bukan `/api/v1/me/complaints`) mengikuti pola router aplikasi. Respons seller & keputusan admin pakai `prompt()` — konsisten dengan aksi order existing, bukan form modal.
 - **Scope**: Setelah barang diterima (DELIVERED), buyer punya 2 hari ajukan komplain dengan bukti foto/video, opsi return-refund atau return-replacement. Flow buyer → seller respon → escalate ke admin.
 - **Schema**:
   ```
@@ -434,17 +437,17 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **API**:
   - `POST /api/v1/orders/:id/complaints`
   - `POST /api/v1/complaints/:id/seller-respond` body `{ accept: boolean, message }`
-  - `POST /api/v1/complaints/:id/escalate` (buyer setelah seller reject)
+  - `POST /api/v1/complaints/:id/escalate` (buyer setelah seller reject / seller diam > 2 hari)
   - `POST /api/v1/admin/complaints/:id/decide` body `{ outcome: "RESOLVED"|"REJECTED", note }`
-  - `GET /api/v1/me/complaints`, `/api/v1/seller/complaints`, `/api/v1/admin/complaints`
+  - `GET /api/v1/complaints` _(deliver: bukan `/api/v1/me/complaints`)_, `/api/v1/seller/complaints`, `/api/v1/admin/complaints`
 - **UI**:
   - Tombol "Komplain" di buyer order detail (hanya muncul jika DELIVERED + dalam window)
-  - Halaman buyer/seller/admin queue + detail
+  - Halaman buyer `/komplain`, seller `/seller/komplain`, admin `/admin/komplain` — kartu bersama `ComplaintCard`, form `ComplaintModal`
 - **Acceptance**:
-  - [ ] Tombol "Komplain" hilang setelah window 2 hari lewat
-  - [ ] Seller bisa accept (langsung set RESOLVED + trigger refund/replacement flow) atau reject
-  - [ ] Setelah reject, buyer punya tombol "Naikkan ke Admin"
-  - [ ] Admin keputusan final, tidak bisa di-escalate lagi
+  - [x] Tombol "Komplain" hilang setelah window 2 hari lewat
+  - [x] Seller bisa accept (langsung set RESOLVED + refund diproses kalau resolusinya REFUND) atau reject
+  - [x] Setelah reject, buyer punya tombol "Naikkan ke Admin"
+  - [x] Admin keputusan final, tidak bisa di-escalate lagi
 - **Effort**: L
 
 ---
@@ -920,7 +923,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 | 🟢 **M7 — Wishlist & Discovery** | Engagement | A1 · A2 · A9 · D2 | **DONE** (PR #16) |
 | 🟢 **M8 — Trust & Communication** | Transparansi | A3 · A6 · C2 · B6 | **DONE** (PR #18, #21, #22, B6) |
 | 🟢 **M9 — Voucher & Promo Lengkap** | Konversi | A4 · B2 · B3 · C1 | **DONE** (PR #24–#27) |
-| **M10 — Komplain & QRIS** | Operasional | A7 · **A5 (QRIS)** · A10 | ~3 hari |
+| 🟢 **M10 — Komplain & QRIS** | Operasional | A7 · **A5 (QRIS)** · A10 | **DONE** (PR #30, #31, A7) |
 | **M11 — Seller Tools & Variant** | Power-seller | B1 · B4 · A8 | ~4 hari |
 | **M12 — Mobile, SEO, Audit** | Polish | A11 · D3 · D4 · C3 | ~2 hari |
 | **M13 — Loyalitas & Toko** | Retensi | A1 · A2 · B1 · B2 | ~3 hari |

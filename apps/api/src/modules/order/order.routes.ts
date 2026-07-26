@@ -4,7 +4,9 @@ import {
   cancelOrderSchema,
   uploadProofSchema,
   requestRefundSchema,
+  createComplaintSchema,
 } from '@tokopudidi/shared';
+import { createComplaint } from '../complaint/complaint.service';
 import { ok, created } from '../../lib/response';
 import { requireAuth } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
@@ -100,6 +102,14 @@ orderRouter.post('/:id/complete', async (req, res, next) => {
   try {
     const order = await completeOrder(req.user!.sub, req.params.id);
     return ok(res, order, 'Pesanan diselesaikan, terima kasih ya!');
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/orders/:id/complaints — buyer ajukan komplain per item (M10-A7).
+orderRouter.post('/:id/complaints', validateBody(createComplaintSchema), async (req, res, next) => {
+  try {
+    const complaint = await createComplaint(req.user!.sub, req.params.id, req.body);
+    return created(res, complaint, 'Komplain terkirim. Penjual akan menanggapi.');
   } catch (err) { next(err); }
 });
 

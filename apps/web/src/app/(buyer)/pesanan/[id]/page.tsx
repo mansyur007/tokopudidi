@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { formatRupiah, formatTanggal, formatTanggalWaktu } from '@tokopudidi/shared';
+import { formatRupiah, formatTanggal, formatTanggalWaktu, isComplaintWindowOpen } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
   getOrder,
@@ -15,6 +15,7 @@ import {
   type OrderDetail,
 } from '@/lib/api/orders';
 import { ApiClientError } from '@/lib/api/client';
+import { ComplaintModal } from '@/components/complaint/ComplaintModal';
 import { STATUS_LABEL, STATUS_COLOR } from '@/lib/orderStatus';
 import { getCourierTrackUrl } from '@/lib/couriers';
 
@@ -27,6 +28,7 @@ export default function OrderDetailPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [complaintOpen, setComplaintOpen] = useState(false);
 
   useEffect(() => {
     if (!user) { router.push('/masuk'); return; }
@@ -109,6 +111,10 @@ export default function OrderDetailPage() {
   if (!user) return null;
   if (loading) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat pesanan...</div>;
   if (!order) return <div className="px-4 py-8 text-center">Pesanan tidak ditemukan.</div>;
+
+  // Jendela komplain: 2 hari sejak barang diterima (M10-A7).
+  const bisaKomplain =
+    ['DELIVERED', 'COMPLETED'].includes(order.status) && isComplaintWindowOpen(order.deliveredAt);
 
   const addr = order.buyerAddress as null | {
     label: string; recipientName: string; recipientPhone: string;
@@ -325,10 +331,30 @@ export default function OrderDetailPage() {
             ↩️ Ajukan Refund
           </button>
         )}
+        {/* Komplain hanya dalam 2 hari sejak barang diterima (M10-A7). */}
+        {bisaKomplain && (
+          <button onClick={() => setComplaintOpen(true)} disabled={busy} className="btn-outline text-red-600">
+            📦 Komplain Barang
+          </button>
+        )}
         <Link href={`/chat?shop=${order.shop.slug}`} className="btn-outline">
           💬 Chat Penjual
         </Link>
       </section>
+
+      {complaintOpen && (
+        <ComplaintModal
+          orderId={order.id}
+          items={order.items.map((it) => ({
+            id: it.id,
+            productName: it.productName,
+            quantity: it.quantity,
+            price: it.price,
+          }))}
+          onClose={() => setComplaintOpen(false)}
+          onSubmitted={load}
+        />
+      )}
     </div>
   );
 }

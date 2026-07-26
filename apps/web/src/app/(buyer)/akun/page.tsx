@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth';
 const MENU = [
   { href: '/akun/alamat',     label: 'Alamat Saya',      emoji: '📍' },
   { href: '/pesanan',         label: 'Riwayat Pesanan',  emoji: '📦' },
+  { href: '/komplain',        label: 'Komplain Saya',    emoji: '🛠️' },
   { href: '/chat',            label: 'Chat',             emoji: '💬' },
   { href: '/wishlist',        label: 'Wishlist',         emoji: '❤️' },
   { href: '/baru-dilihat',    label: 'Baru Dilihat',     emoji: '👀' },
