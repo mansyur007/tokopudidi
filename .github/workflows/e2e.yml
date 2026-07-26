@@ -1,0 +1,112 @@
+name: E2E → TestForge
+
+# Jalankan suite E2E lalu kirim laporan JUnit ke TestForge sebagai Test Run.
+# Tiap test bernama `TC-TKPDD-<n>` otomatis ter-map ke test case manual di
+# https://testforge.emha.space/projects/tkpdd
+#
+# Butuh repo secret TF_API_KEY:
+#   gh secret set TF_API_KEY --repo mansyur007/tokopudidi
+# Tanpa secret, test tetap jalan — hanya langkah unggahnya yang dilewati.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *' # tiap hari 04:00 UTC (11:00 WIB) — deteksi regresi diam
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      TF_PROJECT: tkpdd
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tokopudidi_test
+      JWT_ACCESS_SECRET: e2e-access-secret-not-for-production
+      JWT_REFRESH_SECRET: e2e-refresh-secret-not-for-production
+      OTP_MOCK: 'true'
+      WEB_ORIGIN: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      E2E_API_URL: http://localhost:4000
+      E2E_WEB_URL: http://localhost:3000
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tokopudidi_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Siapkan database
+        run: |
+          npm run db:generate
+          npm run prisma:deploy -w @tokopudidi/database
+          npm run db:seed
+
+      - name: Build (api + web butuh build sebelum start)
+        run: npm run build
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Jalankan app di latar belakang
+        run: |
+          npm run start -w @tokopudidi/api &
+          npm run start -w @tokopudidi/web &
+          npx wait-on http://localhost:4000/api/health http://localhost:3000 --timeout 120000
+
+      - name: Jalankan suite E2E
+        run: npm run e2e
+
+      - name: Kirim laporan ke TestForge
+        # always(): suite yang gagal justru run yang paling perlu tercatat.
+        # continue-on-error: gerbang CI adalah test-nya; TestForge down tidak
+        # boleh memerahkan PR yang sebenarnya hijau.
+        if: always()
+        continue-on-error: true
+        env:
+          TF_API_URL: https://testforge.emha.space
+          TF_API_KEY: ${{ secrets.TF_API_KEY }}
+        run: |
+          if [ -z "$TF_API_KEY" ]; then
+            echo "TF_API_KEY tidak diset (wajar untuk PR dari fork) — unggah dilewati."
+            exit 0
+          fi
+          npm run e2e:upload
+
+      - name: Simpan artefak Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: e2e-results/
+          retention-days: 7
