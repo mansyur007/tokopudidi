@@ -24,6 +24,8 @@ export interface ProductDetail extends Omit<ProductCard, 'originalPrice' | 'disc
   weight: number;
   minOrderQty: number;
   condition: 'NEW' | 'USED';
+  codAvailable: boolean;
+  freeShippingEligible: boolean;
   viewCount: number;
   images: { id: string; url: string; order: number }[];
   variants: { id: string; name: string; priceModifier: number; stock: number }[];
@@ -51,14 +53,24 @@ export type ProductListParams = Partial<{
   categorySlug: string;
   shopId: string;
   province: string;
+  /** Kota, comma-separated. Semantik OR antar kota. */
+  cities: string;
   minPrice: number;
   maxPrice: number;
   minRating: number;
   condition: 'NEW' | 'USED';
+  officialStoreOnly: boolean;
+  freeShipping: boolean;
+  cod: boolean;
   sort: 'relevance' | 'bestseller' | 'cheapest' | 'expensive' | 'newest' | 'rating';
   page: number;
   limit: number;
 }>;
+
+export interface CityOption {
+  city: string;
+  count: number;
+}
 
 function toQuery(p: ProductListParams): string {
   const sp = new URLSearchParams();
@@ -71,6 +83,11 @@ function toQuery(p: ProductListParams): string {
 
 export function listProducts(params: ProductListParams = {}): Promise<ProductListResult> {
   return apiFetch<ProductListResult>(`/api/v1/products${toQuery(params)}`);
+}
+
+/** Opsi filter lokasi — kota yang punya produk aktif + jumlahnya. */
+export function listProductCities(): Promise<CityOption[]> {
+  return apiFetch<CityOption[]>('/api/v1/products/cities');
 }
 
 export function getProduct(slug: string): Promise<ProductDetail> {

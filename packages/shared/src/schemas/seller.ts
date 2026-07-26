@@ -43,6 +43,9 @@ const productBaseSchema = z.object({
   minOrderQty: z.number().int().min(1).default(1),
   weight: z.number().int().min(1, 'Berat minimal 1 gram'),
   condition: z.enum(['NEW', 'USED']).default('NEW'),
+  // Opsi pengiriman (M10-A10) — jadi filter di pencarian & ditegakkan saat checkout.
+  codAvailable: z.boolean().default(true),
+  freeShippingEligible: z.boolean().default(false),
   isActive: z.boolean().default(true),
   imageUrls: z.array(z.string().min(5)).min(1, 'Minimal 1 foto produk').max(5, 'Maksimal 5 foto'),
   variants: z.array(variantInput).max(20).optional(),

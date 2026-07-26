@@ -89,6 +89,8 @@ export interface SellerProductDetail extends SellerProductRow {
   weight: number;
   minOrderQty: number;
   condition: 'NEW' | 'USED';
+  codAvailable: boolean;
+  freeShippingEligible: boolean;
   categoryId: string;
   salePrice: number | null;
   saleStartAt: string | null;

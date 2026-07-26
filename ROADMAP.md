@@ -450,16 +450,17 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M10-A10. Filter Search Lengkap
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Hasil audit** (2026-07-26): API `listProducts` sudah punya `q`, `categoryId/Slug`, `shopId`, `province`, `minPrice`, `maxPrice`, `minRating`, `condition`, `sort`. Yang belum ada: **sidebar filter sama sekali** (halaman `/cari` hanya punya SortBar dengan 2 dropdown), plus param `cities`, `officialStoreOnly`, `freeShipping`, `cod`.
+- **Deliver notes** (2026-07-26): nama param mengikuti yang sudah dipakai kode (`minPrice`/`maxPrice`/`minRating`), bukan `priceMin`/`ratingMin` seperti tertulis di rencana. `cod` & `freeShipping` **tidak berhenti di flag pencarian** — keduanya ditegakkan di checkout supaya filternya tidak jadi janji kosong: COD ditolak kalau ada item `codAvailable=false` (server + radio COD ter-disable di FE), ongkir jadi 0 hanya kalau **seluruh** item satu toko bebas ongkir. `Product.codAvailable` default **true** (bukan false seperti rencana) supaya produk lama tidak mendadak kehilangan opsi COD. `Shop.isOfficialStore` ikut ditambahkan di sini beserta toggle admin (`POST /admin/shops/:id/official-store`) — badge & helper `getShopBadge` tetap milik M14-B1; catatan: halaman produk saat ini masih menampilkan label "Official Store" dari `ktpVerified`, perlu dirapikan di M14-B1. "Count match per filter" dibatasi ke jumlah produk per kota (grup Lokasi) + total hasil di header sidebar — faceting penuh per filter tidak sepadan untuk sekarang. Filter rating & kondisi dipindah dari SortBar ke sidebar supaya tidak ada dua UI yang bersaing.
 - **Scope**: Lengkapi sidebar filter di `/cari` dengan harga range, kondisi, rating min, lokasi, Official Store, bebas ongkir.
-- **Audit dulu**: [apps/web/src/app/(buyer)/cari/page.tsx](apps/web/src/app/(buyer)/cari/page.tsx) — list filter existing vs gap.
-- **Schema diff**: tambah `Product.codAvailable Boolean @default(false)`, `Product.freeShippingEligible Boolean @default(false)` (atau derive dari relasi promo).
-- **API**: extend `listProducts` query params: `priceMin`, `priceMax`, `ratingMin`, `cities[]` (comma-separated), `condition`, `officialStoreOnly`, `freeShipping`, `cod`.
-- **UI**: sidebar collapsible groups, count match per filter, "Reset Filter" button.
+- **Schema diff**: `Product.codAvailable Boolean @default(true)`, `Product.freeShippingEligible Boolean @default(false)`, `Shop.isOfficialStore Boolean @default(false)` (migration `m10_a10_search_filters`).
+- **API**: extend `listProducts` query params: `minPrice`, `maxPrice`, `minRating`, `cities` (comma-separated), `condition`, `officialStoreOnly`, `freeShipping`, `cod`. Baru: `GET /api/v1/products/cities` (opsi lokasi + jumlah produk), `POST /api/v1/admin/shops/:id/official-store`.
+- **UI**: sidebar collapsible groups, count per kota, "Reset Filter" button. Baru: `apps/web/src/app/(buyer)/cari/FilterSidebar.tsx`. Seller product form dapat section "Opsi Pengiriman".
 - **Acceptance**:
-  - [ ] Filter rating min 4★ → produk dengan ratingAvg ≥ 4
-  - [ ] Multi-city filter dengan OR semantics
-  - [ ] URL sync (shareable filter state)
+  - [x] Filter rating min 4★ → produk dengan ratingAvg ≥ 4
+  - [x] Multi-city filter dengan OR semantics
+  - [x] URL sync (shareable filter state)
 - **Effort**: M
 
 ---

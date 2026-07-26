@@ -3,6 +3,19 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M10-A10: Filter Search Lengkap
+
+### Added
+- **Sidebar filter di `/cari`** (`M10-A10`) — grup collapsible: harga (range + tombol terapkan), kondisi, rating minimum, lokasi (multi-kota + jumlah produk per kota), dan Official Store / Bebas Ongkir / Bisa COD. Seluruh state tersimpan di URL, jadi hasil filter bisa dibagikan; tombol "Reset Filter" muncul saat ada filter aktif.
+  - Schema: `Product.codAvailable` (default **true**, supaya produk lama tidak kehilangan COD), `Product.freeShippingEligible`, `Shop.isOfficialStore` (migration `m10_a10_search_filters`).
+  - API: `listProducts` menerima `cities` (comma-separated, semantik OR), `officialStoreOnly`, `freeShipping`, `cod`. Baru: `GET /api/v1/products/cities` untuk mengisi grup Lokasi, `POST /api/v1/admin/shops/:id/official-store` untuk toggle admin.
+  - Seller: section "Opsi Pengiriman" di form produk (COD & bebas ongkir), ikut tersalin saat duplikasi produk.
+  - Test: `apps/api/src/modules/product/product.test.ts` — parsing `cities`, filter boolean, rentang & default.
+
+### Changed
+- Filter rating & kondisi pindah dari SortBar ke sidebar — SortBar sekarang khusus sortir.
+- Checkout menegakkan kedua flag baru, bukan sekadar menyaring pencarian: COD ditolak kalau ada item dengan `codAvailable=false` (radio COD juga ter-disable di FE dengan alasan yang jelas), dan ongkir jadi 0 hanya kalau seluruh item satu toko bebas ongkir.
+
 ## [Unreleased] — M9-B3: Sale Price (Diskon Produk Periodik)
 
 ### Added

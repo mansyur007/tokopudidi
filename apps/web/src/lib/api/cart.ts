@@ -15,6 +15,8 @@ export interface CartItem {
     stock: number;
     isActive: boolean;
     weight: number;
+    codAvailable: boolean;
+    freeShippingEligible: boolean;
   };
   variant: { id: string; name: string; stock: number } | null;
   shop: { id: string; name: string; slug: string; isOpen: boolean };
