@@ -214,8 +214,11 @@ export default function CheckoutPage() {
       await refresh();
 
       // Kalau hanya 1 order → langsung ke detail. Kalau lebih → list pesanan.
+      // Khusus QRIS: hitung mundur 15 menit sudah jalan sejak order dibuat, jadi
+      // antar buyer langsung ke halaman bayar.
       if (result.orders.length === 1) {
-        router.push(`/pesanan/${result.orders[0].id}`);
+        const orderId = result.orders[0].id;
+        router.push(paymentMethod === 'QRIS_MOCK' ? `/pesanan/${orderId}/bayar` : `/pesanan/${orderId}`);
       } else {
         router.push('/pesanan');
       }

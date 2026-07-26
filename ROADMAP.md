@@ -384,22 +384,23 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M10-A5. QRIS Mock — UX lengkap (QR render + countdown + expiry)
-- **Status**: 🔵 TODO (scope dipersempit 2026-07-03 — metode bayar sudah ada)
-- **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-26): rencana awal menulis "tidak ada migration" — **keliru**: status `EXPIRED` belum ada di enum `OrderStatus`, jadi tetap butuh migration aditif (`m10_a5_order_status_expired`). `EXPIRED` dipilih daripada memakai ulang `CANCELLED` supaya kedaluwarsa otomatis bisa dibedakan dari pembatalan oleh orang. Batas waktu **derived** (`createdAt + 15 menit`, konstanta `QRIS_EXPIRY_MINUTES`) — tidak ada kolom `expiresAt` baru. Expiry pakai **lazy-check** (bukan cron): dicek saat buka detail pesanan, saat ambil `/qris`, saat simulate-paid, plus sapuan kecil per-buyer saat buka daftar pesanan; stok dikembalikan lewat helper `restoreStock` yang kini dipakai bersama `cancelOrder`. QR di-render server-side jadi PNG data URI (`qrcode` npm) — FE cukup `<img>`, tidak ada library QR di bundle client. `POST /orders/:id/pay` dipertahankan sebagai alias yang kini lewat flow simulate-paid yang sama (bukan auto-paid). Checkout dengan QRIS langsung diarahkan ke `/pesanan/[id]/bayar` karena hitungan mundur mulai saat order dibuat.
 - **Sudah ada** (M3): `QRIS_MOCK` di enum `PaymentMethod`, radio metode bayar di checkout (COD/Transfer/QRIS), `POST /api/v1/orders/:id/pay` yang langsung auto-paid.
 - **Scope (delta)**: ganti auto-paid jadi flow realistis — halaman bayar render QR code + countdown 15 menit, tombol "Saya sudah bayar (mock)" terpisah untuk simulate webhook, order expired otomatis kalau lewat batas waktu.
-- **Schema**: tidak ada migration — enum sudah punya `QRIS_MOCK`.
-- **Library**: `qrcode` (npm) untuk render data URI server-side atau `react-qr-code` client-side.
+- **Schema**: `OrderStatus` + nilai `EXPIRED` (migration aditif).
+- **Library**: `qrcode` (npm) untuk render data URI server-side atau `react-qr-code` client-side. _(deliver: `qrcode` server-side)_
 - **API**:
-  - `GET /api/v1/orders/:id/qris` → `{ qrString, amount, expiresAt }`
-  - `POST /api/v1/orders/:id/qris/simulate-paid` → set status PAID + paidAt (dev/mock only — production akan diganti webhook PSP); gantikan auto-paid di `POST /orders/:id/pay`
+  - `GET /api/v1/orders/:id/qris` → `{ qrString, qrImageDataUrl, amount, expiresAt, expired }`
+  - `POST /api/v1/orders/:id/qris/simulate-paid` → set status PAID + paidAt (dev/mock only — production akan diganti webhook PSP); `POST /orders/:id/pay` jadi alias flow yang sama
 - **UI touch**:
   - [apps/web/src/app/(buyer)/pesanan/[id]/bayar/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/bayar/page.tsx) — branching by paymentMethod: QRIS render QR + countdown
+  - Baru: `apps/web/src/components/order/QrisPanel.tsx` — QR + hitung mundur + tombol simulate
 - **Acceptance**:
-  - [ ] User pilih QRIS di checkout → halaman bayar render QR + countdown 15 menit
-  - [ ] Tombol simulate-paid → status order PAID, redirect ke detail
-  - [ ] Setelah 15 menit, status order EXPIRED (cron atau lazy-check)
-  - [ ] Bank transfer & COD flow lama tetap jalan tanpa regresi
+  - [x] User pilih QRIS di checkout → halaman bayar render QR + countdown 15 menit
+  - [x] Tombol simulate-paid → status order PAID, redirect ke detail
+  - [x] Setelah 15 menit, status order EXPIRED (cron atau lazy-check) — _deliver: lazy-check_
+  - [x] Bank transfer & COD flow lama tetap jalan tanpa regresi
 - **Effort**: S
 
 ---
