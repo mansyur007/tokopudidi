@@ -32,6 +32,9 @@ enum OrderStatus {
   COMPLETED
   CANCELLED
   REFUNDED
+  // Batas waktu bayar (QRIS mock, 15 menit) terlewat — dibedakan dari CANCELLED
+  // yang berarti dibatalkan pembeli/penjual. Lihat M10-A5.
+  EXPIRED
 }
 
 enum PaymentMethod {

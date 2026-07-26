@@ -8,7 +8,6 @@ import { formatRupiah, formatTanggal, formatTanggalWaktu } from '@tokopudidi/sha
 import { useAuthStore } from '@/store/auth';
 import {
   getOrder,
-  payOrderMock,
   cancelOrder,
   completeOrder,
   requestRefund,
@@ -43,18 +42,6 @@ export default function OrderDetailPage() {
   }, [tokens?.accessToken, id]);
 
   useEffect(() => { load(); }, [load]);
-
-  async function handlePayMock() {
-    if (!tokens?.accessToken || !order) return;
-    setBusy(true); setMsg(null);
-    try {
-      await payOrderMock(tokens.accessToken, order.id);
-      setMsg('Pembayaran berhasil!');
-      await load();
-    } catch (err) {
-      setMsg(err instanceof ApiClientError ? err.message : 'Gagal bayar');
-    } finally { setBusy(false); }
-  }
 
   async function handleCancel() {
     if (!tokens?.accessToken || !order) return;
@@ -149,10 +136,13 @@ export default function OrderDetailPage() {
               {s.at && <span className="text-xs text-gray-500">{formatTanggalWaktu(s.at)}</span>}
             </li>
           ))}
-          {order.status === 'CANCELLED' && (
+          {(order.status === 'CANCELLED' || order.status === 'EXPIRED') && (
             <li className="flex gap-2 text-red-700">
               <span aria-hidden>●</span>
-              <span className="flex-1">Dibatalkan{order.cancelReason ? ` — ${order.cancelReason}` : ''}</span>
+              <span className="flex-1">
+                {order.status === 'EXPIRED' ? 'Kedaluwarsa' : 'Dibatalkan'}
+                {order.cancelReason ? ` — ${order.cancelReason}` : ''}
+              </span>
             </li>
           )}
         </ol>
@@ -296,9 +286,9 @@ export default function OrderDetailPage() {
       {/* Aksi sesuai status */}
       <section className="card p-4 flex flex-wrap gap-2 sticky bottom-16 md:bottom-0">
         {order.status === 'PENDING_PAYMENT' && order.paymentMethod === 'QRIS_MOCK' && (
-          <button onClick={handlePayMock} disabled={busy} className="btn-primary flex-1">
-            Bayar Sekarang (mock)
-          </button>
+          <Link href={`/pesanan/${order.id}/bayar`} className="btn-primary flex-1 text-center">
+            Bayar dengan QRIS
+          </Link>
         )}
         {order.status === 'PENDING_PAYMENT' && order.paymentMethod === 'TRANSFER_MANUAL' && (
           <Link href={`/pesanan/${order.id}/bayar`} className="btn-primary flex-1 text-center">

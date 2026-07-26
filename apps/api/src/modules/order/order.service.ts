@@ -1,8 +1,15 @@
 import { prisma, Prisma } from '@tokopudidi/database';
+import type { OrderStatus, PaymentMethod } from '@tokopudidi/database';
 import { getEffectivePrice } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
 import { quoteShipping, isCodAvailable } from '../shipping/shipping.service';
+import {
+  QRIS_EXPIRY_MINUTES,
+  qrisExpiresAt,
+  generateQrisPayment,
+  markOrderAsPaid,
+} from '../payment/payment.service';
 
 function generateOrderNumber(): string {
   const now = new Date();
@@ -251,10 +258,30 @@ export async function checkout(userId: string, input: CheckoutInput) {
   return created;
 }
 
+/**
+ * Sapu order QRIS milik satu buyer yang sudah lewat batas bayar. Dipanggil saat buyer
+ * membuka daftar pesanan supaya list tidak menampilkan "Belum Bayar" yang sebenarnya mati.
+ * Umumnya 0 baris, jadi murah.
+ */
+async function expireStaleQrisOrders(userId: string) {
+  const stale = await prisma.order.findMany({
+    where: {
+      buyerId: userId,
+      status: 'PENDING_PAYMENT',
+      paymentMethod: 'QRIS_MOCK',
+      createdAt: { lt: new Date(Date.now() - QRIS_EXPIRY_MINUTES * 60 * 1000) },
+    },
+    select: { id: true, status: true, paymentMethod: true, createdAt: true },
+  });
+  for (const order of stale) await expireOrderIfDue(order);
+}
+
 export async function listOrdersForBuyer(
   userId: string,
   filter: { status?: string; page: number; limit: number },
 ) {
+  await expireStaleQrisOrders(userId);
+
   const where: Prisma.OrderWhereInput = { buyerId: userId };
   if (filter.status && filter.status !== 'ALL') {
     // Special: 'BELUM_BAYAR' alias.
@@ -280,17 +307,109 @@ export async function listOrdersForBuyer(
 }
 
 export async function getOrderForBuyer(userId: string, orderId: string) {
-  const order = await prisma.order.findFirst({
-    where: { id: orderId, buyerId: userId },
-    include: {
-      shop: { select: { id: true, name: true, slug: true, logoUrl: true, ownerId: true } },
-      items: true,
-      paymentProof: true,
-      refundRequest: true,
-    },
-  });
+  const include = {
+    shop: { select: { id: true, name: true, slug: true, logoUrl: true, ownerId: true } },
+    items: true,
+    paymentProof: true,
+    refundRequest: true,
+  } satisfies Prisma.OrderInclude;
+
+  const order = await prisma.order.findFirst({ where: { id: orderId, buyerId: userId }, include });
   if (!order) throw new NotFoundError('Pesanan tidak ditemukan');
+
+  // Lazy-expire QRIS yang lewat batas bayar (M10-A5) — baca ulang supaya status terkirim akurat.
+  if (await expireOrderIfDue(order)) {
+    return prisma.order.findFirstOrThrow({ where: { id: orderId, buyerId: userId }, include });
+  }
   return order;
+}
+
+/**
+ * Kembalikan stok produk/varian dari item sebuah order.
+ * Dipakai saat order dibatalkan (cancelOrder) maupun kedaluwarsa (expireOrderIfDue).
+ */
+async function restoreStock(tx: Prisma.TransactionClient, orderId: string) {
+  const items = await tx.orderItem.findMany({ where: { orderId } });
+  for (const it of items) {
+    if (it.variantId) {
+      await tx.productVariant.update({
+        where: { id: it.variantId },
+        data: { stock: { increment: it.quantity } },
+      }).catch(() => undefined);
+    } else {
+      await tx.product.update({
+        where: { id: it.productId },
+        data: { stock: { increment: it.quantity } },
+      }).catch(() => undefined);
+    }
+  }
+}
+
+/**
+ * Lazy-expire (M10-A5): order QRIS yang lewat batas bayar 15 menit ditandai EXPIRED
+ * saat dibaca — dipilih daripada cron supaya tidak menambah proses di VPS 2-vCPU.
+ * Konsekuensinya order baru berpindah status ketika ada yang membukanya; itu cukup
+ * karena stok baru benar-benar dibutuhkan saat ada pembeli lain yang checkout.
+ * Mengembalikan `true` kalau order barusan di-expire.
+ */
+export async function expireOrderIfDue(
+  order: { id: string; status: OrderStatus; paymentMethod: PaymentMethod; createdAt: Date },
+  now: Date = new Date(),
+): Promise<boolean> {
+  if (order.status !== 'PENDING_PAYMENT' || order.paymentMethod !== 'QRIS_MOCK') return false;
+  if (now < qrisExpiresAt(order.createdAt)) return false;
+
+  return prisma.$transaction(async (tx) => {
+    // Guard race dengan simulate-paid: hanya menang kalau statusnya masih PENDING_PAYMENT.
+    const res = await tx.order.updateMany({
+      where: { id: order.id, status: 'PENDING_PAYMENT' },
+      data: {
+        status: 'EXPIRED',
+        cancelledAt: now,
+        cancelReason: 'Batas waktu pembayaran QRIS terlewat',
+      },
+    });
+    if (res.count === 0) return false;
+    await restoreStock(tx, order.id);
+    return true;
+  });
+}
+
+/** Data QR untuk halaman bayar. Sekalian lazy-expire kalau batas waktu sudah lewat. */
+export async function getQrisPayment(userId: string, orderId: string) {
+  const order = await prisma.order.findFirst({ where: { id: orderId, buyerId: userId } });
+  if (!order) throw new NotFoundError('Pesanan tidak ditemukan');
+  if (order.paymentMethod !== 'QRIS_MOCK') {
+    throw new BadRequestError('Pesanan ini tidak dibayar dengan QRIS');
+  }
+  await expireOrderIfDue(order);
+  return generateQrisPayment(order);
+}
+
+/**
+ * Simulasi pembayaran QRIS — pengganti webhook PSP selama masih mock.
+ * Di production titik ini diganti handler webhook provider, bukan endpoint buyer.
+ */
+export async function simulateQrisPaid(userId: string, orderId: string) {
+  const order = await prisma.order.findFirst({ where: { id: orderId, buyerId: userId } });
+  if (!order) throw new NotFoundError('Pesanan tidak ditemukan');
+  if (order.paymentMethod !== 'QRIS_MOCK') {
+    throw new BadRequestError('Pesanan ini tidak dibayar dengan QRIS');
+  }
+  if (order.status !== 'PENDING_PAYMENT') {
+    throw new BadRequestError(
+      order.status === 'EXPIRED'
+        ? 'Batas waktu pembayaran sudah lewat. Silakan pesan ulang ya.'
+        : 'Pesanan ini sudah tidak menunggu pembayaran',
+    );
+  }
+  if (new Date() >= qrisExpiresAt(order.createdAt)) {
+    await expireOrderIfDue(order);
+    throw new BadRequestError('Batas waktu pembayaran sudah lewat. Silakan pesan ulang ya.');
+  }
+
+  await markOrderAsPaid(order.id);
+  return prisma.order.findUnique({ where: { id: orderId } });
 }
 
 export async function cancelOrder(userId: string, orderId: string, reason: string) {
@@ -307,21 +426,7 @@ export async function cancelOrder(userId: string, orderId: string, reason: strin
       where: { id: orderId },
       data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: reason },
     });
-    // Restore stok.
-    const items = await tx.orderItem.findMany({ where: { orderId } });
-    for (const it of items) {
-      if (it.variantId) {
-        await tx.productVariant.update({
-          where: { id: it.variantId },
-          data: { stock: { increment: it.quantity } },
-        }).catch(() => undefined);
-      } else {
-        await tx.product.update({
-          where: { id: it.productId },
-          data: { stock: { increment: it.quantity } },
-        }).catch(() => undefined);
-      }
-    }
+    await restoreStock(tx, orderId);
   });
 
   return prisma.order.findUnique({ where: { id: orderId } });
