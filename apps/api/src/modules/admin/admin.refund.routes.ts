@@ -5,6 +5,7 @@ import { ok } from '../../lib/response';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { settleOrderRefund } from '../order/refund.settlement';
 
 export const adminRefundRouter = Router();
 adminRefundRouter.use(requireAuth, requireRole('ADMIN'));
@@ -75,46 +76,8 @@ adminRefundRouter.post('/:id/resolve', validateBody(resolveRefundSchema), async 
     // Approve: kembalikan stok, balikkan saldo seller, set order REFUNDED.
     await prisma.$transaction(async (tx) => {
       const order = refund.order;
-      const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+      await settleOrderRefund(tx, order);
 
-      // Restore stok.
-      for (const it of items) {
-        if (it.variantId) {
-          await tx.productVariant.update({
-            where: { id: it.variantId },
-            data: { stock: { increment: it.quantity } },
-          }).catch(() => undefined);
-        } else {
-          await tx.product.update({
-            where: { id: it.productId },
-            data: { stock: { increment: it.quantity } },
-          }).catch(() => undefined);
-        }
-      }
-
-      // Balikkan saldo seller. Dana COMPLETED ada di balance; selain itu di pendingBalance.
-      if (order.status === 'COMPLETED') {
-        await tx.shop.update({
-          where: { id: order.shopId },
-          data: { balance: { decrement: order.total }, totalSold: { decrement: 1 } },
-        });
-        for (const it of items) {
-          await tx.product.update({
-            where: { id: it.productId },
-            data: { soldCount: { decrement: it.quantity } },
-          }).catch(() => undefined);
-        }
-      } else if (['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED'].includes(order.status)) {
-        await tx.shop.update({
-          where: { id: order.shopId },
-          data: { pendingBalance: { decrement: order.total } },
-        });
-      }
-
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: 'REFUNDED' },
-      });
       await tx.refundRequest.update({
         where: { id: refund.id },
         data: { status: 'APPROVED', adminNote: adminNote || null, resolvedAt: new Date() },

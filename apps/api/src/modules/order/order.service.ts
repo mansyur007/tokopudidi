@@ -4,6 +4,7 @@ import { getEffectivePrice } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
 import { quoteShipping, isCodAvailable } from '../shipping/shipping.service';
+import { restoreStock } from './stock';
 import {
   QRIS_EXPIRY_MINUTES,
   qrisExpiresAt,
@@ -333,27 +334,6 @@ export async function getOrderForBuyer(userId: string, orderId: string) {
     return prisma.order.findFirstOrThrow({ where: { id: orderId, buyerId: userId }, include });
   }
   return order;
-}
-
-/**
- * Kembalikan stok produk/varian dari item sebuah order.
- * Dipakai saat order dibatalkan (cancelOrder) maupun kedaluwarsa (expireOrderIfDue).
- */
-async function restoreStock(tx: Prisma.TransactionClient, orderId: string) {
-  const items = await tx.orderItem.findMany({ where: { orderId } });
-  for (const it of items) {
-    if (it.variantId) {
-      await tx.productVariant.update({
-        where: { id: it.variantId },
-        data: { stock: { increment: it.quantity } },
-      }).catch(() => undefined);
-    } else {
-      await tx.product.update({
-        where: { id: it.productId },
-        data: { stock: { increment: it.quantity } },
-      }).catch(() => undefined);
-    }
-  }
 }
 
 /**

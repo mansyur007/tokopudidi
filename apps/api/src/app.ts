@@ -22,6 +22,11 @@ import { bannerRouter } from './modules/banner/banner.routes';
 import { cartRouter } from './modules/cart/cart.routes';
 import { categoryRouter } from './modules/category/category.routes';
 import { chatRouter } from './modules/chat/chat.routes';
+import {
+  complaintRouter,
+  sellerComplaintRouter,
+  adminComplaintRouter,
+} from './modules/complaint/complaint.routes';
 import { discussionRouter } from './modules/discussion/discussion.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { notificationRouter } from './modules/notification/notification.routes';
@@ -75,6 +80,7 @@ export function createApp(): Application {
   app.use('/api/v1/cart', cartRouter);
   app.use('/api/v1/categories', categoryRouter);
   app.use('/api/v1/chats', chatRouter);
+  app.use('/api/v1/complaints', complaintRouter);
   app.use('/api/v1/discussions', discussionRouter);
   app.use('/api/v1/notifications', notificationRouter);
   app.use('/api/v1/orders', orderRouter);
@@ -99,6 +105,7 @@ export function createApp(): Application {
   app.use('/api/v1/seller/finance', sellerFinanceRouter);
   app.use('/api/v1/seller/chat-templates', sellerChatTemplateRouter);
   app.use('/api/v1/seller/voucher', sellerVoucherRouter);
+  app.use('/api/v1/seller/complaints', sellerComplaintRouter);
 
   // Admin panel
   app.use('/api/v1/admin', adminDashboardRouter);          // /dashboard
@@ -107,6 +114,7 @@ export function createApp(): Application {
   app.use('/api/v1/admin/products', adminProductRouter);
   app.use('/api/v1/admin/refunds', adminRefundRouter);
   app.use('/api/v1/admin/reports', adminReportRouter);
+  app.use('/api/v1/admin/complaints', adminComplaintRouter);
   app.use('/api/v1/admin/voucher', adminVoucherRouter);
   app.use('/api/v1/admin/banners', adminBannerRouter);
   app.use('/api/v1/admin/categories', adminCategoryRouter);

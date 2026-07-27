@@ -3,6 +3,19 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M10-A7: Komplain / Return
+
+### Added
+- **Komplain / Return** (`M10-A7`) — setelah barang diterima, buyer punya **2 hari** untuk komplain per item pesanan dengan bukti foto, memilih penyelesaian **kembalikan dana** atau **ganti barang**. Alurnya buyer → seller → (kalau ditolak) admin.
+  - Schema: model `Complaint` + enum `ComplaintType` / `ComplaintResolution` / `ComplaintStatus` (migration `m10_a7_complaint`). `@@unique([orderItemId])` — satu item sekali komplain, kelanjutannya lewat escalate.
+  - API: `POST /orders/:id/complaints`, `POST /complaints/:id/seller-respond`, `POST /complaints/:id/escalate`, `GET /complaints`, `GET /seller/complaints`, `GET /admin/complaints`, `POST /admin/complaints/:id/decide`.
+  - Sisi uang: helper baru `settleOrderRefund` (kembalikan stok, tarik saldo seller, set order REFUNDED) diekstrak dari route refund admin dan dipakai bersama — komplain yang berakhir REFUND memproses pengembalian dengan aturan saldo yang sama persis. Resolusi REPLACEMENT hanya mencatat keputusan + notifikasi.
+  - FE: tombol "📦 Komplain Barang" di detail pesanan (muncul hanya saat DELIVERED/COMPLETED dan masih dalam jendela 2 hari) + `ComplaintModal`; halaman `/komplain` (buyer), `/seller/komplain`, `/admin/komplain` memakai kartu bersama `ComplaintCard`; item sidebar seller & admin, plus entri "Komplain Saya" di menu akun.
+  - Test: `apps/api/src/modules/complaint/complaint.test.ts` — jendela waktu, aturan escalate, validasi schema.
+
+### Changed
+- Buyer juga bisa menaikkan komplain ke admin kalau seller **tidak menanggapi** dalam 2 hari — di luar rencana awal, tapi tanpa ini komplain bisa menggantung selamanya di status OPEN.
+
 ## [Unreleased] — M10-A10: Filter Search Lengkap
 
 ### Added
@@ -15,6 +28,7 @@ Versioning follows [SemVer](https://semver.org/).
 ### Changed
 - Filter rating & kondisi pindah dari SortBar ke sidebar — SortBar sekarang khusus sortir.
 - Checkout menegakkan kedua flag baru, bukan sekadar menyaring pencarian: COD ditolak kalau ada item dengan `codAvailable=false` (radio COD juga ter-disable di FE dengan alasan yang jelas), dan ongkir jadi 0 hanya kalau seluruh item satu toko bebas ongkir.
+
 ## [Unreleased] — M10-A5: QRIS Mock UX (QR + countdown + expiry)
 
 ### Added
