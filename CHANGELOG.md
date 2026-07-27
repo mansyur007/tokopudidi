@@ -15,6 +15,18 @@ Versioning follows [SemVer](https://semver.org/).
 
 ### Changed
 - Buyer juga bisa menaikkan komplain ke admin kalau seller **tidak menanggapi** dalam 2 hari — di luar rencana awal, tapi tanpa ini komplain bisa menggantung selamanya di status OPEN.
+## [Unreleased] — M10-A5: QRIS Mock UX (QR + countdown + expiry)
+
+### Added
+- **QRIS mock flow lengkap** (`M10-A5`) — checkout dengan QRIS tidak lagi auto-paid; buyer diarahkan ke halaman bayar berisi QR, nominal, dan hitung mundur 15 menit.
+  - Schema: `OrderStatus` + nilai `EXPIRED` (migration `m10_a5_order_status_expired`, aditif). Dibedakan dari `CANCELLED` supaya kedaluwarsa otomatis tidak tercampur dengan pembatalan oleh pembeli/penjual.
+  - API: `GET /api/v1/orders/:id/qris` (QR PNG data URI via `qrcode`, nominal, `expiresAt`, `expired`) dan `POST /api/v1/orders/:id/qris/simulate-paid` sebagai pengganti webhook PSP selama masih mock. `POST /orders/:id/pay` dipertahankan sebagai alias flow yang sama.
+  - Expiry: batas waktu derived dari `createdAt + QRIS_EXPIRY_MINUTES` (tanpa kolom baru), ditegakkan lewat lazy-check saat baca detail/daftar pesanan & saat simulate-paid — stok dikembalikan lewat helper `restoreStock` yang kini dipakai bersama `cancelOrder`. Race dengan simulate-paid dijaga `updateMany ... where status = PENDING_PAYMENT`.
+  - FE: komponen `QrisPanel` (QR + hitung mundur, merah saat < 3 menit, state kedaluwarsa), halaman bayar bercabang per metode bayar, tombol di detail pesanan jadi "Bayar dengan QRIS", checkout QRIS langsung menuju halaman bayar.
+  - Test: `apps/api/src/modules/payment/payment.test.ts` — batas waktu & payload QR.
+
+### Changed
+- `POST /api/v1/orders/:id/pay` sekarang menghormati batas waktu 15 menit dan menolak order yang sudah kedaluwarsa (sebelumnya selalu langsung menandai PAID).
 
 ## [Unreleased] — M9-B3: Sale Price (Diskon Produk Periodik)
 

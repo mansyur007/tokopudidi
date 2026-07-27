@@ -9,7 +9,8 @@ export type OrderStatus =
   | 'DELIVERED'
   | 'COMPLETED'
   | 'CANCELLED'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  | 'EXPIRED';
 
 export interface OrderListItem {
   id: string;
@@ -68,6 +69,14 @@ export interface OrderDetail extends OrderListItem {
   tracking: { status: string; timestamp: string; reached: boolean }[] | null;
 }
 
+export interface QrisPayment {
+  qrString: string;
+  qrImageDataUrl: string;
+  amount: number;
+  expiresAt: string;
+  expired: boolean;
+}
+
 export interface PaymentInstruction {
   method: string;
   qrCodeUrl?: string;
@@ -92,8 +101,12 @@ export const getOrder = (token: string, id: string) =>
 export const getPaymentInstruction = (token: string, id: string) =>
   apiFetch<PaymentInstruction>(`/api/v1/orders/${id}/payment-instruction`, { token });
 
-export const payOrderMock = (token: string, id: string) =>
-  apiFetch(`/api/v1/orders/${id}/pay`, { method: 'POST', token });
+export const getQrisPayment = (token: string, id: string) =>
+  apiFetch<QrisPayment>(`/api/v1/orders/${id}/qris`, { token });
+
+/** Mock-only: menggantikan webhook PSP. Ditolak server kalau batas waktu sudah lewat. */
+export const simulateQrisPaid = (token: string, id: string) =>
+  apiFetch(`/api/v1/orders/${id}/qris/simulate-paid`, { method: 'POST', token });
 
 export const uploadPaymentProof = (
   token: string,

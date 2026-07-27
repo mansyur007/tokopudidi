@@ -1,11 +1,20 @@
 // Mock payment service.
-// QRIS_MOCK: simulasi auto-paid setelah ~30 detik (atau via endpoint /pay manual).
+// QRIS_MOCK: buyer dapat QR + countdown 15 menit; pembayaran disimulasikan lewat
+//   endpoint simulate-paid (pengganti webhook PSP), lewat batas waktu → EXPIRED.
 // TRANSFER_MANUAL: buyer upload bukti, seller verifikasi.
 // COD: bayar saat barang tiba — order langsung ke PROCESSING setelah seller terima.
 // Adapter pattern — siap diganti dengan Midtrans/Xendit di production.
 
+import QRCode from 'qrcode';
 import { prisma } from '@tokopudidi/database';
 import { logger } from '../../lib/logger';
+
+// Batas waktu bayar QRIS. Dipakai bersama order.service (lazy-expire) & FE countdown.
+export const QRIS_EXPIRY_MINUTES = 15;
+
+export function qrisExpiresAt(createdAt: Date): Date {
+  return new Date(createdAt.getTime() + QRIS_EXPIRY_MINUTES * 60 * 1000);
+}
 
 export interface PaymentProvider {
   generatePaymentInstruction(orderId: string, total: number): Promise<{
@@ -38,7 +47,38 @@ const provider: PaymentProvider = new MockPaymentProvider();
 
 export const generatePaymentInstruction = provider.generatePaymentInstruction.bind(provider);
 
-// Untuk QRIS_MOCK: tandai paid otomatis. Dipanggil dari endpoint /pay.
+export interface QrisPayment {
+  qrString: string;
+  /** PNG data URI — FE tinggal render <img src>, tidak perlu library QR di client. */
+  qrImageDataUrl: string;
+  amount: number;
+  expiresAt: string;
+  expired: boolean;
+}
+
+// Payload mock, bukan QRIS EMVCo asli — sengaja tidak menyerupai supaya tidak ada
+// yang mengira bisa di-scan aplikasi bank sungguhan.
+function buildQrisPayload(orderNumber: string, amount: number, expiresAt: Date): string {
+  return `TOKOPUDIDI-QRIS-MOCK|${orderNumber}|${amount}|${expiresAt.toISOString()}`;
+}
+
+export async function generateQrisPayment(
+  order: { orderNumber: string; total: number; createdAt: Date },
+  now: Date = new Date(),
+): Promise<QrisPayment> {
+  const expiresAt = qrisExpiresAt(order.createdAt);
+  const qrString = buildQrisPayload(order.orderNumber, order.total, expiresAt);
+  const qrImageDataUrl = await QRCode.toDataURL(qrString, { width: 300, margin: 1 });
+  return {
+    qrString,
+    qrImageDataUrl,
+    amount: order.total,
+    expiresAt: expiresAt.toISOString(),
+    expired: now >= expiresAt,
+  };
+}
+
+// Untuk QRIS_MOCK: tandai paid otomatis. Dipanggil dari endpoint simulate-paid.
 export async function markOrderAsPaid(orderId: string): Promise<void> {
   await prisma.order.update({
     where: { id: orderId },
