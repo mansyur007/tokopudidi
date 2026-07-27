@@ -1,4 +1,5 @@
 import { Prisma } from '@tokopudidi/database';
+import { restoreStock } from './stock';
 
 /**
  * Beresi sisi uang & stok saat sebuah pesanan direfund penuh:
@@ -14,24 +15,11 @@ export async function settleOrderRefund(
   tx: Prisma.TransactionClient,
   order: { id: string; shopId: string; status: string; total: number },
 ): Promise<void> {
-  const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
-
-  for (const it of items) {
-    if (it.variantId) {
-      await tx.productVariant.update({
-        where: { id: it.variantId },
-        data: { stock: { increment: it.quantity } },
-      }).catch(() => undefined);
-    } else {
-      await tx.product.update({
-        where: { id: it.productId },
-        data: { stock: { increment: it.quantity } },
-      }).catch(() => undefined);
-    }
-  }
+  await restoreStock(tx, order.id);
 
   // Dana pesanan COMPLETED sudah pindah ke balance; selain itu masih pendingBalance.
   if (order.status === 'COMPLETED') {
+    const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
     await tx.shop.update({
       where: { id: order.shopId },
       data: { balance: { decrement: order.total }, totalSold: { decrement: 1 } },
