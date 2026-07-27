@@ -138,6 +138,11 @@ export async function checkout(userId: string, input: CheckoutInput) {
       if (!it.product.shop.isOpen) {
         throw new BadRequestError(`Toko "${it.product.shop.name}" sedang tutup`);
       }
+      // Seller bisa menutup opsi COD per produk (M10-A10) — flag yang sama dipakai
+      // filter pencarian, jadi harus ditegakkan di sini supaya tidak jadi janji kosong.
+      if (input.paymentMethod === 'COD' && !it.product.codAvailable) {
+        throw new BadRequestError(`Produk "${it.product.name}" tidak bisa dibayar COD`);
+      }
     }
 
     let subtotal = 0;
@@ -149,10 +154,16 @@ export async function checkout(userId: string, input: CheckoutInput) {
       weightGr += it.product.weight * it.quantity;
     }
 
+    // Bebas ongkir (M10-A10): gratis hanya kalau semua item toko ini memang
+    // ditandai bebas ongkir oleh seller — campur dengan produk biasa tetap bayar.
+    const semuaBebasOngkir = items.every((it) => it.product.freeShippingEligible);
+
     let shippingCost = 0;
     if (shopGroup.shippingMethod !== 'PICKUP_SENDIRI') {
       if (!address) throw new BadRequestError('Alamat tujuan belum dipilih');
-      shippingCost = quoteShipping(address.province, shopGroup.shippingMethod, weightGr);
+      shippingCost = semuaBebasOngkir
+        ? 0
+        : quoteShipping(address.province, shopGroup.shippingMethod, weightGr);
     }
 
     combinedSubtotal += subtotal;

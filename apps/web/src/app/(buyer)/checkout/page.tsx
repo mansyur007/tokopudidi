@@ -143,7 +143,10 @@ export default function CheckoutPage() {
     for (const g of groups) {
       const ps = perShop[g.shop.id];
       if (!ps) continue;
-      if (ps.shippingMethod === 'PICKUP_SENDIRI') {
+      // Bebas ongkir (M10-A10) berlaku kalau seluruh item toko ini ditandai bebas
+      // ongkir — aturan yang sama dipakai server saat checkout.
+      const bebasOngkir = g.items.every((it) => it.product.freeShippingEligible);
+      if (ps.shippingMethod === 'PICKUP_SENDIRI' || bebasOngkir) {
         if (ps.shippingCost !== 0) {
           setPerShop((prev) => ({ ...prev, [g.shop.id]: { ...prev[g.shop.id], shippingCost: 0 } }));
         }
@@ -166,6 +169,15 @@ export default function CheckoutPage() {
   const totalShipping = groups.reduce((s, g) => s + (perShop[g.shop.id]?.shippingCost ?? 0), 0);
   const discount = promoApplied?.discountAmount ?? 0;
   const grandTotal = Math.max(0, totalSubtotal + totalShipping - discount);
+
+  // Seller bisa menutup COD per produk (M10-A10). Satu produk saja cukup untuk
+  // memblokir COD di checkout ini — server menolak dengan aturan yang sama.
+  const codDiblokirProduk = groups.some((g) => g.items.some((it) => !it.product.codAvailable));
+
+  // Kalau isi keranjang berubah jadi memuat produk non-COD, pindahkan pilihan bayar.
+  useEffect(() => {
+    if (codDiblokirProduk && paymentMethod === 'COD') setPaymentMethod('QRIS_MOCK');
+  }, [codDiblokirProduk, paymentMethod]);
 
   const allPickup = groups.length > 0 && groups.every((g) => perShop[g.shop.id]?.shippingMethod === 'PICKUP_SENDIRI');
   const needsAddress = !allPickup;
@@ -395,7 +407,7 @@ export default function CheckoutPage() {
         <h2 className="font-semibold mb-2">💳 Metode Pembayaran</h2>
         <div className="space-y-2">
           {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((m) => {
-            const disabled = m === 'COD' && !codAvailable;
+            const disabled = m === 'COD' && (!codAvailable || codDiblokirProduk);
             return (
               <label
                 key={m}
@@ -411,7 +423,11 @@ export default function CheckoutPage() {
                   onChange={() => setPaymentMethod(m)}
                 />
                 <span>{PAYMENT_LABELS[m]}</span>
-                {disabled && <span className="ml-auto text-xs text-orange-600">tidak tersedia di area</span>}
+                {disabled && (
+                  <span className="ml-auto text-xs text-orange-600">
+                    {codDiblokirProduk ? 'ada produk yang tidak melayani COD' : 'tidak tersedia di area'}
+                  </span>
+                )}
               </label>
             );
           })}

@@ -41,7 +41,7 @@ adminShopRouter.get('/', async (req, res, next) => {
         take: limit,
         select: {
           id: true, name: true, slug: true, city: true, province: true,
-          ktpVerified: true, isOpen: true, ratingAvg: true, ratingCount: true,
+          ktpVerified: true, isOfficialStore: true, isOpen: true, ratingAvg: true, ratingCount: true,
           totalSold: true, balance: true, joinedAt: true, deletedAt: true,
           owner: { select: { id: true, fullName: true, phone: true } },
           _count: { select: { products: true, orders: true } },
@@ -85,6 +85,30 @@ adminShopRouter.post('/:id/verify-ktp', async (req, res, next) => {
       },
     });
     return ok(res, null, 'KTP toko diverifikasi');
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/admin/shops/:id/official-store — toggle flag Official Store (M10-A10).
+// Flag ini yang dipakai filter "Official Store" di pencarian; badge visualnya M14-B1.
+adminShopRouter.post('/:id/official-store', async (req, res, next) => {
+  try {
+    const shop = await prisma.shop.findUnique({ where: { id: req.params.id } });
+    if (!shop) throw new NotFoundError('Toko tidak ditemukan');
+
+    const isOfficialStore = !shop.isOfficialStore;
+    await prisma.shop.update({ where: { id: shop.id }, data: { isOfficialStore } });
+    await prisma.notification.create({
+      data: {
+        userId: shop.ownerId,
+        type: 'SYSTEM',
+        title: isOfficialStore ? 'Toko jadi Official Store 🏅' : 'Status Official Store dicabut',
+        body: isOfficialStore
+          ? `Toko "${shop.name}" sekarang terdaftar sebagai Official Store.`
+          : `Status Official Store untuk toko "${shop.name}" dicabut admin.`,
+        linkUrl: '/seller',
+      },
+    });
+    return ok(res, { isOfficialStore }, isOfficialStore ? 'Toko ditandai Official Store' : 'Status Official Store dicabut');
   } catch (err) { next(err); }
 });
 

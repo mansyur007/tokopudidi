@@ -89,7 +89,16 @@ export async function listProducts(query: ProductListQuery): Promise<{
     if (query.maxPrice !== undefined) where.price.lte = query.maxPrice;
   }
   if (query.minRating !== undefined) where.ratingAvg = { gte: query.minRating };
-  if (query.province) where.shop = { ...(where.shop as object), province: query.province };
+  if (query.freeShipping) where.freeShippingEligible = true;
+  if (query.cod) where.codAvailable = true;
+
+  // Filter yang menempel ke toko digabung dalam satu objek `shop`.
+  const shopWhere: Prisma.ShopWhereInput = {};
+  if (query.province) shopWhere.province = query.province;
+  // Multi-kota: semantik OR antar kota yang dipilih.
+  if (query.cities?.length) shopWhere.city = { in: query.cities };
+  if (query.officialStoreOnly) shopWhere.isOfficialStore = true;
+  if (Object.keys(shopWhere).length > 0) where.shop = shopWhere;
 
   const skip = (query.page - 1) * query.limit;
 
@@ -110,6 +119,22 @@ export async function listProducts(query: ProductListQuery): Promise<{
   const items: ProductCard[] = rows.map(toProductCard);
 
   return { items, total, page: query.page, limit: query.limit };
+}
+
+/**
+ * Daftar kota yang punya produk aktif, beserta jumlah produknya — untuk mengisi
+ * grup filter "Lokasi" di halaman pencarian (M10-A10). Raw query karena Prisma
+ * groupBy tidak bisa mengelompokkan lewat field relasi.
+ */
+export async function listProductCities(): Promise<{ city: string; count: number }[]> {
+  return prisma.$queryRaw<{ city: string; count: number }[]>`
+    SELECT s."city" AS city, COUNT(*)::int AS count
+    FROM "Product" p
+    JOIN "Shop" s ON s."id" = p."shopId"
+    WHERE p."isActive" = true AND p."deletedAt" IS NULL AND p."stock" > 0
+    GROUP BY s."city"
+    ORDER BY count DESC, city ASC
+  `;
 }
 
 export async function getProductBySlug(slug: string) {

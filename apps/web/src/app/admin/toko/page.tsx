@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatRupiah, formatTanggal } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
-  listAdminShops, getAdminShop, verifyShopKtp, suspendShop, unsuspendShop,
+  listAdminShops, getAdminShop, verifyShopKtp, suspendShop, unsuspendShop, toggleOfficialStore,
   type AdminShopRow, type AdminShopDetail,
 } from '@/lib/api/admin';
 import { ApiClientError } from '@/lib/api/client';
@@ -61,6 +61,18 @@ export default function AdminShopsPage() {
     finally { setBusy(false); }
   }
 
+  // Official Store (M10-A10) — flag ini yang dipakai filter pencarian pembeli.
+  async function doToggleOfficial(id: string) {
+    if (!tokens?.accessToken) return;
+    setBusy(true); setMsg(null);
+    try {
+      const res = await toggleOfficialStore(tokens.accessToken, id);
+      setMsg(res.isOfficialStore ? 'Toko ditandai Official Store' : 'Status Official Store dicabut');
+      setDetail(null); await refresh();
+    } catch (err) { setMsg(err instanceof ApiClientError ? err.message : 'Gagal'); }
+    finally { setBusy(false); }
+  }
+
   async function doSuspend(s: AdminShopDetail | AdminShopRow) {
     if (!tokens?.accessToken) return;
     setBusy(true); setMsg(null);
@@ -109,6 +121,7 @@ export default function AdminShopsPage() {
                 {s.ktpVerified
                   ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ Verified</span>
                   : <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">Belum</span>}
+                {s.isOfficialStore && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">🏅 Official</span>}
                 {s.deletedAt && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">Ditangguhkan</span>}
               </div>
               <p className="text-xs text-gray-500 truncate">
@@ -119,6 +132,15 @@ export default function AdminShopsPage() {
             <div className="flex flex-col gap-1">
               {!s.ktpVerified && !s.deletedAt && (
                 <button disabled={busy} onClick={() => doVerify(s.id)} className="text-xs px-2 py-1 rounded border text-green-700 border-green-300">Verifikasi</button>
+              )}
+              {!s.deletedAt && (
+                <button
+                  disabled={busy}
+                  onClick={() => doToggleOfficial(s.id)}
+                  className={`text-xs px-2 py-1 rounded border ${s.isOfficialStore ? 'text-gray-600 border-gray-300' : 'text-blue-700 border-blue-300'}`}
+                >
+                  {s.isOfficialStore ? 'Cabut Official' : 'Jadikan Official'}
+                </button>
               )}
               <button disabled={busy} onClick={() => doSuspend(s)} className={`text-xs px-2 py-1 rounded border ${s.deletedAt ? 'text-green-700 border-green-300' : 'text-red-600 border-red-300'}`}>
                 {s.deletedAt ? 'Pulihkan' : 'Tangguhkan'}

@@ -100,6 +100,8 @@ sellerProductRouter.post('/', validateBody(productCreateSchema), async (req, res
           minOrderQty: req.body.minOrderQty,
           weight: req.body.weight,
           condition: req.body.condition,
+          codAvailable: req.body.codAvailable,
+          freeShippingEligible: req.body.freeShippingEligible,
           isActive: req.body.isActive,
           images: {
             create: req.body.imageUrls.map((url: string, order: number) => ({ url, order })),
@@ -228,6 +230,8 @@ sellerProductRouter.post('/:id/duplicate', async (req, res, next) => {
         minOrderQty: existing.minOrderQty,
         weight: existing.weight,
         condition: existing.condition,
+        codAvailable: existing.codAvailable,
+        freeShippingEligible: existing.freeShippingEligible,
         isActive: false,
         images: { create: existing.images.map((img, i) => ({ url: img.url, order: i })) },
         variants: {

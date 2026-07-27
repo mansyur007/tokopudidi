@@ -39,6 +39,8 @@ interface FormState {
   minOrderQty: number;
   weight: number;
   condition: 'NEW' | 'USED';
+  codAvailable: boolean;
+  freeShippingEligible: boolean;
   isActive: boolean;
   imageUrls: string[];
   variants: VariantState[];
@@ -67,6 +69,8 @@ function initialFromProduct(p?: SellerProductDetail): FormState {
     minOrderQty: p?.minOrderQty ?? 1,
     weight:      p?.weight      ?? 0,
     condition:   p?.condition   ?? 'NEW',
+    codAvailable:         p?.codAvailable         ?? true,
+    freeShippingEligible: p?.freeShippingEligible ?? false,
     isActive:    p?.isActive    ?? true,
     imageUrls:   p?.images.map((img) => img.url) ?? [],
     variants:    p?.variants.map((v) => ({ id: v.id, name: v.name, priceModifier: v.priceModifier, stock: v.stock })) ?? [],
@@ -318,6 +322,39 @@ export function ProductForm({ initial, productId }: Props) {
             <option value="0">Nonaktif (sembunyi)</option>
           </select>
         </div>
+      </div>
+
+      {/* Opsi pengiriman (M10-A10) — jadi filter di pencarian & berlaku saat checkout. */}
+      <div className="card p-3 space-y-2 bg-gray-50">
+        <p className="text-sm font-medium">🚚 Opsi Pengiriman</p>
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={state.codAvailable}
+            onChange={(e) => setField('codAvailable', e.target.checked)}
+          />
+          <span>
+            Bisa COD
+            <span className="block text-xs text-gray-500">
+              Kalau dimatikan, produk ini tidak bisa di-checkout dengan bayar di tempat.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={state.freeShippingEligible}
+            onChange={(e) => setField('freeShippingEligible', e.target.checked)}
+          />
+          <span>
+            Bebas ongkir
+            <span className="block text-xs text-gray-500">
+              Ongkir ditanggung toko. Gratis berlaku kalau seluruh isi pesanan dari toko ini bebas ongkir.
+            </span>
+          </span>
+        </label>
       </div>
 
       <div>
