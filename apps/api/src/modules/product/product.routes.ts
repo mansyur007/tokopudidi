@@ -14,6 +14,7 @@ import {
   getRelatedProducts,
   getForYouProducts,
   incrementViewCount,
+  listProductCities,
 } from './product.service';
 
 export const productRouter = Router();
@@ -24,6 +25,16 @@ productRouter.get('/', async (req, res, next) => {
     const query = productListQuerySchema.parse(req.query);
     const result = await listProducts(query);
     return ok(res, result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/products/cities — opsi filter lokasi + jumlah produk per kota.
+// Harus di atas /:slug supaya tidak tertangkap route param.
+productRouter.get('/cities', async (_req, res, next) => {
+  try {
+    return ok(res, await listProductCities());
   } catch (err) {
     next(err);
   }

@@ -58,6 +58,7 @@ export interface AdminShopRow {
   city: string;
   province: string | null;
   ktpVerified: boolean;
+  isOfficialStore: boolean;
   isOpen: boolean;
   ratingAvg: number;
   ratingCount: number;
@@ -88,6 +89,12 @@ export const getAdminShop = (token: string, id: string) =>
 
 export const verifyShopKtp = (token: string, id: string) =>
   apiFetch(`/api/v1/admin/shops/${id}/verify-ktp`, { method: 'POST', token });
+
+/** Toggle flag Official Store (M10-A10) — dipakai filter pencarian. */
+export const toggleOfficialStore = (token: string, id: string) =>
+  apiFetch<{ isOfficialStore: boolean }>(`/api/v1/admin/shops/${id}/official-store`, {
+    method: 'POST', token,
+  });
 
 export const suspendShop = (token: string, id: string, reason: string) =>
   apiFetch(`/api/v1/admin/shops/${id}/suspend`, { method: 'POST', token, body: JSON.stringify({ reason }) });

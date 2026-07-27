@@ -24,6 +24,7 @@ export async function getCartForUser(userId: string) {
               id: true, name: true, slug: true, price: true, stock: true,
               salePrice: true, saleStartAt: true, saleEndAt: true,
               isActive: true, weight: true,
+              codAvailable: true, freeShippingEligible: true,
               images: { orderBy: { order: 'asc' }, take: 1 },
               shop:   { select: { id: true, name: true, slug: true, isOpen: true } },
             },
@@ -54,6 +55,8 @@ export async function getCartForUser(userId: string) {
         stock: it.product.stock,
         isActive: it.product.isActive,
         weight: it.product.weight,
+        codAvailable: it.product.codAvailable,
+        freeShippingEligible: it.product.freeShippingEligible,
       },
       variant: it.variant
         ? { id: it.variant.id, name: it.variant.name, stock: it.variant.stock }

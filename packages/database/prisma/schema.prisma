@@ -188,6 +188,9 @@ model Shop {
   ratingCount   Int      @default(0)
   totalSold     Int      @default(0)
   ktpVerified   Boolean  @default(false)
+  // Di-set admin (M10-A10) — dipakai filter "Official Store" di pencarian.
+  // Badge & tampilannya menyusul di M14-B1.
+  isOfficialStore Boolean @default(false)
   ktpUrl        String?  // hanya admin akses via signed URL
   bankName      String?
   bankAccountNo String?
@@ -252,6 +255,11 @@ model Product {
   minOrderQty  Int      @default(1)
   weight       Int      // gram
   condition    ProductCondition @default(NEW)
+  // Opsi pengiriman per produk (M10-A10) — di-set seller, jadi filter di pencarian
+  // sekaligus ditegakkan saat checkout.
+  // COD default true supaya produk lama tidak mendadak kehilangan opsi bayar di tempat.
+  codAvailable Boolean  @default(true)
+  freeShippingEligible Boolean @default(false)
   isActive     Boolean  @default(true)
   soldCount    Int      @default(0)
   viewCount    Int      @default(0)
