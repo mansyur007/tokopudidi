@@ -10,6 +10,7 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   COMPLETED: 'Selesai',
   CANCELLED: 'Dibatalkan',
   REFUNDED: 'Direfund',
+  EXPIRED: 'Kedaluwarsa',
 };
 
 export const STATUS_COLOR: Record<OrderStatus, string> = {
@@ -21,6 +22,7 @@ export const STATUS_COLOR: Record<OrderStatus, string> = {
   COMPLETED:       'bg-green-100 text-green-700',
   CANCELLED:       'bg-gray-100 text-gray-700',
   REFUNDED:        'bg-gray-100 text-gray-700',
+  EXPIRED:         'bg-gray-100 text-gray-700',
 };
 
 export const TABS: { key: string; label: string }[] = [

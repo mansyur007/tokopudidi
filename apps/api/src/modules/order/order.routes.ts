@@ -16,8 +16,10 @@ import {
   completeOrder,
   uploadPaymentProof,
   requestRefund,
+  getQrisPayment,
+  simulateQrisPaid,
 } from './order.service';
-import { generatePaymentInstruction, markOrderAsPaid } from '../payment/payment.service';
+import { generatePaymentInstruction } from '../payment/payment.service';
 import { mockTracking } from '../shipping/shipping.service';
 
 export const orderRouter = Router();
@@ -55,18 +57,28 @@ orderRouter.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/v1/orders/:id/pay — untuk QRIS_MOCK auto-paid.
+// GET /api/v1/orders/:id/qris — QR + nominal + batas waktu untuk halaman bayar.
+orderRouter.get('/:id/qris', async (req, res, next) => {
+  try {
+    const qris = await getQrisPayment(req.user!.sub, req.params.id);
+    return ok(res, qris);
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/orders/:id/qris/simulate-paid — pengganti webhook PSP selama QRIS masih mock.
+orderRouter.post('/:id/qris/simulate-paid', async (req, res, next) => {
+  try {
+    const order = await simulateQrisPaid(req.user!.sub, req.params.id);
+    return ok(res, order, 'Pembayaran berhasil!');
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/orders/:id/pay — alias lama QRIS mock, kini lewat flow simulate-paid
+// yang sama (menghormati batas waktu 15 menit). Dipertahankan supaya klien lama tidak putus.
 orderRouter.post('/:id/pay', async (req, res, next) => {
   try {
-    const order = await getOrderForBuyer(req.user!.sub, req.params.id);
-    if (order.status !== 'PENDING_PAYMENT') {
-      return ok(res, order, 'Pesanan sudah dibayar atau tidak butuh pembayaran');
-    }
-    if (order.paymentMethod !== 'QRIS_MOCK') {
-      return ok(res, order, 'Endpoint ini hanya untuk QRIS mock');
-    }
-    await markOrderAsPaid(order.id);
-    return ok(res, null, 'Pembayaran berhasil!');
+    const order = await simulateQrisPaid(req.user!.sub, req.params.id);
+    return ok(res, order, 'Pembayaran berhasil!');
   } catch (err) { next(err); }
 });
 
