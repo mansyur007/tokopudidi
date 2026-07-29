@@ -121,6 +121,7 @@ export default function SellerProductListPage() {
               </p>
               <div className="flex flex-wrap gap-2 mt-2 text-xs">
                 <Link href={`/seller/produk/${p.id}/edit`} className="btn-outline px-2 py-1 min-h-0">Edit</Link>
+                <Link href={`/seller/produk/${p.id}/statistik`} className="btn-outline px-2 py-1 min-h-0">📈 Statistik</Link>
                 <button onClick={() => handleDuplicate(p.id)} className="btn-outline px-2 py-1 min-h-0">Duplikat</button>
                 <button onClick={() => toggleActive(p)} className="btn-outline px-2 py-1 min-h-0">
                   {p.isActive ? 'Nonaktifkan' : 'Aktifkan'}

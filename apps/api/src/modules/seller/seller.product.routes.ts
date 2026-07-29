@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import { requireShopOwner } from './seller.middleware';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { getProductStats } from './product.stats';
 
 export const sellerProductRouter = Router();
 sellerProductRouter.use(requireAuth, requireShopOwner);
@@ -58,6 +59,16 @@ sellerProductRouter.get('/:id', async (req, res, next) => {
     });
     if (!product) throw new NotFoundError('Produk tidak ditemukan');
     return ok(res, product);
+  } catch (err) { next(err); }
+});
+
+// GET /api/v1/seller/products/:id/stats?range=7d|30d — statistik per produk (M11-B4).
+sellerProductRouter.get('/:id/stats', async (req, res, next) => {
+  try {
+    const stats = await getProductStats(req.shop!.id, req.params.id, req.query.range);
+    // null = bukan milik toko ini atau tidak ada — jangan bedakan keduanya.
+    if (!stats) throw new NotFoundError('Produk tidak ditemukan');
+    return ok(res, stats);
   } catch (err) { next(err); }
 });
 
