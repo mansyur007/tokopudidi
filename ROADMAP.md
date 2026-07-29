@@ -1,7 +1,9 @@
 # 🗺️ Tokopudidi — Roadmap M7–M15
 
-> **Status dokumen**: Draft 2 · Terakhir di-update: **2026-07-05**
+> **Status dokumen**: Draft 3 · Terakhir di-update: **2026-07-29**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
+>
+> **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
 > **Progress terbaru (2026-07-27)** — **M10 selesai (menunggu review)**: A5 QRIS Mock UX ([PR #30](https://github.com/mansyur007/tokopudidi/pull/30)), A10 Filter Search Lengkap ([PR #31](https://github.com/mansyur007/tokopudidi/pull/31)), A7 Komplain/Return. Ketiganya butuh migration, jadi jalankan `prisma migrate deploy` saat merge. Milestone berikutnya yang bebas di-klaim: **M11**.
 >
@@ -472,172 +474,217 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ### M11-B1. Etalase / Showcase Toko ⭐
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
 - **Scope**: Seller kelompokkan produk dalam folder ("Best Seller", "Diskon"), tampil sebagai tab di halaman toko.
+- **Konteks kode (audit 2026-07-29)**:
+  - Halaman toko [apps/web/src/app/(buyer)/toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) **belum punya tab bar** — hanya section header + grid produk. Tab "Semua" = grid existing.
+  - Route publik toko: `shopRouter.get('/:slug')` di [apps/api/src/modules/shop/shop.routes.ts](apps/api/src/modules/shop/shop.routes.ts#L24).
+  - Registrasi router seller di [apps/api/src/app.ts](apps/api/src/app.ts#L102-L108) — tambahkan `sellerShowcaseRouter` → `/api/v1/seller/showcase`.
+  - **Pola yang ditiru**: ChatTemplate M8-B6 ([seller.chatTemplate.routes.ts](apps/api/src/modules/seller/seller.chatTemplate.routes.ts) + `ChatTemplateManager`) — CRUD + reorder tombol ▲▼ (swap kolom `order`), bukan drag-and-drop.
 - **Schema**:
   ```
   model ShopShowcase {
-    id        String   @id @default(cuid())
+    id        String   @id @default(uuid())   // uuid, bukan cuid — konsisten model lain
     shopId    String
+    shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
     name      String
     slug      String
     order     Int      @default(0)
+    createdAt DateTime @default(now())
     products  ShopShowcaseProduct[]
     @@unique([shopId, slug])
     @@index([shopId, order])
   }
   model ShopShowcaseProduct {
     showcaseId String
+    showcase   ShopShowcase @relation(fields: [showcaseId], references: [id], onDelete: Cascade)
     productId  String
+    product    Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
     order      Int @default(0)
     @@id([showcaseId, productId])
   }
   ```
+  Tambah relasi balik: `Shop.showcases ShopShowcase[]`, `Product.showcaseItems ShopShowcaseProduct[]`.
 - **API**:
-  - Seller: `GET/POST/PUT/DELETE /api/v1/seller/showcase`, `POST /api/v1/seller/showcase/:id/products` (bulk assign), `DELETE /api/v1/seller/showcase/:id/products/:productId`
-  - Public: include di `GET /api/v1/shops/:slug` response
+  - Seller: `GET/POST/PUT/DELETE /api/v1/seller/showcase`, `POST /api/v1/seller/showcase/:id/products` (bulk assign, replace-all), `DELETE /api/v1/seller/showcase/:id/products/:productId`, `POST /api/v1/seller/showcase/:id/move` (▲▼ swap order — pola chat template)
+  - Public: include `showcases` (id, name, slug, productCount) di `GET /api/v1/shops/:slug`; produk per etalase via `GET /api/v1/shops/:slug/showcase/:showcaseSlug` (paginated, lewat `toProductCard` yang sama supaya harga sale M9-B3 ikut)
 - **UI**:
-  - Seller panel baru `apps/web/src/app/seller/etalase/page.tsx` — list + create modal + product picker (multi-select dari produk toko)
-  - [apps/web/src/app/(buyer)/toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) — tab bar atas (etalase + tab "Semua")
-  - Route: `apps/web/src/app/(buyer)/toko/[slug]/etalase/[showcaseSlug]/page.tsx`
+  - Seller panel baru `apps/web/src/app/seller/etalase/page.tsx` — list + create modal + product picker multi-select dari produk toko; tambah menu di `SellerShell.tsx`
+  - Halaman toko — tab bar atas (tab "Semua" + satu tab per etalase); route `apps/web/src/app/(buyer)/toko/[slug]/etalase/[showcaseSlug]/page.tsx`
+- **Jebakan**:
+  - Bulk assign **wajib validasi kepemilikan**: semua `productId` harus `shopId` milik seller (query `findMany where id IN … AND shopId` lalu bandingkan count) — tanpa ini seller bisa menempelkan produk toko lain ke etalasenya.
+  - Etalase tanpa produk aktif disembunyikan dari respons publik, tapi tetap tampil di panel seller.
+  - `slug` dibuat dari `name` saat create dan **stabil setelahnya** (URL shareable) — rename hanya mengubah `name`.
+  - Hapus etalase hanya menghapus baris join (cascade), bukan produknya.
+  - Max 10 etalase per toko, max 50 produk per etalase (guard zod + UI).
 - **Acceptance**:
   - [ ] Produk bisa ada di > 1 etalase
-  - [ ] Etalase tanpa produk tidak ditampilkan ke buyer
-  - [ ] Drag reorder etalase
+  - [ ] Etalase tanpa produk (aktif) tidak ditampilkan ke buyer
+  - [ ] Reorder etalase via tombol ▲▼ (konsisten M8-B6)
+  - [ ] Assign produk toko lain → 403, tidak ada partial write
+  - [ ] Harga di tab etalase identik dengan grid "Semua" (sale price ikut)
 - **Effort**: M
 
 ---
 
 ### M11-B4. Statistik Produk Detail
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Seller lihat per-produk: view 7/30d, ATC count, conversion %, revenue, line chart.
-- **API**: `GET /api/v1/seller/products/:id/stats?range=7d|30d|all` aggregate dari ProductView (M7-A2), CartItem, OrderItem.
-- **UI**: Baru `apps/web/src/app/seller/produk/[id]/statistik/page.tsx` — pakai chart library ringan (recharts atau chart.js).
+- **Scope**: Seller lihat per-produk: penonton unik per hari (chart), total view, terjual, revenue, conversion.
+- **Konteks kode (audit 2026-07-29)** — dua fakta yang memaksa re-scope dari rencana lama:
+  - **`ProductView` di-upsert** per (userId/sessionKey, productId) — `viewedAt` di-overwrite saat dilihat ulang. Agregat per-hari dari `ProductView.viewedAt` = "penonton unik yang terakhir lihat hari itu" (aproksimasi), **bukan** pageview historis. `Product.viewCount` = counter kumulatif sesungguhnya.
+  - **`CartItem` dihapus saat checkout** — data ATC historis tidak ada. **Metrik ATC di-drop** dari scope; jangan bangun event-log baru hanya untuk ini.
+  - Pola agregasi harian sudah ada di [seller.dashboard.routes.ts](apps/api/src/modules/seller/seller.dashboard.routes.ts#L11-L70) (loop hari + `prisma.aggregate`) — tiru.
+  - **Belum ada chart library** di `apps/web/package.json` (hanya next/react/zustand) — tambah `recharts`, render via `next/dynamic` `ssr: false` supaya tidak membebani SSR.
+- **Metrik yang di-deliver**:
+  - Chart: penonton unik per hari (dari `ProductView.viewedAt`, label jujur "penonton unik (aproksimasi)")
+  - Angka: `viewCount` total, `soldCount`, revenue & order count dari `OrderItem` join `Order.status IN (PAID…COMPLETED)`, conversion = pembeli unik ÷ penonton unik (guard division-by-zero → 0%)
+- **API**: `GET /api/v1/seller/products/:id/stats?range=7d|30d` — guard kepemilikan produk via `seller.middleware` + cek `product.shopId`.
+- **UI**: Baru `apps/web/src/app/seller/produk/[id]/statistik/page.tsx` + link/icon 📈 dari tabel produk seller ([apps/web/src/app/seller/produk/page.tsx](apps/web/src/app/seller/produk/page.tsx)).
 - **Acceptance**:
-  - [ ] Chart view 30 hari render < 500ms
-  - [ ] Conversion = `paidOrderCount / viewCount` (dengan handling division by zero)
-  - [ ] Tabel detail order yang include produk ini
+  - [ ] Chart 30 hari render, hari tanpa view tetap muncul sebagai 0 (bukan bolong)
+  - [ ] Conversion dengan 0 view → tampil 0%, tidak NaN/crash
+  - [ ] Tabel order terakhir yang memuat produk ini (nomor order, qty, status, link)
+  - [ ] Produk milik toko lain → 404/403
 - **Effort**: S
 
 ---
 
 ### M11-A8. Variant Kombinasi Multi-Axis
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Refactor variant dari single-axis (`name`) jadi multi-axis (warna × ukuran × ...). Stock & price per kombinasi.
-- **Schema**:
+- **Scope**: Refactor variant dari single-axis (`name`) jadi multi-axis (warna × ukuran). Stock & priceModifier per kombinasi.
+- **Konteks kode (audit 2026-07-29)** — siapa saja yang memegang `ProductVariant` sekarang:
+  - Model: `ProductVariant { name, priceModifier, stock, isActive }` ([schema.prisma:299](packages/database/prisma/schema.prisma#L299)) — direferensikan `CartItem.variantId` dan `OrderItem { variantId, variantName }` (snapshot).
+  - BuyBox: state `variantId` tunggal + chips ([BuyBox.tsx:111-123](apps/web/src/components/product/BuyBox.tsx#L111-L123)); harga = `getEffectivePrice + priceModifier` (:67).
+  - Seller form: `state.variants` array flat di [ProductForm.tsx](apps/web/src/components/seller/ProductForm.tsx#L46) (418 baris — form sudah padat, matrix editor jadi komponen terpisah).
+  - Checkout: harga per item di [order.service.ts:152](apps/api/src/modules/order/order.service.ts#L152) — **tidak berubah**, `priceModifier` tetap milik `ProductVariant`.
+- **Prinsip desain**: **`ProductVariant` dipertahankan** (id tetap → FK dari CartItem/OrderItem aman); yang baru hanya lapisan option/value + tabel join. Kolom `name` di-drop paling akhir.
+- **Schema** (additive dulu):
   ```
   model ProductOption {
-    id        String   @id @default(cuid())
+    id        String   @id @default(uuid())
     productId String
+    product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
     name      String   // "Warna", "Ukuran"
     order     Int      @default(0)
     values    ProductOptionValue[]
+    @@index([productId, order])
   }
   model ProductOptionValue {
-    id        String   @id @default(cuid())
+    id        String   @id @default(uuid())
     optionId  String
+    option    ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
     value     String   // "Merah", "M"
     order     Int      @default(0)
   }
-  // ProductVariant: drop `name`, tambah relasi M2M ke values
-  model ProductVariant {
-    id            String   @id @default(cuid())
-    productId     String
-    sku           String?
-    stock         Int
-    priceModifier Int      @default(0)
-    imageUrl      String?
-    values        ProductVariantValue[]
-  }
   model ProductVariantValue {
     variantId     String
+    variant       ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
     optionValueId String
+    optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
     @@id([variantId, optionValueId])
   }
+  // ProductVariant: + values ProductVariantValue[], + imageUrl String? (opsional per rencana)
   ```
-- **Data migration**: existing single-axis variants → buat 1 ProductOption "Varian" + values per row.
-- **API**: include nested struktur di product detail; semua input form pakai struktur baru.
+- **Migration plan (4 tahap, jangan digabung)**:
+  1. Migration additive: 3 tabel baru + relasi.
+  2. **Backfill via script terpisah** di `scripts/` (bukan di SQL migration): per produk yang punya variants → buat `ProductOption` "Varian" + 1 value per `variant.name` + link `ProductVariantValue`. Idempotent (skip produk yang sudah punya option).
+  3. Switch code path: product detail response + zod di [packages/shared/src/schemas/product.ts](packages/shared/src/schemas/product.ts) kirim struktur nested; BuyBox & ProductForm baca struktur baru. FE+API satu repo, deploy bareng — tidak perlu dual-read lama.
+  4. Migration drop `ProductVariant.name` — **terpisah**, setelah verifikasi produksi.
 - **UI**:
-  - BuyBox: render satu kelompok chip per option, disable value tidak valid (tidak combine ke variant aktif), update image jika variant punya imageUrl khusus.
-  - Seller form: matrix editor — table 2D dengan cell per kombinasi, input stock+priceMod+sku.
-- **Migration plan**:
-  1. Tambah tabel baru (additive)
-  2. Backfill script jalankan untuk convert data
-  3. Switch code path baca ke struktur baru
-  4. Drop kolom legacy
+  - BuyBox: satu kelompok chip per option; value di-disable kalau tidak ada kombinasi aktif+berstok dengan value yang sudah dipilih; kombinasi terpilih lengkap → tampil stok & harga; variant ber-`imageUrl` → ganti gambar utama.
+  - Seller: komponen baru `VariantMatrixEditor` — definisikan option+values, auto-generate kombinasi kartesius jadi tabel (baris = kombinasi; kolom stock/priceModifier/aktif).
+- **Jebakan**:
+  - **Edit variant jangan regenerate row**: match kombinasi lama by value-set, update in place; kombinasi yang hilang → `isActive=false` (bukan delete — masih direferensikan CartItem/OrderItem).
+  - Snapshot `OrderItem.variantName` = join values ("Merah / M") — set saat checkout.
+  - Guard: max 3 option per produk, total kombinasi ≤ 50 (zod + UI sebelum generate).
+  - Cart berisi variant yang di-nonaktifkan → tampil "varian tidak tersedia" di keranjang, blokir checkout item itu (perilaku sama dengan produk nonaktif existing).
 - **Acceptance**:
-  - [ ] Produk lama tetap render benar setelah migration
-  - [ ] Pilih warna "Merah" → ukuran yang tidak ada stok Merah disable
-  - [ ] Total kombinasi max 50 (UI guard)
-- **Effort**: L (paling besar di milestone)
+  - [ ] Produk lama (single-axis) tetap render benar setelah backfill, tanpa edit manual
+  - [ ] Cart/order lama yang mereferensikan variant lama tetap valid
+  - [ ] Pilih "Merah" → ukuran tanpa stok Merah disable
+  - [ ] Guard 50 kombinasi bekerja di FE dan API
+  - [ ] Drop `name` baru dijalankan setelah semua acceptance lain hijau
+- **Effort**: L (paling besar di milestone — kerjakan terakhir supaya tidak block B1/B4)
 
 ---
 
 ### M12-A11. Mobile Bottom Nav
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Bottom nav fixed 5 icon untuk mobile (Home / Wishlist / Order / Notif / Akun).
+- **Scope**: Bottom nav fixed 5 icon untuk mobile: Home `/` · Wishlist `/wishlist` · Pesanan `/pesanan` · Notif `/notifikasi` · Akun `/akun`.
+- **Konteks kode (audit 2026-07-29)**:
+  - [layout.tsx:11](apps/web/src/app/(buyer)/layout.tsx#L11) buyer sudah `<main className="flex-1 pb-20 md:pb-0">` — **ruang bottom nav sudah disiapkan**, tidak perlu ubah padding.
+  - Sumber badge sudah ada di [Header.tsx](apps/web/src/components/shell/Header.tsx#L37-L39): `useCartStore.totalQuantity()`, `useWishlistStore.ids.size`, dan `NotifBell` (unread count) — **reuse store yang sama**, jangan fetch ulang. Kalau unread count masih lokal di `NotifBell`, angkat ke store/hook bersama dulu.
+  - Icon wishlist di header saat ini `hidden md:inline-grid` — bottom nav jadi akses mobile-nya (konsisten).
 - **UI**:
-  - Baru: `apps/web/src/components/shell/MobileBottomNav.tsx` — `fixed bottom-0 md:hidden`
-  - [apps/web/src/app/(buyer)/layout.tsx](apps/web/src/app/(buyer)/layout.tsx) — render + tambah `pb-[64px]` ke `<main>`
+  - Baru: `apps/web/src/components/shell/MobileBottomNav.tsx` — `md:hidden fixed bottom-0 inset-x-0 z-40`, tinggi ~64px + `pb-[env(safe-area-inset-bottom)]` (iOS).
+  - Render di [layout.tsx](apps/web/src/app/(buyer)/layout.tsx) buyer saja — **tidak** di (auth)/seller/admin layout.
+  - Active state: `/` exact match; lainnya `pathname.startsWith(href)`.
+  - **Sembunyikan** di `/checkout`, `/pesanan/[id]/bayar`, dan `/chat` (composer chat butuh bottom penuh) — cek via `usePathname` di komponen (client), bukan di layout.
+- **Badge**: wajib = notif unread; opsional = pesanan `PENDING_PAYMENT` (kalau digarap, ambil dari list orders existing dengan filter status, jangan endpoint baru).
 - **Acceptance**:
-  - [ ] Active state berdasarkan pathname (home / akun/wishlist / pesanan / notifikasi / akun)
-  - [ ] Badge count untuk Notif & Order (pending payment)
-  - [ ] Tidak muncul di halaman checkout/bayar (hide UI ribet)
+  - [ ] Muncul hanya < md, tidak menutupi konten (padding main sudah ada)
+  - [ ] Active state benar di 5 route + nested route (`/pesanan/xxx` → tab Pesanan)
+  - [ ] Hidden di checkout, halaman bayar, dan chat
+  - [ ] Badge notif konsisten dengan angka di `NotifBell` (satu sumber)
 - **Effort**: S
 
 ---
 
 ### M12-D3. SEO & Meta
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Sitemap dinamis, robots, JSON-LD per produk, OG meta per produk/toko/kategori.
+- **Scope**: Sitemap dinamis, robots, JSON-LD produk, OG meta per produk/toko/kategori. Domain: `https://toko.emha.space`.
+- **Konteks kode (audit 2026-07-29)**:
+  - **Belum ada satu pun `generateMetadata`** di `apps/web` — halaman buyer adalah server component yang fetch via `apps/web/src/lib/api/*`; `generateMetadata` bisa pakai helper fetch yang sama (Next dedup request per render).
+  - **Sebagian `ProductImage.url` adalah data-URI base64** (upload via FileReader, `express.json` limit 5mb) — data-URI **tidak valid** untuk `og:image`/JSON-LD dan membengkakkan `<head>`. Semua meta image wajib difilter: hanya pakai URL `http(s)`, kalau tidak ada → fallback tanpa og:image.
+  - Set `metadataBase` di root layout (`apps/web/src/app/layout.tsx`) → env `NEXT_PUBLIC_SITE_URL`.
+- **API**: baru `GET /api/v1/sitemap` — sekali call kembalikan `{ products: [{slug, updatedAt}], shops: […], categories: […] }`, produk aktif saja, cap 5.000 terbaru — lebih hemat daripada crawling endpoint list paginated.
 - **Files**:
-  - Baru: `apps/web/src/app/sitemap.ts` (Next 14 metadata route)
-  - Baru: `apps/web/src/app/robots.ts`
-  - [apps/web/src/app/(buyer)/produk/[slug]/page.tsx](apps/web/src/app/(buyer)/produk/[slug]/page.tsx) — `generateMetadata()` + `<script type="application/ld+json">`
-  - Sama untuk `/toko/[slug]` & `/kategori/[slug]`
+  - Baru: `apps/web/src/app/sitemap.ts` + `apps/web/src/app/robots.ts` (disallow: `/admin`, `/seller`, `/akun`, `/checkout`, `/keranjang`, `/chat`, `/scrap`)
+  - [produk/[slug]/page.tsx](apps/web/src/app/(buyer)/produk/[slug]/page.tsx) — `generateMetadata()` + JSON-LD `Product`: `offers.price` = **harga efektif** (`getEffectivePrice` — konsisten M9-B3), `priceCurrency: "IDR"`, `availability` dari stock, `aggregateRating` hanya jika `ratingCount > 0`
+  - Sama untuk `/toko/[slug]` & `/kategori/[slug]` (OG title/description saja, tanpa JSON-LD Product)
 - **Acceptance**:
-  - [ ] `/sitemap.xml` list semua produk/toko/kategori dengan lastmod
-  - [ ] Google Rich Results Test pass untuk product page
-  - [ ] OG image kelihatan saat preview link di WhatsApp/Telegram
+  - [ ] `/sitemap.xml` valid, berisi produk/toko/kategori + lastmod
+  - [ ] Google Rich Results Test pass untuk halaman produk (dengan & tanpa rating)
+  - [ ] Produk yang semua gambarnya data-URI → meta tetap valid tanpa og:image (tidak menyisipkan base64 ke head)
+  - [ ] Harga di JSON-LD = harga sale saat sale aktif
 - **Effort**: S
 
 ---
 
 ### M12-D4. Image Optimization Audit
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Audit `<img>` yang belum pakai `next/image`, register remote pattern.
-- **Files**:
-  - [apps/web/src/components/product/ProductReviews.tsx](apps/web/src/components/product/ProductReviews.tsx#L192) — convert ke Image dengan `unoptimized` jika perlu
-  - [apps/web/next.config.js](apps/web/next.config.js) — tambah `images.remotePatterns` untuk MinIO/R2
+- **Scope**: Audit pemakaian `<img>` mentah, konversi yang layak ke `next/image`, rapikan `remotePatterns`.
+- **Konteks kode (audit 2026-07-29)** — `<img>` dipakai di **17 file**, terbagi dua kelas:
+  1. **Data-URI / preview upload — biarkan `<img>`** (next/image tidak mengoptimasi data-URI): `QrisPanel.tsx` (QR PNG data-URI), `ComplaintModal/Card`, `ReportModal`, `ProductForm`, `pesanan/[id]/bayar` (bukti bayar), `ChatRoom` (gambar base64), `seller/daftar` (preview KTP).
+  2. **URL remote — konversi ke `next/image`**: [ProductReviews.tsx:192](apps/web/src/components/product/ProductReviews.tsx#L192), thumbnail di tabel admin (`banner`, `laporan`, `produk`, `refund`, `toko`) & seller (`pembayaran`, `ulasan`, `pesanan/ulasan`).
+  - `remotePatterns` saat ini hanya `picsum.photos`, `images.unsplash.com`, `placehold.co` ([next.config.js:10-14](apps/web/next.config.js#L10-L14)).
+- **Langkah pertama (wajib)**: cek proporsi nyata URL vs data-URI di DB — `SELECT left(url,30), count(*) FROM "ProductImage" GROUP BY 1` — kalau mayoritas data-URI, konversi kelas 2 tetap jalan tapi penambahan `remotePatterns` produksi menunggu ada host media http nyata (MinIO belum diekspos via URL publik).
+- **Catatan**: gambar data-URI yang tampil di list panjang (chat, komplain) sebaiknya diberi `loading="lazy"` — perbaikan murah tanpa next/image.
 - **Acceptance**:
-  - [ ] Lighthouse "Properly size images" pass
-  - [ ] Tidak ada warning eslint-disable img element baru
+  - [ ] Semua `<img>` tersisa punya alasan (data-URI/preview) — tercatat di PR
+  - [ ] Konversi tidak merusak layout (dimensi/fill diuji di mobile & desktop)
+  - [ ] Lighthouse "Properly size images" pass di halaman produk & ulasan
 - **Effort**: S
 
 ---
 
 ### M12-C3. Audit Log Aksi Admin
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Catat semua aksi admin (siapa takedown apa, kapan, alasan).
-- **Schema**:
+- **Scope**: Catat semua aksi tulis admin (siapa, apa, kapan, payload) — append-only + viewer.
+- **Konteks kode (audit 2026-07-29)**:
+  - Guard admin = `requireRole('ADMIN')` ([middleware/auth.ts:28](apps/api/src/middleware/auth.ts#L28)); route admin tersebar di `admin.*.routes.ts` ([app.ts:111-121](apps/api/src/app.ts#L111-L121)).
+  - **Inventaris aksi yang wajib dicatat** (dari route existing): suspend/unsuspend user, verify KTP, toggle official store (M10-A10), takedown/restore produk, resolve refund, resolve report, decide komplain (M10-A7), CRUD voucher platform, CRUD banner, CRUD kategori.
+- **Implementation**: helper eksplisit — **bukan** middleware otomatis (lebih jelas & testable):
+  ```ts
+  // apps/api/src/lib/adminLog.ts
+  export function logAdmin(adminId, action, opts?: { targetType?, targetId?, payload?, note? }): void
+  // fire-and-forget: void prisma.adminLog.create(...).catch(err => logger.error(...))
   ```
-  model AdminLog {
-    id         String   @id @default(cuid())
-    adminId    String
-    action     String   // "TAKEDOWN_PRODUCT", "VERIFY_KTP", ...
-    targetType String?
-    targetId   String?
-    payload    Json?
-    note       String?
-    createdAt  DateTime @default(now())
-    @@index([adminId, createdAt])
-    @@index([action, createdAt])
-  }
-  ```
-- **Implementation**: middleware atau decorator di route `/admin/*` log setiap action sukses.
-- **UI**: Baru `apps/web/src/app/admin/log/page.tsx` — filter by adminId, action, date range, pagination.
+  Dipanggil setelah aksi sukses di tiap route; **tidak di-`await`** di jalur respons (acceptance ≤100ms otomatis terpenuhi).
+- **Schema**: model `AdminLog` sesuai rencana lama (id uuid, adminId, action string konstanta `"TAKEDOWN_PRODUCT"` dst, targetType/targetId, payload Json, note, createdAt; index `[adminId, createdAt]` + `[action, createdAt]`). Tanpa route delete — append-only by construction.
+- **UI**: Baru `apps/web/src/app/admin/log/page.tsx` — filter adminId/action/rentang tanggal + pagination; tambah entry nav di [AdminShell.tsx:10-20](apps/web/src/components/admin/AdminShell.tsx#L10-L20) (array `navItems`, emoji 📜).
 - **Acceptance**:
-  - [ ] Setiap aksi admin tercatat dalam ≤ 100ms tanpa block response
-  - [ ] Log viewer filter & paginated
-  - [ ] Log tidak bisa dihapus (append-only)
+  - [ ] Semua aksi di inventaris di atas tercatat (checklist di PR)
+  - [ ] Log gagal ditulis → aksi utama tetap sukses, error masuk pino
+  - [ ] Viewer filter & paginated; tidak ada endpoint hapus/edit log
 - **Effort**: S
 
 ---
@@ -648,238 +695,237 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 
 ### M13-A1. Follow / Favorit Toko ⭐
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Buyer bisa follow toko dari halaman toko, lihat daftar toko yang di-follow di `/akun/toko-favorit`, unfollow. Halaman toko tampilkan jumlah follower. Pilar retensi utama Tokopedia yang belum ada sama sekali.
-- **Schema**:
-  ```
-  model ShopFollower {
-    shopId    String
-    userId    String
-    createdAt DateTime @default(now())
-    shop      Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-    user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
-    @@id([shopId, userId])
-    @@index([userId, createdAt])
-  }
-  ```
-- **API**:
-  - `POST /api/v1/shops/:slug/follow` · `DELETE /api/v1/shops/:slug/follow`
-  - `GET /api/v1/users/me/following?page=&limit=` → list toko + followerCount
-  - `GET /api/v1/shops/:slug` — include `followerCount` + `isFollowing` (jika login)
-- **UI touch**:
-  - [apps/web/src/app/(buyer)/toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) — tombol Follow/Following + follower count di header toko
-  - Baru: `apps/web/src/app/(buyer)/akun/toko-favorit/page.tsx` — grid toko
+- **Scope**: Buyer follow toko dari halaman toko, lihat daftar di `/akun/toko-favorit`, unfollow. Halaman toko tampilkan follower count. Prasyarat M13-B2 Broadcast.
+- **Konteks kode (audit 2026-07-29)**:
+  - `GET /shops/:slug` di [shop.routes.ts:24](apps/api/src/modules/shop/shop.routes.ts#L24) — `isFollowing` butuh auth opsional; middleware **`optionalAuth` sudah ada** ([apps/api/src/middleware/optionalAuth.ts](apps/api/src/middleware/optionalAuth.ts)).
+  - **Pola yang ditiru persis**: wishlist M7-A1 — optimistic toggle + redirect `/masuk?return=` untuk guest ([apps/web/src/store/wishlist.ts](apps/web/src/store/wishlist.ts)).
+  - `followerCount` via `_count.followers` include — **jangan** kolom counter (skala belum butuh).
+- **Schema**: model `ShopFollower` sesuai rencana lama (id uuid composite `@@id([shopId, userId])`, index `[userId, createdAt]`) + relasi balik `Shop.followers`, `User.followedShops`.
+- **API**: `POST`/`DELETE /api/v1/shops/:slug/follow` · `GET /api/v1/users/me/following?page=&limit=` (registrasi pattern `users/me/*` di [app.ts:94-96](apps/api/src/app.ts#L94-L96)) · `GET /shops/:slug` + `followerCount` & `isFollowing`.
+- **UI**: tombol Follow/Following + count di header toko ([toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) — header section sekitar baris 33-63); halaman baru `/akun/toko-favorit` (grid toko, tombol unfollow inline).
 - **Acceptance**:
-  - [ ] Logged-out klik Follow → redirect `/masuk` dengan return URL (pola sama M7-A1)
-  - [ ] Toggle optimistic, follower count update tanpa reload
-  - [ ] Unfollow dari halaman `/akun/toko-favorit` langsung remove dari grid
+  - [ ] Logged-out klik Follow → redirect `/masuk` dengan return URL (pola M7-A1)
+  - [ ] Toggle optimistic, count update tanpa reload; double-click tidak double-insert (upsert/skipDuplicates)
+  - [ ] Unfollow dari `/akun/toko-favorit` langsung remove dari grid
 - **Effort**: S
 
 ---
 
 ### M13-A2. Invoice Pesanan (Buyer)
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Buyer bisa lihat & cetak invoice per pesanan — halaman printable ala `seller/pesanan/[id]/print` yang sudah ada (bukan PDF generator, cukup print-to-PDF browser).
-- **Schema**: tidak ada — semua data sudah di `Order` (orderNumber, snapshot alamat, items, total).
-- **API**: pakai `GET /api/v1/orders/:id` existing (guard: hanya buyer pemilik order).
-- **UI touch**:
-  - Baru: `apps/web/src/app/(buyer)/pesanan/[id]/invoice/page.tsx` — layout print-friendly (logo, nomor invoice = orderNumber, rincian item, ongkir, diskon, total, metode bayar)
-  - [apps/web/src/app/(buyer)/pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx) — tombol "Lihat Invoice" (muncul setelah PAID)
+- **Scope**: Halaman invoice printable per pesanan (print-to-PDF browser, bukan PDF generator).
+- **Konteks kode (audit 2026-07-29)**:
+  - **Pola print sudah ada**: `apps/web/src/app/seller/pesanan/[id]/print/page.tsx` — tiru layout + media-query print-nya.
+  - Data lengkap tanpa join produk hidup: `Order.buyerAddress`/`shopAddress` (Json snapshot), `OrderItem.productName/variantName/price/subtotal` (snapshot), `promoCode`/`discountAmount`/`shippingCost`/`total`.
+  - `GET /api/v1/orders/:id` existing sudah guard buyer pemilik — **tidak perlu API baru**.
+- **UI**:
+  - Baru: `apps/web/src/app/(buyer)/pesanan/[id]/invoice/page.tsx` — nomor invoice = `INV/{orderNumber}`, rincian item, ongkir, diskon (kalau ada), total, metode bayar, alamat snapshot
+  - [pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx) — tombol "Lihat Invoice", tampil hanya untuk status `PAID | PROCESSING | SHIPPED | DELIVERED | COMPLETED` (bukan PENDING_PAYMENT/CANCELLED/EXPIRED/REFUNDED)
 - **Acceptance**:
-  - [ ] Invoice hanya bisa diakses buyer pemilik order
-  - [ ] Tombol muncul hanya untuk status ≥ PAID
-  - [ ] `window.print()` menghasilkan 1 halaman A4 rapi (media query print)
+  - [ ] Hanya buyer pemilik yang bisa akses (guard existing)
+  - [ ] Status di bawah PAID / dibatalkan → tombol tidak muncul & akses langsung di-redirect
+  - [ ] `window.print()` → 1 halaman A4 rapi, tombol/nav tersembunyi via `print:hidden`
 - **Effort**: S
 
 ---
 
 ### M13-B1. Harga Grosir (Tiered Pricing)
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Seller set harga bertingkat per kuantitas (beli ≥10 lebih murah). Fitur khas Tokopedia yang pas untuk UMKM semi-B2B. BuyBox render tabel harga grosir, harga di cart/checkout mengikuti qty.
-- **Schema**:
+- **Scope**: Seller set harga bertingkat per kuantitas (max 5 tier). BuyBox render tabel tier + harga mengikuti qty; cart/checkout ikut.
+- **Konteks kode (audit 2026-07-29)** — titik integrasi harga (semuanya terverifikasi):
+  - Kontrak prioritas terdokumentasi di [packages/shared/src/utils/price.ts:1-3](packages/shared/src/utils/price.ts#L1-L3): Flash Sale > Sale Price > **Grosir** > normal.
+  - Call sites yang harus pindah ke helper baru: checkout [order.service.ts:152](apps/api/src/modules/order/order.service.ts#L152), cart [cart.service.ts:41](apps/api/src/modules/cart/cart.service.ts#L41), `toProductCard` di product.service (card tetap tampil harga satuan qty=1 — tabel tier hanya di BuyBox).
+  - **Koreksi rencana lama**: kolom snapshot bernama `OrderItem.price` — `priceAtPurchase` tidak pernah ada (sudah dikoreksi di deliver notes M9-B3).
+- **Schema**: model `ProductWholesaleTier` sesuai rencana (id uuid, productId, minQty, price, `@@unique([productId, minQty])`, onDelete Cascade) + relasi `Product.wholesaleTiers`.
+- **Helper** (extend `price.ts`, bukan file baru):
+  ```ts
+  // tier menang hanya kalau lebih murah dari harga efektif (kontrak "min", lihat M9-B3/M15-C1)
+  getUnitPrice(p: SalePriceFields & { wholesaleTiers?: {minQty; price}[] }, qty: number, now?: Date): number
   ```
-  model ProductWholesaleTier {
-    id        String  @id @default(cuid())
-    productId String
-    minQty    Int
-    price     Int
-    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-    @@unique([productId, minQty])
-  }
-  ```
-- **API**:
-  - Include `wholesaleTiers` di product detail & seller product form (nested create/update)
-  - Helper `getUnitPrice(product, qty)` di shared package — dipakai cart, checkout, dan `OrderItem.priceAtPurchase`
-- **UI touch**:
-  - [apps/web/src/components/product/BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx) — tabel harga grosir + harga berubah saat qty naik
-  - Seller product form ([apps/web/src/app/seller/produk/baru](apps/web/src/app/seller/produk/baru/page.tsx) & edit) — section "Harga Grosir" (max 5 tier)
+  Variant `priceModifier` **ditambahkan setelah** `getUnitPrice` (konsisten pola existing di order.service:152).
+- **Validasi** (zod di [packages/shared/src/schemas/seller.ts](packages/shared/src/schemas/seller.ts) / product schema): max 5 tier, `minQty` naik monoton mulai ≥ 2, `price` turun monoton dan < harga normal.
+- **UI**:
+  - [BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx) — tabel tier + harga satuan/subtotal update saat qty berubah
+  - [ProductForm.tsx](apps/web/src/components/seller/ProductForm.tsx) — section "Harga Grosir" (pola section "Diskon Periodik" di :234)
+  - Keranjang — harga satuan item ikut tier saat qty diedit (cart.service sudah hitung server-side, FE refresh)
 - **Acceptance**:
-  - [ ] Validasi: minQty naik monoton, price turun monoton, max 5 tier
-  - [ ] Ubah qty di BuyBox/cart → harga satuan & subtotal update sesuai tier
-  - [ ] `OrderItem.priceAtPurchase` menyimpan harga tier saat checkout
-  - [ ] Interaksi dengan sale price (M9-B3): pakai `min(effectivePrice, tierPrice)` — dokumentasikan di helper
+  - [ ] Validasi monoton bekerja di FE dan API
+  - [ ] Qty naik melewati tier → harga satuan & subtotal berubah di BuyBox, cart, checkout (konsisten server-side)
+  - [ ] `OrderItem.price` menyimpan harga tier saat checkout
+  - [ ] Produk sedang sale: harga = `min(salePrice, tierPrice)` — tercakup unit test helper
 - **Effort**: M
 
 ---
 
 ### M13-B2. Broadcast Promo ke Follower
 - **Status**: ⚪ BLOCKED (butuh M13-A1) · **Owner**: _belum di-klaim_
-- **Scope**: Seller kirim pengumuman/promo ke semua follower tokonya via notifikasi in-app (bukan chat massal). Rate-limited supaya tidak jadi spam.
-- **Schema**:
-  ```
-  model ShopBroadcast {
-    id        String   @id @default(cuid())
-    shopId    String
-    title     String
-    body      String
-    productId String?  // opsional: link ke produk
-    sentAt    DateTime @default(now())
-    @@index([shopId, sentAt])
-  }
-  ```
+- **Scope**: Seller kirim pengumuman ke semua follower via notifikasi in-app. Rate-limited 1×/24 jam per toko.
+- **Konteks kode (audit 2026-07-29)**:
+  - **Koreksi rencana lama**: enum `NotificationType` ([schema.prisma:52-58](packages/database/prisma/schema.prisma#L52)) belum punya `SHOP_BROADCAST` → item ini **butuh migration** (enum aditif + model `ShopBroadcast`).
+  - Notifikasi selama ini dibuat inline `prisma.notification.create` per-module — untuk fan-out pakai `createMany` batch (chunk 500), dijalankan **setelah respons** (fire-and-forget + log), bukan di jalur request.
+  - Rate limiter existing ([middleware/rateLimit.ts](apps/api/src/middleware/rateLimit.ts)) per-IP — tidak cocok; cek `ShopBroadcast.sentAt` terakhir di DB.
+- **Schema**: model `ShopBroadcast` sesuai rencana + kolom `recipientCount Int @default(0)` (riwayat perlu tahu jangkauan) + relasi `Shop.broadcasts`.
 - **API**:
-  - `POST /api/v1/seller/broadcast` — buat broadcast + fan-out `Notification` ke follower (batch insert; tipe baru `SHOP_BROADCAST`)
-  - `GET /api/v1/seller/broadcast` — riwayat
-- **UI touch**: Baru section "Broadcast" di [apps/web/src/app/seller/pengaturan/page.tsx](apps/web/src/app/seller/pengaturan/page.tsx) atau halaman sendiri `apps/web/src/app/seller/broadcast/page.tsx`
+  - `POST /api/v1/seller/broadcast` — validasi: sentAt terakhir ≥ 24 jam (429 kalau belum), follower > 0 (400 "belum ada follower" — bukan sukses kosong), `productId` (opsional) milik toko sendiri; `linkUrl` notif = `/toko/[slug]` atau `/produk/[slug]`
+  - `GET /api/v1/seller/broadcast` — riwayat + recipientCount
+- **UI**: halaman sendiri `apps/web/src/app/seller/broadcast/page.tsx` (form title/body/product-picker + riwayat) + menu di `SellerShell.tsx`.
 - **Acceptance**:
-  - [ ] Rate limit: max 1 broadcast per toko per 24 jam
-  - [ ] Follower dapat notif in-app, klik → halaman toko atau produk terkait
-  - [ ] Fan-out 1000 follower tidak block response (> batch/async)
+  - [ ] Broadcast ke-2 dalam 24 jam → 429 dengan pesan sisa waktu
+  - [ ] Follower dapat notif tipe `SHOP_BROADCAST`, klik → toko/produk terkait
+  - [ ] Fan-out 1000 follower tidak menahan respons (batch async)
+  - [ ] Toko tanpa follower → 400 dengan pesan jelas
 - **Effort**: M
 
 ---
 
 ### M14-A1. Login dengan Google (OAuth)
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Tombol "Masuk dengan Google" di `/masuk` & `/daftar`. Akun Google baru → auto-register; email sama dengan akun existing → link.
-- **Schema diff**: `User.googleId String? @unique`, `User.passwordHash` jadi nullable (akun OAuth-only).
-- **Library**: `google-auth-library` (verifikasi ID token) — flow: Google Identity Services di client → kirim credential ke API → verify → issue JWT pair existing.
-- **API**: `POST /api/v1/auth/google` body `{ credential }` → response sama dengan login biasa (access+refresh token).
-- **UI touch**: [apps/web/src/app/(auth)/masuk/page.tsx](apps/web/src/app/(auth)/masuk/page.tsx) & daftar — tombol Google di atas form.
-- **ENV**: `GOOGLE_CLIENT_ID` (API + web `NEXT_PUBLIC_`).
+- **Scope**: Tombol "Masuk dengan Google" di `/masuk` & `/daftar`; akun baru via Google, linking ke akun existing.
+- **Konteks kode (audit 2026-07-29)** — kendala yang mengubah desain lama:
+  - Identitas utama = **phone**: `User.phone` wajib & unique, login = phone+password ([auth.service.ts:75-89](apps/api/src/modules/auth/auth.service.ts#L75)), `User.email` opsional, `passwordHash` non-null.
+  - Konsekuensi: **akun Google baru tidak bisa langsung dibuat** (tidak punya phone) → flow 2 langkah di bawah. Rencana lama "auto-register" tidak berlaku.
+- **Flow**:
+  1. `POST /api/v1/auth/google` `{ credential }` → verifikasi via `google-auth-library` (audience = `GOOGLE_CLIENT_ID`):
+     - payload `sub` match `User.googleId` → login (token pair existing)
+     - payload email match `User.email` **dan `email_verified: true`** → set `googleId`, login
+     - tidak match → **jangan buat user**; balas `{ needsPhone: true, ticket }` — ticket = JWT 5 menit (payload `{googleId, email, name, avatarUrl}`, sign pakai [lib/jwt.ts](apps/api/src/lib/jwt.ts) existing)
+  2. `POST /api/v1/auth/google/complete` `{ ticket, phone }` → validasi ticket + phone belum terpakai → create user (`passwordHash: null`, `googleId` terisi) → token pair. Verifikasi phone via OTP mengikuti flow existing (tidak blokir login pertama — konsisten register biasa).
+- **Schema diff**: `User.googleId String? @unique`, `User.passwordHash String?` (nullable).
+- **Jebakan**: semua pemakai `bcrypt.compare` wajib guard null — [auth.service.ts:87](apps/api/src/modules/auth/auth.service.ts#L87) (login form akun OAuth-only → error "Akun ini terdaftar via Google — gunakan tombol Masuk dengan Google") dan `resetPassword` (:142, reset justru jadi cara akun OAuth menambah password — biarkan jalan, set hash).
+- **UI**: komponen client `GoogleButton` (Google Identity Services script) di [(auth)/masuk/page.tsx](apps/web/src/app/(auth)/masuk/page.tsx) & daftar; state `needsPhone` → form nomor HP inline.
+- **ENV**: `GOOGLE_CLIENT_ID` (api) + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (web) → `.env.example` + env VPS.
 - **Acceptance**:
-  - [ ] Login Google akun baru → user terbuat, langsung masuk
-  - [ ] Email Google = email akun password existing → login ke akun itu (set `googleId`)
-  - [ ] Akun OAuth-only tidak bisa login via form password (error jelas)
+  - [ ] Google baru → diminta phone → akun terbuat, langsung masuk
+  - [ ] Email Google (verified) = email akun existing → login ke akun itu, `googleId` terisi
+  - [ ] Akun OAuth-only login via form password → error jelas, bukan 500
+  - [ ] Ticket kadaluarsa/diubah → 401, tidak ada user setengah jadi
 - **Effort**: M
 
 ---
 
-### M14-A2. Email Transaksional Real
+### M14-A2. Email Transaksional
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Ganti OTP mock dengan email sungguhan + email event penting: OTP register, reset password, order dibuat (buyer), order dibayar (seller), order dikirim (buyer).
-- **Library**: `nodemailer` via SMTP (Resend/Brevo free tier untuk prod; MailHog di docker-compose untuk dev).
-- **Schema**: tidak wajib (opsional `EmailLog` untuk debug).
-- **Implementation**: service `email.service.ts` dengan template sederhana (HTML inline), dipanggil dari event yang sudah ada (auth OTP, order status transition — titik yang sama dengan trigger `Notification`).
-- **ENV**: `SMTP_HOST/PORT/USER/PASS`, `EMAIL_FROM`.
+- **Scope (re-scope 2026-07-29)**: email event transaksional untuk user yang **punya email**. **OTP phone mock TETAP** — rencana lama "ganti OTP mock dengan email" tidak 1:1: OTP existing berbasis phone ([otp.service.ts](apps/api/src/modules/auth/otp.service.ts) — console mock, purpose REGISTER/LOGIN/RESET_PASSWORD) dan `User.email` opsional, jadi email tidak bisa jadi jalur wajib tanpa membuat email required (di luar scope).
+- **Event yang dikirim** (semua: skip diam-diam kalau `user.email` kosong):
+  - Order dibuat → buyer (rincian + instruksi bayar)
+  - Order dibayar → owner toko (info order masuk)
+  - Order dikirim + resi → buyer
+  - Komplain/refund diputus → buyer
+  - Welcome saat register dengan email terisi
+- **Implementation**:
+  - `apps/api/src/lib/email.ts` — nodemailer transport dari ENV; **ENV kosong → log-only mode** (dev tidak wajib MailHog); `sendMail(to, subject, html)` fire-and-forget, tidak di-`await` di jalur respons (pola sama `prisma.notification.create` yang inline di service)
+  - Template HTML inline sederhana (fungsi per event) — tanpa template engine
+  - Call sites = titik transisi status yang **sudah** memanggil `prisma.notification.create` di `order.service` / `payment.service` / `complaint.service` — tempelkan di sebelahnya
+  - `docker-compose.yml` dev: service `mailhog` (SMTP :1025, UI :8025) — opsional
+- **ENV**: `SMTP_HOST/PORT/USER/PASS`, `EMAIL_FROM` → `.env.example`; prod pakai Resend/Brevo free tier.
 - **Acceptance**:
-  - [ ] Dev: email tertangkap di MailHog (service baru di docker-compose)
-  - [ ] Kirim email tidak block response (fire-and-forget + error di-log)
-  - [ ] OTP register & reset password terkirim real, flow mock lama dihapus
+  - [ ] Dev + MailHog: 5 event di atas tertangkap dengan isi benar
+  - [ ] ENV SMTP kosong → app jalan normal, email cuma ke log
+  - [ ] SMTP down → checkout/aksi tetap sukses, error email di pino
+  - [ ] User tanpa email → tidak ada error, tidak ada kiriman
 - **Effort**: M
 
 ---
 
 ### M14-B1. Badge Reputasi Toko
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Versi ringan Power Merchant / Official Store Tokopedia. Badge otomatis dari performa + flag Official Store yang di-set admin. Tampil di ProductCard, halaman produk, dan halaman toko. Sinergi dengan filter `officialStoreOnly` di M10-A10.
-- **Schema diff**: `Shop.isOfficialStore Boolean @default(false)` (di-set admin). Badge performa **derived, bukan kolom** — helper di shared package.
-- **Logic**: `getShopBadge(shop)` → `OFFICIAL` (isOfficialStore) > `STAR_PLUS` (ktpVerified + ratingAvg ≥ 4.5 + totalSold ≥ 100) > `STAR` (ktpVerified + ratingAvg ≥ 4 + totalSold ≥ 10) > `NONE`.
-- **API**: include `badge` di response product list/detail & shop detail; admin toggle `isOfficialStore` di `PUT /api/v1/admin/shops/:id`.
-- **UI touch**:
-  - [apps/web/src/components/product/ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx) — icon badge kecil di samping nama toko
-  - [apps/web/src/app/(buyer)/toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) — badge besar di header
-  - Admin toko: toggle Official Store
+- **Scope**: Badge otomatis dari performa + Official Store. Tampil di ProductCard, halaman produk, halaman toko. **Termasuk membayar utang M10-A10** (label official yang salah sumber).
+- **Konteks kode (audit 2026-07-29)** — koreksi rencana lama:
+  - `Shop.isOfficialStore` **sudah ada** ([schema.prisma:193-195](packages/database/prisma/schema.prisma#L193)) berikut toggle admin `POST /api/v1/admin/shops/:id/official-store` + kolomnya di halaman admin toko (semua dari M10-A10) → **item ini tanpa migration & tanpa endpoint admin baru**.
+  - Utang yang dibayar di sini: halaman produk menampilkan label "Official Store" dari `ktpVerified` (deliver notes M10-A10), dan header toko menampilkan ✅ dari `ktpVerified` ([toko/[slug]/page.tsx:43](apps/web/src/app/(buyer)/toko/[slug]/page.tsx#L43)) — keduanya ganti ke badge helper.
+- **Logic**: helper pure `getShopBadge(shop)` di `packages/shared` (sebelah `price.ts`):
+  `OFFICIAL` (isOfficialStore) > `STAR_PLUS` (ktpVerified && ratingAvg ≥ 4.5 && totalSold ≥ 100) > `STAR` (ktpVerified && ratingAvg ≥ 4 && totalSold ≥ 10) > `null`.
+- **API**: hitung badge **di API** dan kirim `badge: 'OFFICIAL'|'STAR_PLUS'|'STAR'|null` di `toProductCard` (subset shop di card tidak memuat ratingAvg/totalSold — lebih murah kirim hasil daripada menambah field mentah) + shop detail + product detail.
+- **UI**: icon kecil + nama toko di [ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx); badge + tooltip (`title=`) di header toko & halaman produk. Ikon: 🏛️ OFFICIAL / ⭐+ / ⭐ (atau SVG konsisten design token).
 - **Acceptance**:
-  - [ ] Badge berubah otomatis saat kriteria terpenuhi (tanpa cron — dihitung saat read)
-  - [ ] Admin set Official Store → badge OFFICIAL menang atas badge performa
-  - [ ] Tooltip badge menjelaskan artinya
-- **Effort**: M
+  - [ ] Badge berubah otomatis saat kriteria terpenuhi (derived saat read, tanpa cron)
+  - [ ] OFFICIAL menang atas badge performa
+  - [ ] Tidak ada lagi label official/✅ bersumber `ktpVerified` di halaman produk & toko
+  - [ ] Tooltip menjelaskan arti tiap badge
+- **Effort**: M (mengecil dari rencana — schema & admin toggle sudah ada)
 
 ---
 
 ### M14-B2. Bulk Edit Stok & Harga
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Mode edit inline di tabel produk seller — ubah harga/stok/status aktif banyak produk sekaligus, simpan sekali klik. (Bulk import CSV tetap out-of-scope; ini edit inline saja.)
-- **Schema**: tidak ada.
-- **API**: `PATCH /api/v1/seller/products/bulk` body `[{ id, price?, stock?, isActive? }]` — validasi kepemilikan semua id, transaksi tunggal.
-- **UI touch**: [apps/web/src/app/seller/produk/page.tsx](apps/web/src/app/seller/produk/page.tsx) — tombol "Edit Massal" → cell harga/stok jadi input, checkbox aktif, tombol Simpan/Batal sticky.
+- **Scope**: Mode edit inline di tabel produk seller — harga/stok/aktif banyak produk, simpan sekali klik. (CSV import tetap out-of-scope.)
+- **Konteks kode (audit 2026-07-29)**: tabel di [apps/web/src/app/seller/produk/page.tsx](apps/web/src/app/seller/produk/page.tsx); router [seller.product.routes.ts](apps/api/src/modules/seller/seller.product.routes.ts); zod di [packages/shared/src/schemas/seller.ts](packages/shared/src/schemas/seller.ts).
+- **API**: `PATCH /api/v1/seller/products/bulk` body `{ items: [{ id, price?, stock?, isActive? }] }`, max 50 item:
+  - Kepemilikan: `findMany({ where: { id: { in }, shopId } })` → count ≠ payload → **403 tanpa partial write**
+  - `$transaction` semua update; respons `{ updated: n }`
+  - **Guard sale price (M9-B3)**: kalau produk punya `salePrice` dan `price` baru ≤ `salePrice` → tolak baris itu (422 dengan daftar id bermasalah) — jangan diam-diam membuat sale mati
+- **UI**: tombol "Edit Massal" → cell harga/stok jadi input + checkbox aktif, dirty-tracking (hanya kirim baris berubah), tombol Simpan/Batal sticky bottom; validasi client harga ≥ 100, stok ≥ 0.
 - **Acceptance**:
-  - [ ] Edit 20 produk → 1 request, 1 transaksi DB
-  - [ ] Produk milik toko lain di payload → 403, tidak ada yang tersimpan
-  - [ ] Validasi client: harga ≥ 100, stok ≥ 0
+  - [ ] Edit 20 produk → 1 request, 1 transaksi
+  - [ ] Produk toko lain di payload → 403, tidak ada yang tersimpan
+  - [ ] Price baru ≤ salePrice aktif → error per-baris dengan pesan jelas
+  - [ ] Baris tidak diubah tidak ikut terkirim
 - **Effort**: S
 
 ---
 
 ### M15-C1. Flash Sale (Event Terjadwal)
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Admin buat event flash sale (nama, periode, slot produk dengan harga khusus + kuota). Homepage render section countdown + produk flash sale; halaman `/flash-sale`. Beda dari M9-B3 (sale price per produk oleh seller): ini event terpusat dengan kuota, dikurasi admin.
-- **Schema**:
+- **Scope**: Admin buat event (nama, periode, slot produk: harga khusus + kuota). Homepage section countdown + `/flash-sale`; kuota atomik di checkout. Beda dari M9-B3: terpusat, dikurasi admin, ber-kuota.
+- **Konteks kode (audit 2026-07-29)** — titik integrasi:
+  - Harga checkout per item: [order.service.ts:152](apps/api/src/modules/order/order.service.ts#L152); kontrak prioritas di [price.ts:1-3](packages/shared/src/utils/price.ts#L1-L3) — **flash menang atas sale price**. Helper pure tidak bisa query DB → resolusi flash dilakukan di API: kalau ada `FlashSaleItem` aktif ber-kuota untuk produk → pakai `salePrice` flash; else jalur `getEffectivePrice` (+grosir M13-B1 kalau sudah ada).
+  - **Pelepasan kuota** saat order batal: `restoreStock` ([apps/api/src/modules/order/stock.ts](apps/api/src/modules/order/stock.ts)) sudah dipakai cancel + expiry QRIS (M10-A5) + refund settlement ([refund.settlement.ts](apps/api/src/modules/order/refund.settlement.ts), M10-A7) — decrement `soldCount` flash **di titik yang sama**. Supaya tahu item mana yang flash → **snapshot `OrderItem.flashSaleItemId String?`** (kolom baru, di luar rencana lama tapi wajib — tanpa ini pelepasan kuota tidak akurat).
+  - Countdown UI: pola sudah ada di `QrisPanel.tsx` (countdown 15 menit) — tiru.
+  - Admin: router baru `admin.flashSale.routes.ts` daftar di [app.ts:111-121](apps/api/src/app.ts#L111); nav [AdminShell.tsx:10-20](apps/web/src/components/admin/AdminShell.tsx#L10) (⚡).
+- **Schema**: `FlashSale` + `FlashSaleItem` sesuai rencana lama (ganti `cuid()` → `uuid()`, konsisten) + `OrderItem.flashSaleItemId String?` + relasi.
+- **Kuota atomik** (race guard):
+  ```ts
+  // dalam transaksi checkout, per item flash:
+  const r = await tx.flashSaleItem.updateMany({
+    where: { id, soldCount: { lte: quota - qty } },   // quota dibaca sebelumnya di tx
+    data:  { soldCount: { increment: qty } },
+  });
+  // r.count === 0 → kuota habis → fallback harga normal (JANGAN gagalkan checkout)
   ```
-  model FlashSale {
-    id       String   @id @default(cuid())
-    name     String
-    startAt  DateTime
-    endAt    DateTime
-    isActive Boolean  @default(true)
-    items    FlashSaleItem[]
-    @@index([startAt, endAt])
-  }
-  model FlashSaleItem {
-    id          String @id @default(cuid())
-    flashSaleId String
-    productId   String
-    salePrice   Int
-    quota       Int
-    soldCount   Int    @default(0)
-    flashSale   FlashSale @relation(fields: [flashSaleId], references: [id], onDelete: Cascade)
-    @@unique([flashSaleId, productId])
-  }
-  ```
-- **API**:
-  - Admin CRUD: `GET/POST/PUT/DELETE /api/v1/admin/flash-sales` + kelola items
-  - Public: `GET /api/v1/flash-sales/active` → event berjalan + items (product nested, sisa kuota)
-  - Checkout: kalau produk ada di flash sale aktif & kuota sisa → pakai `salePrice`, increment `soldCount` dalam transaksi (guard race: `UPDATE ... WHERE soldCount < quota`)
-- **UI touch**:
-  - Homepage — section "⚡ Flash Sale" dengan countdown + progress bar kuota per produk
-  - Baru: `apps/web/src/app/(buyer)/flash-sale/page.tsx`
-  - Baru: `apps/web/src/app/admin/flash-sale/page.tsx`
+- **Validasi admin**: `salePrice` < `Product.price`; produk yang sama tidak boleh ada di 2 event yang periodenya overlap (tolak saat save); warning (bukan blokir) kalau kuota > stok produk.
+- **API**: admin CRUD + kelola items; public `GET /api/v1/flash-sales/active` → event berjalan + items (product card nested + sisa kuota + `endAt`).
+- **UI**: section "⚡ Flash Sale" di homepage ([apps/web/src/app/(buyer)/page.tsx](apps/web/src/app/(buyer)/page.tsx)) — countdown + progress bar kuota; `/flash-sale` list penuh; `/admin/flash-sale`.
 - **Acceptance**:
-  - [ ] Kuota habis → produk tampil "Habis" di section, checkout pakai harga normal
-  - [ ] Dua buyer rebutan kuota terakhir → hanya 1 dapat harga flash (uji race)
-  - [ ] Event lewat `endAt` → section hilang dari homepage tanpa intervensi
-  - [ ] Prioritas harga: flash sale > sale price (M9-B3) > harga grosir (M13-B1) — dokumentasikan di helper harga shared
+  - [ ] Kuota habis → "Habis" di UI, checkout pakai harga normal tanpa error
+  - [ ] Race kuota terakhir: uji integrasi 2 checkout paralel (pola `payment.test.ts`) → tepat 1 dapat harga flash
+  - [ ] Order flash di-cancel/expired/refund → `soldCount` turun kembali (via titik restoreStock)
+  - [ ] Lewat `endAt` → section hilang tanpa intervensi; harga kembali normal
+  - [ ] Prioritas: flash > sale (M9-B3) > grosir (M13-B1) — update komentar kontrak di `price.ts`
 - **Effort**: L
 
 ---
 
 ### M15-B1. Pre-Order
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Produk made-by-order (makanan, kerajinan) bisa ditandai pre-order dengan lead time X hari. Badge di card & BuyBox, SLA proses order menyesuaikan.
-- **Schema diff**: `Product.isPreorder Boolean @default(false)`, `Product.preorderDays Int?` (1–90).
-- **API**: include di product response; validasi `preorderDays` wajib jika `isPreorder`.
-- **UI touch**:
-  - [apps/web/src/components/product/ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx) & [BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx) — badge "Pre-Order · X hari"
-  - Seller product form — toggle + input hari
-  - Order detail — info estimasi proses untuk item pre-order
+- **Scope**: Produk ditandai pre-order dengan lead time X hari. Badge di card/BuyBox/cart/checkout; estimasi proses di order detail. Murni informasi — **tidak ada SLA otomatis** (tidak ada auto-cancel di kode, jangan tambah).
+- **Schema diff**: `Product.isPreorder Boolean @default(false)`, `Product.preorderDays Int?` (1–90), **+ snapshot `OrderItem.preorderDays Int?`** — supaya estimasi di order lama tidak berubah saat seller mengubah setting produk (pola snapshot yang sama dengan `productName`/`price`).
+- **Konteks kode (audit 2026-07-29)**: [ProductForm.tsx](apps/web/src/components/seller/ProductForm.tsx) sudah punya pola section toggle ("Diskon Periodik" :234, "Opsi Pengiriman" :329) — section "Pre-Order" mengikuti; zod refine di [packages/shared/src/schemas/product.ts](packages/shared/src/schemas/product.ts): `isPreorder: true` → `preorderDays` wajib 1–90; `false` → server null-kan.
+- **UI**:
+  - Badge "Pre-Order · N hari" di [ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx), [BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx), item keranjang, item checkout
+  - Order detail buyer ([pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx)) — catatan di stage PROCESSING: "estimasi diproses s.d. {paidAt + maxDays} " dengan `maxDays = max(items.preorderDays)` (hari kalender, sederhana)
 - **Acceptance**:
-  - [ ] Badge tampil konsisten di card, detail, cart, checkout
-  - [ ] Checkout campur produk ready + pre-order → estimasi pakai lead time terlama
-  - [ ] Toggle off → `preorderDays` di-clear
+  - [ ] Badge konsisten di card, detail, cart, checkout
+  - [ ] Checkout campur ready + pre-order → estimasi pakai lead time terlama
+  - [ ] Toggle off → `preorderDays` ter-clear di DB
+  - [ ] Seller ubah lead time setelah ada order → estimasi order lama tidak berubah (snapshot)
 - **Effort**: S–M
 
 ---
 
 ### M15-D1. PWA (Manifest + Installable)
 - **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Web app installable di Android/desktop — manifest, ikon, theme color. Pelengkap Mobile Bottom Nav (M12-A11). Service worker/offline **tidak** termasuk (cukup installable).
+- **Scope**: Installable di Android/desktop — manifest + ikon + theme color. Service worker/offline **tidak** termasuk.
+- **Konteks kode (audit 2026-07-29)**:
+  - `apps/web/public/` **belum ada** — buat. Ikon sumber: `apps/web/src/app/icon.svg` (favicon brand, commit `3dfd290`).
+  - Export PNG 192/512 + varian maskable (safe zone ~20% padding) via script sekali-jalan (sharp sebagai devDependency atau tool eksternal) — **commit hasil PNG-nya**, script tidak masuk build.
 - **Files**:
-  - Baru: `apps/web/src/app/manifest.ts` (Next 14 metadata route) — name, icons 192/512, `display: standalone`, theme color brand
-  - Ikon dari favicon brand existing (commit `3dfd290`) di-export ke ukuran PWA
+  - Baru: `apps/web/src/app/manifest.ts` (Next 14 metadata route) — `name: "Tokopudidi"`, `short_name`, `start_url: "/"`, `display: "standalone"`, `background_color: "#ffffff"`, `theme_color` = primary dari [tailwind.config.ts](apps/web/tailwind.config.ts), icons 192/512 + maskable
+  - Root layout: export `viewport`/`themeColor` sesuai API Next 14
+- **Catatan keputusan**: tanpa service worker, kriteria installability Chrome terbaru umumnya masih terpenuhi dengan manifest lengkap; kalau prompt tidak muncul saat verifikasi → tambah SW no-op minimal dan catat di PR (jangan diam-diam menambah offline caching).
 - **Acceptance**:
-  - [ ] Chrome Android tampilkan prompt "Add to Home Screen"
-  - [ ] Lighthouse PWA installable check pass
-  - [ ] Ikon & splash tampil benar saat launch dari home screen
+  - [ ] Chrome Android tawarkan "Add to Home Screen"
+  - [ ] Lighthouse installable check pass
+  - [ ] Ikon (termasuk maskable) & splash benar saat launch dari home screen; theme color = brand
 - **Effort**: S
 
 ---
@@ -956,7 +1002,7 @@ Estimasi asumsi **1 orang full-time per milestone**. Bisa diparalelkan antar-ora
 - **M9-A4 Voucher Picker** ⇄ **M9-B2 Toko Voucher** & **M9-C1 Voucher Platform** — picker baru bermanfaat penuh setelah B2 & C1 ready, tapi bisa rilis bertahap.
 - **M11-A8 Variant Multi-Axis** — sentuh data layer luas, lakukan di akhir milestone supaya tidak block fitur lain.
 - **M13-A1 Follow Toko** → prasyarat **M13-B2 Broadcast Promo** (fan-out ke follower).
-- **M14-B1 Badge Reputasi** ⇄ **M10-A10 Filter Search** — filter `officialStoreOnly` butuh flag `Shop.isOfficialStore` dari B1; kerjakan B1 dulu atau stub flag-nya.
+- **M14-B1 Badge Reputasi** ⇄ **M10-A10 Filter Search** — _resolved_: `Shop.isOfficialStore` + toggle admin sudah dikerjakan di M10-A10; M14-B1 tinggal badge derived + membayar utang label `ktpVerified`.
 - **Prioritas harga** (helper shared, urutan menang): Flash Sale (M15-C1) > Sale Price (M9-B3) > Harga Grosir (M13-B1) > harga normal — siapa pun yang mengerjakan duluan membuat helper `getUnitPrice`, yang berikutnya extend.
 
 ### Quality gate sebelum merge
