@@ -130,3 +130,32 @@ export const chatTemplateSchema = z.object({
 export type ChatTemplateInput = z.infer<typeof chatTemplateSchema>;
 
 export const chatTemplateUpdateSchema = chatTemplateSchema.partial();
+
+// ===== Etalase / showcase toko (M11-B1) =====
+export const MAX_SHOWCASES_PER_SHOP = 10;
+export const MAX_PRODUCTS_PER_SHOWCASE = 50;
+
+export const showcaseCreateSchema = z.object({
+  name: z.string().trim().min(2, 'Nama etalase minimal 2 karakter').max(40),
+});
+export type ShowcaseCreateInput = z.infer<typeof showcaseCreateSchema>;
+
+// Slug sengaja tidak bisa diubah — URL etalase tetap stabil setelah dibuat.
+export const showcaseUpdateSchema = z.object({
+  name: z.string().trim().min(2, 'Nama etalase minimal 2 karakter').max(40).optional(),
+});
+export type ShowcaseUpdateInput = z.infer<typeof showcaseUpdateSchema>;
+
+// Replace-all: daftar final produk di etalase ini. Array kosong = kosongkan etalase.
+export const showcaseAssignProductsSchema = z.object({
+  productIds: z
+    .array(z.string().uuid())
+    .max(MAX_PRODUCTS_PER_SHOWCASE, `Maksimal ${MAX_PRODUCTS_PER_SHOWCASE} produk per etalase`),
+});
+export type ShowcaseAssignProductsInput = z.infer<typeof showcaseAssignProductsSchema>;
+
+// Reorder pakai tombol ▲▼ (swap dengan tetangga) — konsisten M8-B6 template chat.
+export const showcaseMoveSchema = z.object({
+  direction: z.enum(['up', 'down']),
+});
+export type ShowcaseMoveInput = z.infer<typeof showcaseMoveSchema>;

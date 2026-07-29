@@ -3,6 +3,25 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M11-B1: Etalase / Showcase Toko
+
+### Added
+- **Etalase Toko** (`M11-B1`) — seller mengelompokkan produk ke dalam etalase (mis. "Best Seller", "Diskon"); di halaman toko etalase tampil sebagai tab di samping "Semua Produk".
+  - Schema: model `ShopShowcase` + tabel join `ShopShowcaseProduct` (migration `m11_b1_shop_showcase`). `@@unique([shopId, slug])` — slug unik per toko, bukan global, jadi dua toko boleh sama-sama punya `best-seller`. Satu produk boleh berada di lebih dari satu etalase.
+  - API seller: `GET/POST/PUT/DELETE /seller/showcase`, `POST /seller/showcase/:id/products` (replace-all), `DELETE /seller/showcase/:id/products/:productId`, `POST /seller/showcase/:id/move`.
+  - API publik: `GET /shops/:slug` kini menyertakan `showcases`; produk per etalase di `GET /shops/:slug/showcase/:showcaseSlug` (paginated, lewat `toProductCard` yang sama dengan listing lain sehingga harga sale M9-B3 ikut terhitung).
+  - FE: halaman `/seller/etalase` (CRUD + picker produk dengan pencarian server-side + reorder ▲▼) dan tab etalase di `/toko/[slug]` + route `/toko/[slug]/etalase/[showcaseSlug]`. Header toko diekstrak jadi `ShopHeader` supaya kedua halaman tidak menyimpan salinan markup yang sama.
+  - Test: unit `showcase.test.ts` (18 test — reorder + schema) dan e2e `showcase.spec.ts` (TC-TKPDD-125–128) yang menutup jalur ber-DB: kepemilikan produk, etalase kosong disembunyikan, slug stabil setelah rename.
+
+### Changed
+- `GET /api/v1/shops/:slug` menambah field `showcases` (array; kosong kalau toko belum punya etalase berisi). Aditif — konsumen lama tidak terpengaruh.
+
+### Notes
+- Batas: **10 etalase per toko**, **50 produk per etalase** — ditegakkan di zod dan UI.
+- Etalase kosong (atau yang seluruh produknya nonaktif/habis stok) sengaja disembunyikan dari pembeli, tapi tetap terlihat di panel seller supaya bisa diisi.
+- **Rename tidak mengubah slug.** URL etalase yang sudah dibagikan tetap hidup; konsekuensinya slug bisa tidak lagi cocok dengan nama barunya.
+- Etalase dihapus **tidak** menghapus produknya — cascade hanya membersihkan baris join.
+
 ## [Unreleased] — M10-A7: Komplain / Return
 
 ### Added

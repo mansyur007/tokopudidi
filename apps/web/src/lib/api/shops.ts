@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import type { ProductCard } from './products';
 
 export interface ShopCard {
   id: string;
@@ -11,6 +12,14 @@ export interface ShopCard {
   totalSold: number;
 }
 
+// Etalase toko (M11-B1) — hanya yang punya produk tampil yang dikirim API.
+export interface ShopShowcaseSummary {
+  id: string;
+  name: string;
+  slug: string;
+  productCount: number;
+}
+
 export interface ShopDetail extends ShopCard {
   description: string | null;
   bannerUrl: string | null;
@@ -19,6 +28,7 @@ export interface ShopDetail extends ShopCard {
   closedReason: string | null;
   joinedAt: string;
   ktpVerified: boolean;
+  showcases: ShopShowcaseSummary[];
 }
 
 export async function fetchFeaturedShops(): Promise<ShopCard[]> {
@@ -31,4 +41,22 @@ export async function fetchFeaturedShops(): Promise<ShopCard[]> {
 
 export function getShop(slug: string): Promise<ShopDetail> {
   return apiFetch<ShopDetail>(`/api/v1/shops/${slug}`);
+}
+
+export function getShopShowcase(
+  slug: string,
+  showcaseSlug: string,
+  params: { page?: number; limit?: number } = {},
+): Promise<{
+  showcase: { id: string; name: string; slug: string };
+  items: ProductCard[];
+  total: number;
+  page: number;
+  limit: number;
+}> {
+  const sp = new URLSearchParams();
+  if (params.page) sp.set('page', String(params.page));
+  if (params.limit) sp.set('limit', String(params.limit));
+  const qs = sp.toString();
+  return apiFetch(`/api/v1/shops/${slug}/showcase/${showcaseSlug}${qs ? `?${qs}` : ''}`);
 }

@@ -75,7 +75,7 @@ export interface SellerProductRow {
   images: { id: string; url: string; order: number }[];
 }
 
-export const listSellerProducts = (token: string, params: { q?: string; status?: string; page?: number } = {}) => {
+export const listSellerProducts = (token: string, params: { q?: string; status?: string; page?: number; limit?: number } = {}) => {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v) sp.set(k, String(v));
   return apiFetch<{ items: SellerProductRow[]; total: number; page: number; limit: number }>(
@@ -301,3 +301,62 @@ export const updateSellerVoucher = (token: string, id: string, body: Partial<Vou
 
 export const deleteSellerVoucher = (token: string, id: string) =>
   apiFetch(`/api/v1/seller/voucher/${id}`, { method: 'DELETE', token });
+
+// ===== Etalase / showcase toko (M11-B1) =====
+export interface SellerShowcaseRow {
+  id: string;
+  name: string;
+  slug: string;
+  order: number;
+  createdAt: string;
+  _count: { products: number };
+}
+
+export interface SellerShowcaseDetail {
+  id: string;
+  name: string;
+  slug: string;
+  order: number;
+  products: {
+    order: number;
+    product: {
+      id: string;
+      name: string;
+      slug: string;
+      price: number;
+      stock: number;
+      isActive: boolean;
+      images: { url: string }[];
+    };
+  }[];
+}
+
+export const listSellerShowcases = (token: string) =>
+  apiFetch<SellerShowcaseRow[]>('/api/v1/seller/showcase', { token });
+
+export const getSellerShowcase = (token: string, id: string) =>
+  apiFetch<SellerShowcaseDetail>(`/api/v1/seller/showcase/${id}`, { token });
+
+export const createSellerShowcase = (token: string, body: { name: string }) =>
+  apiFetch<SellerShowcaseRow>('/api/v1/seller/showcase', {
+    method: 'POST', token, body: JSON.stringify(body),
+  });
+
+export const updateSellerShowcase = (token: string, id: string, body: { name: string }) =>
+  apiFetch<SellerShowcaseRow>(`/api/v1/seller/showcase/${id}`, {
+    method: 'PUT', token, body: JSON.stringify(body),
+  });
+
+export const deleteSellerShowcase = (token: string, id: string) =>
+  apiFetch(`/api/v1/seller/showcase/${id}`, { method: 'DELETE', token });
+
+// Replace-all: kirim daftar final produk etalase ini.
+export const assignShowcaseProducts = (token: string, id: string, productIds: string[]) =>
+  apiFetch<{ count: number }>(`/api/v1/seller/showcase/${id}/products`, {
+    method: 'POST', token, body: JSON.stringify({ productIds }),
+  });
+
+export const moveSellerShowcase = (token: string, id: string, direction: 'up' | 'down') =>
+  apiFetch(`/api/v1/seller/showcase/${id}/move`, {
+    method: 'POST', token, body: JSON.stringify({ direction }),
+  });
