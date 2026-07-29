@@ -14,6 +14,14 @@ a JSON dataset, then **push** it with `scripts/push-cases.mjs`.
 - `TESTFORGE_API_URL` and `TESTFORGE_API_KEY` in the target repo's `.env`
   (Tokopudidi already has both under the `# TestForge` section). The key must be
   a **write**-scoped key or every POST 403s.
+  - `TESTFORGE_API_URL` **must include the `/api/v1` prefix** — e.g.
+    `https://testforge.emha.space/api/v1`. The push script appends resource
+    paths straight onto it, so a bare host makes every call 404. Not to be
+    confused with `TF_API_URL` used by the `testforge-e2e-ci` skill, which
+    takes the bare host and appends `/api/v1` itself.
+- **Node 20+** — the script uses global `fetch` (18+) and is invoked with
+  `--env-file` (20.6+). On Node 16 it dies with `ReferenceError: fetch is not
+  defined`. Check `node -v` before blaming the API.
 - The project slug (e.g. `tkpdd`) — ask the user if unknown, don't guess.
 - Live schema is authoritative over this doc if they ever diverge: fetch
   `${TESTFORGE_API_URL}/openapi` (ReDoc at `/docs/api`).
