@@ -20,6 +20,7 @@
     "db:generate": "npm run prisma:generate -w @tokopudidi/database",
     "db:migrate": "npm run prisma:migrate -w @tokopudidi/database",
     "db:seed": "npm run seed -w @tokopudidi/database",
+    "db:backfill-variants": "node scripts/backfill-variant-options.mjs",
     "db:studio": "npm run prisma:studio -w @tokopudidi/database"
   },
   "devDependencies": {

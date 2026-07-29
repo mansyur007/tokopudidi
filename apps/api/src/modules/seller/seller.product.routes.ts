@@ -7,6 +7,8 @@ import { requireShopOwner } from './seller.middleware';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
 import { getProductStats } from './product.stats';
+import { writeProductVariants } from './variant.write';
+import { withVariantValues } from '../product/variant.read';
 
 export const sellerProductRouter = Router();
 sellerProductRouter.use(requireAuth, requireShopOwner);
@@ -53,12 +55,20 @@ sellerProductRouter.get('/:id', async (req, res, next) => {
       where: { id: req.params.id, shopId: req.shop!.id },
       include: {
         images: { orderBy: { order: 'asc' } },
-        variants: true,
+        // Seller melihat kombinasi aktif saja — yang nonaktif adalah sisa
+        // kombinasi lama yang dipertahankan demi keranjang & riwayat pesanan.
+        variants: {
+          where: { isActive: true },
+          include: {
+            values: { select: { optionValue: { select: { id: true, value: true, option: { select: { order: true } } } } } },
+          },
+        },
+        options: { orderBy: { order: 'asc' }, include: { values: { orderBy: { order: 'asc' } } } },
         category: true,
       },
     });
     if (!product) throw new NotFoundError('Produk tidak ditemukan');
-    return ok(res, product);
+    return ok(res, withVariantValues(product));
   } catch (err) { next(err); }
 });
 
@@ -119,17 +129,8 @@ sellerProductRouter.post('/', validateBody(productCreateSchema), async (req, res
           },
         },
       });
-      if (req.body.variants?.length) {
-        for (const v of req.body.variants) {
-          await tx.productVariant.create({
-            data: {
-              productId: p.id,
-              name: v.name,
-              priceModifier: v.priceModifier ?? 0,
-              stock: v.stock,
-            },
-          });
-        }
+      if (req.body.options?.length && req.body.variants?.length) {
+        await writeProductVariants(tx, p.id, req.body.options, req.body.variants);
       }
       return p;
     });
@@ -146,7 +147,7 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
     });
     if (!existing) throw new NotFoundError('Produk tidak ditemukan');
 
-    const { imageUrls, variants, ...rest } = req.body;
+    const { imageUrls, variants, options, ...rest } = req.body;
 
     // Konsistensi diskon periodik (M9-B3) — gabungan payload + data existing.
     const nextPrice = rest.price ?? existing.price;
@@ -176,28 +177,18 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
         }
       }
 
-      // Replace varian kalau dikirim.
-      if (variants) {
-        const incomingIds = (variants as Array<{ id?: string }>).map((v) => v.id).filter(Boolean) as string[];
-        await tx.productVariant.deleteMany({
-          where: { productId: existing.id, id: { notIn: incomingIds.length ? incomingIds : ['00000000-0000-0000-0000-000000000000'] } },
-        });
-        for (const v of variants as Array<{ id?: string; name: string; priceModifier?: number; stock: number }>) {
-          if (v.id) {
-            await tx.productVariant.update({
-              where: { id: v.id },
-              data: { name: v.name, priceModifier: v.priceModifier ?? 0, stock: v.stock },
-            }).catch(() => undefined);
-          } else {
-            await tx.productVariant.create({
-              data: { productId: existing.id, name: v.name, priceModifier: v.priceModifier ?? 0, stock: v.stock },
-            });
-          }
-        }
+      // Sinkronkan varian kalau dikirim. `options` dan `variants` selalu
+      // berjalan bersama — zod sudah menolak variants tanpa options.
+      if (variants || options) {
+        await writeProductVariants(tx, existing.id, options ?? [], variants ?? []);
       }
       return tx.product.findUnique({
         where: { id: existing.id },
-        include: { images: true, variants: true },
+        include: {
+          images: true,
+          variants: { where: { isActive: true } },
+          options: { orderBy: { order: 'asc' }, include: { values: { orderBy: { order: 'asc' } } } },
+        },
       });
     });
     return ok(res, updated, 'Produk berhasil diupdate');
