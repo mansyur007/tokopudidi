@@ -5,7 +5,7 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
-> **Progress (2026-07-29)** — **M11-B1 Etalase Toko selesai** (butuh migration `m11_b1_shop_showcase`, jalankan `prisma migrate deploy` saat merge). Sisa M11: B4 Statistik Produk, A8 Variant Multi-Axis (kerjakan terakhir — menyentuh data layer luas).
+> **Progress (2026-07-29)** — **M11-B1 Etalase Toko** (butuh migration `m11_b1_shop_showcase`) & **M11-B4 Statistik Produk** (tanpa migration) selesai. Sisa M11: **A8 Variant Multi-Axis** — item terbesar milestone ini, menyentuh data layer luas dan butuh migration 4 tahap.
 >
 > **Progress terbaru (2026-07-27)** — **M10 selesai (menunggu review)**: A5 QRIS Mock UX ([PR #30](https://github.com/mansyur007/tokopudidi/pull/30)), A10 Filter Search Lengkap ([PR #31](https://github.com/mansyur007/tokopudidi/pull/31)), A7 Komplain/Return. Ketiganya butuh migration, jadi jalankan `prisma migrate deploy` saat merge. Milestone berikutnya yang bebas di-klaim: **M11**.
 >
@@ -529,7 +529,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M11-B4. Statistik Produk Detail
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-29): tanpa migration — semua dari data existing. **Chart tidak memakai library**: isinya cuma 7–30 batang dari satu deret angka, sementara recharts menambah ~100 KB gzipped ke panel seller yang halamannya kini ~115 KB; dibuat komponen `DailyBarChart` (CSS bar + `<title>` tooltip + tabel `sr-only` untuk pembaca layar). Pindah ke library kalau nanti butuh sumbu ganda/zoom/multi-seri. Kunci hari dibuat dari **komponen tanggal lokal**, bukan `toISOString().slice(0,10)` — yang terakhir mengonversi ke UTC sehingga batang jatuh ke kolom yang salah kalau TZ server bukan UTC (`seller.dashboard.routes` masih memakai pola lama itu, layak dirapikan terpisah). Di FE, `formatTanggal('YYYY-MM-DD')` juga diparse sebagai UTC, jadi label diberi sufiks `T00:00:00`. `REVENUE_STATUSES` disamakan persis dengan `weekRevenue` di dashboard supaya angka pendapatan tidak beda antar-halaman. Produk toko lain dibalas **404, bukan 403**, supaya keberadaan produknya tidak bocor. Konversi boleh > 100% (pembeli yang melihat sebelum rentang tetap terhitung pembeli) — ditampilkan apa adanya dengan penjelasan di UI, tidak di-clamp.
 - **Scope**: Seller lihat per-produk: penonton unik per hari (chart), total view, terjual, revenue, conversion.
 - **Konteks kode (audit 2026-07-29)** — dua fakta yang memaksa re-scope dari rencana lama:
   - **`ProductView` di-upsert** per (userId/sessionKey, productId) — `viewedAt` di-overwrite saat dilihat ulang. Agregat per-hari dari `ProductView.viewedAt` = "penonton unik yang terakhir lihat hari itu" (aproksimasi), **bukan** pageview historis. `Product.viewCount` = counter kumulatif sesungguhnya.
@@ -542,10 +543,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **API**: `GET /api/v1/seller/products/:id/stats?range=7d|30d` — guard kepemilikan produk via `seller.middleware` + cek `product.shopId`.
 - **UI**: Baru `apps/web/src/app/seller/produk/[id]/statistik/page.tsx` + link/icon 📈 dari tabel produk seller ([apps/web/src/app/seller/produk/page.tsx](apps/web/src/app/seller/produk/page.tsx)).
 - **Acceptance**:
-  - [ ] Chart 30 hari render, hari tanpa view tetap muncul sebagai 0 (bukan bolong)
-  - [ ] Conversion dengan 0 view → tampil 0%, tidak NaN/crash
-  - [ ] Tabel order terakhir yang memuat produk ini (nomor order, qty, status, link)
-  - [ ] Produk milik toko lain → 404/403
+  - [x] Chart 30 hari render, hari tanpa view tetap muncul sebagai 0 (bukan bolong)
+  - [x] Conversion dengan 0 view → tampil `—`, tidak NaN/crash _(deliver: `null` dari API, bukan 0% — 0% menyiratkan ada penonton yang tidak membeli)_
+  - [x] Tabel order terakhir yang memuat produk ini (nomor order, qty, status, link)
+  - [x] Produk milik toko lain → 404
 - **Effort**: S
 
 ---

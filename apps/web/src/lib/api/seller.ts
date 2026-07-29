@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import type { OrderStatus } from './orders';
 import type {
   UpgradeToSellerInput,
   ProductCreateInput,
@@ -360,3 +361,28 @@ export const moveSellerShowcase = (token: string, id: string, direction: 'up' | 
   apiFetch(`/api/v1/seller/showcase/${id}/move`, {
     method: 'POST', token, body: JSON.stringify({ direction }),
   });
+
+// ===== Statistik produk (M11-B4) =====
+export interface ProductStats {
+  product: {
+    id: string; name: string; slug: string;
+    viewCount: number; soldCount: number; stock: number; isActive: boolean;
+  };
+  range: '7d' | '30d';
+  chart: { date: string; count: number }[];
+  totals: {
+    viewersInRange: number;
+    buyersInRange: number;
+    orderCount: number;
+    qtySold: number;
+    revenue: number;
+    conversionPct: number | null;
+  };
+  recentOrders: {
+    orderId: string; orderNumber: string; status: OrderStatus; createdAt: string;
+    quantity: number; subtotal: number; buyerName: string;
+  }[];
+}
+
+export const getProductStats = (token: string, id: string, range: '7d' | '30d') =>
+  apiFetch<ProductStats>(`/api/v1/seller/products/${id}/stats?range=${range}`, { token });

@@ -3,6 +3,20 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M11-B4: Statistik Produk Detail
+
+### Added
+- **Statistik per produk** (`M11-B4`) — halaman `/seller/produk/[id]/statistik`: chart penonton unik per hari (7/30 hari), kartu metrik (penonton, pesanan, pendapatan, konversi), dan tabel pesanan terakhir yang memuat produk tersebut. Tanpa migration — semua dari data existing.
+  - API: `GET /seller/products/:id/stats?range=7d|30d`. Produk milik toko lain dibalas **404** (bukan 403) supaya keberadaannya tidak bocor.
+  - Helper agregasi murni di `product.stats.ts` (`dayKey`, `buildDayKeys`, `bucketByDay`, `conversionPct`) — 19 unit test, plus e2e `product-stats.spec.ts` (TC-TKPDD-129–131).
+  - Komponen `DailyBarChart` — chart batang CSS tanpa library, dilengkapi tabel `sr-only` untuk pembaca layar.
+
+### Notes
+- **Batas data yang jujur**: `ProductView` di-upsert per (penonton, produk), jadi chart menggambarkan **penonton unik per hari** ("minat harian"), bukan jumlah pageview. Pageview kumulatif tetap ada di `Product.viewCount` dan ditampilkan terpisah. Metrik add-to-cart **tidak disediakan** — `CartItem` dihapus saat checkout sehingga tidak ada jejak historisnya, dan menampilkan angka tebakan lebih buruk daripada tidak menampilkannya.
+- **Konversi bisa melebihi 100%** kalau pembelinya melihat produk sebelum rentang dimulai. Ditampilkan apa adanya dengan penjelasan di UI, tidak di-clamp. Bernilai `null` (tampil `—`) saat belum ada penonton — bukan 0%, yang keliru menyiratkan ada penonton yang tidak membeli.
+- **Chart sengaja tanpa library**: 7–30 batang dari satu deret angka tidak sepadan dengan ~100 KB gzipped tambahan di panel seller. Pindah ke recharts kalau nanti butuh sumbu ganda, zoom, atau multi-seri.
+- Kunci hari dibuat dari komponen tanggal **lokal**, bukan `toISOString()` yang mengonversi ke UTC dan menggeser batas hari. `seller.dashboard.routes` masih memakai pola lama itu — layak dirapikan terpisah.
+
 ## [Unreleased] — M11-B1: Etalase / Showcase Toko
 
 ### Added
