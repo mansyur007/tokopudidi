@@ -5,6 +5,8 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
+> **Progress (2026-07-29)** — **M11-B1 Etalase Toko selesai** (butuh migration `m11_b1_shop_showcase`, jalankan `prisma migrate deploy` saat merge). Sisa M11: B4 Statistik Produk, A8 Variant Multi-Axis (kerjakan terakhir — menyentuh data layer luas).
+>
 > **Progress terbaru (2026-07-27)** — **M10 selesai (menunggu review)**: A5 QRIS Mock UX ([PR #30](https://github.com/mansyur007/tokopudidi/pull/30)), A10 Filter Search Lengkap ([PR #31](https://github.com/mansyur007/tokopudidi/pull/31)), A7 Komplain/Return. Ketiganya butuh migration, jadi jalankan `prisma migrate deploy` saat merge. Milestone berikutnya yang bebas di-klaim: **M11**.
 >
 > **Progress (2026-07-08)** — **M9 selesai & merged ke `main`**: A4 Voucher Picker ([PR #24](https://github.com/mansyur007/tokopudidi/pull/24)), B2 Toko Voucher ([PR #25](https://github.com/mansyur007/tokopudidi/pull/25)), C1 Voucher Platform ([PR #26](https://github.com/mansyur007/tokopudidi/pull/26)), B3 Sale Price ([PR #27](https://github.com/mansyur007/tokopudidi/pull/27)). Milestone berikutnya yang bebas di-klaim: **M10**.
@@ -472,7 +474,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M11-B1. Etalase / Showcase Toko ⭐
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-29): reorder pakai endpoint `POST /:id/move` (`{direction}`) yang **menulis ulang seluruh urutan jadi 0..n-1**, bukan menukar dua nilai `order` — kolom `order` bisa kembar/bolong dari data lama dan swap dua nilai akan diam-diam gagal kalau nilainya sama; logic-nya diekstrak ke `showcase.order.ts` supaya bisa diuji tanpa DB. Assign produk **replace-all** (array kosong = kosongkan etalase) dengan dedupe sebelum `createMany` — id kembar akan menabrak PK gabungan. Picker produk di FE memakai **pencarian server-side** (debounce 250ms, limit 50): filter client-side hanya menyaring halaman pertama sehingga produk yang ada tampak "tidak ditemukan". Header toko diekstrak jadi `ShopHeader` karena kini dipakai dua halaman. Visibilitas produk di etalase sengaja memakai filter yang sama persis dengan `listProducts` (`isActive` + `deletedAt: null` + `stock > 0`) supaya angka di tab konsisten dengan grid "Semua Produk". **Ditemukan saat audit**: `GET /shops/:slug` — endpoint yang diubah item ini — sebelumnya tidak punya cakupan e2e sama sekali, jadi ditambahkan `e2e/showcase.spec.ts` (TC-125–128); TC baru ini perlu didaftarkan di TestForge.
 - **Scope**: Seller kelompokkan produk dalam folder ("Best Seller", "Diskon"), tampil sebagai tab di halaman toko.
 - **Konteks kode (audit 2026-07-29)**:
   - Halaman toko [apps/web/src/app/(buyer)/toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) **belum punya tab bar** — hanya section header + grid produk. Tab "Semua" = grid existing.
@@ -516,11 +519,11 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Hapus etalase hanya menghapus baris join (cascade), bukan produknya.
   - Max 10 etalase per toko, max 50 produk per etalase (guard zod + UI).
 - **Acceptance**:
-  - [ ] Produk bisa ada di > 1 etalase
-  - [ ] Etalase tanpa produk (aktif) tidak ditampilkan ke buyer
-  - [ ] Reorder etalase via tombol ▲▼ (konsisten M8-B6)
-  - [ ] Assign produk toko lain → 403, tidak ada partial write
-  - [ ] Harga di tab etalase identik dengan grid "Semua" (sale price ikut)
+  - [x] Produk bisa ada di > 1 etalase
+  - [x] Etalase tanpa produk (aktif) tidak ditampilkan ke buyer
+  - [x] Reorder etalase via tombol ▲▼ (konsisten M8-B6)
+  - [x] Assign produk toko lain → 403, tidak ada partial write
+  - [x] Harga di tab etalase identik dengan grid "Semua" (sale price ikut)
 - **Effort**: M
 
 ---

@@ -11,6 +11,7 @@ import { ApiClientError } from '@/lib/api/client';
 const NAV = [
   { href: '/seller',            label: 'Dashboard',     emoji: '📊' },
   { href: '/seller/produk',     label: 'Produk',        emoji: '📦' },
+  { href: '/seller/etalase',    label: 'Etalase',       emoji: '🗂️' },
   { href: '/seller/pesanan',    label: 'Pesanan',       emoji: '🧾' },
   { href: '/seller/chat',       label: 'Chat',          emoji: '💬' },
   { href: '/seller/ulasan',     label: 'Ulasan',        emoji: '⭐' },

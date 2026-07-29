@@ -210,6 +210,7 @@ model Shop {
   withdrawals Withdrawal[]
   chatTemplates ChatTemplate[]
   promoCodes PromoCode[]
+  showcases ShopShowcase[]
 
   @@index([slug])
   @@index([city])
@@ -278,6 +279,7 @@ model Product {
   wishlistedBy Wishlist[]
   views      ProductView[]
   discussions Discussion[]
+  showcaseItems ShopShowcaseProduct[]
   // searchVector dikelola via raw SQL trigger di migration
 
   @@index([shopId])
@@ -740,4 +742,36 @@ model ChatTemplate {
   createdAt DateTime @default(now())
 
   @@index([shopId, order])
+}
+
+// ============= ETALASE / SHOWCASE TOKO (M11-B1) =============
+
+model ShopShowcase {
+  id        String   @id @default(uuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name      String
+  // Dibuat dari `name` saat create dan stabil setelahnya — URL etalase shareable,
+  // rename hanya mengubah `name`.
+  slug      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products ShopShowcaseProduct[]
+
+  @@unique([shopId, slug])
+  @@index([shopId, order])
+}
+
+model ShopShowcaseProduct {
+  showcaseId String
+  showcase   ShopShowcase @relation(fields: [showcaseId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order      Int          @default(0)
+
+  @@id([showcaseId, productId])
+  @@index([showcaseId, order])
+  @@index([productId])
 }
