@@ -17,18 +17,14 @@ import {
   type SellerProductDetail,
 } from '@/lib/api/seller';
 import { ApiClientError } from '@/lib/api/client';
+import { VariantMatrixEditor, type OptionState, type ComboState } from './VariantMatrixEditor';
 
 interface Props {
   initial?: SellerProductDetail;
   productId?: string;
 }
 
-interface VariantState {
-  id?: string;
-  name: string;
-  priceModifier: number;
-  stock: number;
-}
+// Varian multi-axis (M11-A8) — bentuk state mengikuti VariantMatrixEditor.
 
 interface FormState {
   name: string;
@@ -43,7 +39,8 @@ interface FormState {
   freeShippingEligible: boolean;
   isActive: boolean;
   imageUrls: string[];
-  variants: VariantState[];
+  options: OptionState[];
+  combos: ComboState[];
   // Diskon periodik (M9-B3) — tanggal dalam format input datetime-local.
   saleEnabled: boolean;
   salePrice: number;
@@ -73,7 +70,14 @@ function initialFromProduct(p?: SellerProductDetail): FormState {
     freeShippingEligible: p?.freeShippingEligible ?? false,
     isActive:    p?.isActive    ?? true,
     imageUrls:   p?.images.map((img) => img.url) ?? [],
-    variants:    p?.variants.map((v) => ({ id: v.id, name: v.name, priceModifier: v.priceModifier, stock: v.stock })) ?? [],
+    options:     p?.options?.map((o) => ({ name: o.name, values: o.values.map((v) => v.value) })) ?? [],
+    // Varian lama yang belum di-backfill tidak punya optionValues — pakai
+    // `name` sebagai nilai tunggal supaya tetap bisa diedit tanpa kehilangan data.
+    combos:      p?.variants.map((v) => ({
+      values: v.optionValues?.length ? v.optionValues : [v.name],
+      priceModifier: v.priceModifier,
+      stock: v.stock,
+    })) ?? [],
     saleEnabled: p?.salePrice != null,
     salePrice:   p?.salePrice   ?? 0,
     saleStartAt: toLocalInput(p?.saleStartAt),
@@ -119,27 +123,22 @@ export function ProductForm({ initial, productId }: Props) {
     setState((prev) => ({ ...prev, imageUrls: prev.imageUrls.filter((_, i) => i !== idx) }));
   }
 
-  function addVariant() {
-    setState((prev) => ({ ...prev, variants: [...prev.variants, { name: '', priceModifier: 0, stock: 0 }] }));
-  }
-  function updateVariant(i: number, patch: Partial<VariantState>) {
-    setState((prev) => ({
-      ...prev,
-      variants: prev.variants.map((v, idx) => idx === i ? { ...v, ...patch } : v),
-    }));
-  }
-  function removeVariant(i: number) {
-    setState((prev) => ({ ...prev, variants: prev.variants.filter((_, idx) => idx !== i) }));
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!tokens?.accessToken) return;
     setError(null);
 
-    const { saleEnabled, salePrice, saleStartAt, saleEndAt, ...base } = state;
+    const { saleEnabled, salePrice, saleStartAt, saleEndAt, options, combos, ...base } = state;
+    // Buang opsi setengah jadi (nama/nilai kosong) supaya tidak ditolak zod
+    // hanya karena baris yang belum diisi seller.
+    const opsiValid = options.filter((o) => o.name.trim() && o.values.length > 0);
     const candidate = {
       ...base,
+      options: opsiValid.length ? opsiValid : undefined,
+      variants: opsiValid.length
+        ? combos.filter((c) => c.values.length === opsiValid.length)
+        : undefined,
       salePrice: saleEnabled ? salePrice : null,
       saleStartAt: saleEnabled && saleStartAt ? new Date(saleStartAt).toISOString() : null,
       saleEndAt: saleEnabled && saleEndAt ? new Date(saleEndAt).toISOString() : null,
@@ -369,41 +368,11 @@ export function ProductForm({ initial, productId }: Props) {
         />
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="label mb-0">Varian (opsional, 1 dimensi saja)</label>
-          <button type="button" onClick={addVariant} className="btn-outline text-sm">+ Varian</button>
-        </div>
-        <p className="text-xs text-gray-500 mb-2">
-          Contoh: warna (Merah, Biru), ukuran (S, M, L). Stok varian terpisah dari stok utama.
-        </p>
-        {state.variants.map((v, i) => (
-          <div key={i} className="flex gap-2 mb-2 items-center">
-            <input
-              className="input flex-1 min-w-0"
-              placeholder="Nama varian"
-              value={v.name}
-              onChange={(e) => updateVariant(i, { name: e.target.value })}
-            />
-            <input
-              type="number"
-              className="input w-28"
-              placeholder="±harga"
-              value={v.priceModifier}
-              onChange={(e) => updateVariant(i, { priceModifier: Number(e.target.value) })}
-            />
-            <input
-              type="number"
-              className="input w-20"
-              placeholder="Stok"
-              value={v.stock}
-              min={0}
-              onChange={(e) => updateVariant(i, { stock: Number(e.target.value) })}
-            />
-            <button type="button" onClick={() => removeVariant(i)} className="text-red-600 px-2" aria-label="Hapus varian">✕</button>
-          </div>
-        ))}
-      </div>
+      <VariantMatrixEditor
+        options={state.options}
+        combos={state.combos}
+        onChange={({ options, combos }) => setState((prev) => ({ ...prev, options, combos }))}
+      />
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded">{error}</div>}
 

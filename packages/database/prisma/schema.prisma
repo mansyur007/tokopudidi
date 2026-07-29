@@ -273,6 +273,7 @@ model Product {
 
   images     ProductImage[]
   variants   ProductVariant[]
+  options    ProductOption[]
   cartItems  CartItem[]
   reviews    Review[]
   orderItems OrderItem[]
@@ -298,18 +299,64 @@ model ProductImage {
   @@index([productId])
 }
 
+// Variant multi-axis (M11-A8). `ProductVariant` tetap jadi baris "kombinasi" —
+// id-nya dipegang CartItem (FK) dan OrderItem (kolom polos, tanpa FK), jadi
+// tidak boleh diganti model. Yang baru cuma lapisan option/value di atasnya.
 model ProductVariant {
   id            String  @id @default(uuid())
   productId     String
   product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Label gabungan hasil turunan dari `values`, mis. "Merah / M". Ditulis ulang
+  // tiap kali variant disimpan. Dipertahankan karena dipakai snapshot
+  // OrderItem.variantName dan sebagai fallback untuk data yang belum di-backfill.
+  // Rencana drop kolom ini ada di tahap 4 M11-A8 — terpisah, setelah verifikasi.
   name          String
   priceModifier Int     @default(0)
   stock         Int     @default(0)
   isActive      Boolean @default(true)
+  // Gambar khusus kombinasi ini (mis. foto warna merah). Null = pakai galeri produk.
+  imageUrl      String?
 
-  cartItems  CartItem[]
+  cartItems CartItem[]
+  values    ProductVariantValue[]
 
   @@index([productId])
+}
+
+model ProductOption {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String // "Warna", "Ukuran"
+  order     Int     @default(0)
+
+  values ProductOptionValue[]
+
+  @@unique([productId, name])
+  @@index([productId, order])
+}
+
+model ProductOptionValue {
+  id       String        @id @default(uuid())
+  optionId String
+  option   ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  value    String // "Merah", "M"
+  order    Int           @default(0)
+
+  variantValues ProductVariantValue[]
+
+  @@unique([optionId, value])
+  @@index([optionId, order])
+}
+
+model ProductVariantValue {
+  variantId     String
+  variant       ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  optionValueId String
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, optionValueId])
+  @@index([optionValueId])
 }
 
 // ============= CART =============

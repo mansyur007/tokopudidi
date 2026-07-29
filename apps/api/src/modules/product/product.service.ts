@@ -1,6 +1,7 @@
 import { prisma, Prisma } from '@tokopudidi/database';
 import { getEffectivePrice, getDiscountPct } from '@tokopudidi/shared';
 import type { ProductListQuery } from '@tokopudidi/shared';
+import { withVariantValues } from './variant.read';
 
 // Output ringkas untuk listing card. Hindari send semua relasi supaya payload kecil.
 export interface ProductCard {
@@ -142,7 +143,14 @@ export async function getProductBySlug(slug: string) {
     where: { slug, isActive: true, deletedAt: null },
     include: {
       images: { orderBy: { order: 'asc' } },
-      variants: { where: { isActive: true } },
+      // Variant multi-axis (M11-A8) — hanya kombinasi aktif yang ditawarkan.
+      variants: {
+        where: { isActive: true },
+        include: {
+          values: { select: { optionValue: { select: { id: true, value: true, option: { select: { order: true } } } } } },
+        },
+      },
+      options: { orderBy: { order: 'asc' }, include: { values: { orderBy: { order: 'asc' } } } },
       category: { select: { id: true, name: true, slug: true } },
       shop: {
         select: {
@@ -153,7 +161,7 @@ export async function getProductBySlug(slug: string) {
       },
     },
   });
-  return product;
+  return product ? withVariantValues(product) : product;
 }
 
 export async function getRelatedProducts(productId: string, limit = 6): Promise<ProductCard[]> {

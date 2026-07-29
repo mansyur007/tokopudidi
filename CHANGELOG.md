@@ -3,6 +3,28 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M11-A8: Variant Kombinasi Multi-Axis (tahap 1–3)
+
+### Added
+- **Varian multi-axis** (`M11-A8`) — produk bisa punya sampai **3 opsi** (mis. Warna × Ukuran) dengan stok & selisih harga per kombinasi, maksimal **50 kombinasi**.
+  - Schema: `ProductOption`, `ProductOptionValue`, `ProductVariantValue`, plus `ProductVariant.imageUrl` (migration `m11_a8_variant_options`, aditif murni).
+  - Helper bersama `packages/shared/src/utils/variant.ts` (`cartesian`, `comboKey`, `availableValues`, `findVariant`) — dipakai API dan FE supaya aturannya hidup di satu tempat.
+  - FE: `VariantPicker` (chip per sumbu, nilai tanpa kombinasi berstok otomatis nonaktif) dan `VariantMatrixEditor` di panel seller (definisi opsi → tabel kombinasi).
+  - Script backfill idempoten: `npm run db:backfill-variants` (dukung `--dry-run`).
+  - Test: 32 unit (`variant.test.ts`) + e2e TC-TKPDD-132–135.
+
+### Changed
+- `ProductVariant.name` **berubah peran** jadi cache turunan label kombinasi ("Merah / M") yang ditulis ulang tiap simpan. Kolomnya dipertahankan — snapshot `OrderItem.variantName` jadi tetap benar tanpa perubahan apa pun, dan produk yang belum di-backfill tetap punya label.
+- Payload varian seller berganti bentuk: `{ options: [{name, values}], variants: [{values, priceModifier, stock}] }`. Kombinasi dirujuk lewat **nilai posisional**, bukan id, supaya create dan edit sebentuk.
+- Seed menghasilkan struktur option/value dan menambah satu produk 2 sumbu (Baju Koko — Warna × Ukuran, kombinasi Navy/XL sengaja berstok 0).
+
+### Fixed
+- **Kombinasi varian yang dihapus seller tidak lagi menghilangkan varian di keranjang orang lain.** Perilaku lama meng-hard-delete `ProductVariant`; karena `CartItem.variantId` ber-FK `ON DELETE SET NULL`, item keranjang pembeli diam-diam berubah jadi "tanpa varian", dan `OrderItem.variantId` (kolom polos tanpa FK) menunjuk baris yang sudah lenyap. Sekarang kombinasi yang tidak lagi ditawarkan **dinonaktifkan**, id-nya dipertahankan.
+
+### Notes
+- **Tahap 4 (drop kolom `ProductVariant.name`) sengaja belum dikerjakan** — menunggu backfill diverifikasi di produksi. Sebelum itu `name` masih dipakai snapshot pesanan dan fallback FE.
+- Produk lama yang **belum** di-backfill tetap tampil normal: FE jatuh ke mode 1 sumbu memakai `name`. Jadi jeda antara `migrate deploy` dan backfill tidak merusak halaman produk.
+
 ## [Unreleased] — M11-B4: Statistik Produk Detail
 
 ### Added

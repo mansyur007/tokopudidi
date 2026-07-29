@@ -5,7 +5,7 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
-> **Progress (2026-07-29)** — **M11-B1 Etalase Toko** (butuh migration `m11_b1_shop_showcase`) & **M11-B4 Statistik Produk** (tanpa migration) selesai. Sisa M11: **A8 Variant Multi-Axis** — item terbesar milestone ini, menyentuh data layer luas dan butuh migration 4 tahap.
+> **Progress (2026-07-29)** — **M11-B1 Etalase Toko** & **M11-B4 Statistik Produk** selesai. **M11-A8 Variant Multi-Axis** tahap 1–3 selesai (migration `m11_a8_variant_options` + backfill `npm run db:backfill-variants`); **tahap 4 (drop kolom `ProductVariant.name`) sengaja ditunda** sampai backfill terverifikasi di produksi. Setelah itu M11 tuntas dan **M12** bebas di-klaim.
 >
 > **Progress terbaru (2026-07-27)** — **M10 selesai (menunggu review)**: A5 QRIS Mock UX ([PR #30](https://github.com/mansyur007/tokopudidi/pull/30)), A10 Filter Search Lengkap ([PR #31](https://github.com/mansyur007/tokopudidi/pull/31)), A7 Komplain/Return. Ketiganya butuh migration, jadi jalankan `prisma migrate deploy` saat merge. Milestone berikutnya yang bebas di-klaim: **M11**.
 >
@@ -552,7 +552,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M11-A8. Variant Kombinasi Multi-Axis
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟡 IN PROGRESS (tahap 1–3 selesai; **tahap 4 drop kolom belum**) · **Owner**: Claude
+- **Deliver notes** (2026-07-29): **`ProductVariant.name` sengaja DIPERTAHANKAN**, berubah peran jadi *cache turunan* dari nilai kombinasi ("Merah / M") yang ditulis ulang tiap simpan. Konsekuensinya snapshot `OrderItem.variantName` ([order.service.ts:227](apps/api/src/modules/order/order.service.ts#L227)) tidak perlu diubah sama sekali, dan produk yang belum di-backfill tetap punya label. Audit menemukan `name` ternyata **satu-satunya** field variant yang dibaca di luar id/stock/priceModifier — radius perubahan jauh lebih kecil dari perkiraan rencana. **Kombinasi yang hilang dinonaktifkan, bukan dihapus**: `CartItem.variantId` ber-FK `ON DELETE SET NULL` (menghapus akan membuat item keranjang orang lain diam-diam jadi "tanpa varian") dan `OrderItem.variantId` kolom polos tanpa FK (akan menunjuk baris lenyap) — perilaku lama yang menghapus adalah bug laten yang ikut diperbaiki di sini. Pencocokan kombinasi saat edit membaca **tautan nilai** sebelum option lama dihapus, bukan mengurai `name`, karena nilai yang memuat `" / "` akan terpecah salah. Payload varian memakai **nilai posisional**, bukan id, supaya create & edit sebentuk. FE punya **fallback 1 sumbu** (`LegacyVariantPicker`) untuk produk yang belum di-backfill — tanpa ini halaman produk kehilangan pilihan varian di jeda antara migration dan backfill. Seed ikut menghasilkan struktur baru + 1 produk 2 sumbu (Baju Koko, Navy/XL sengaja stok 0).
+- **Sisa pekerjaan (tahap 4)**: drop kolom `ProductVariant.name` lewat migration terpisah **setelah** backfill diverifikasi di produksi. Sebelum itu, `name` masih dipakai snapshot order dan fallback FE — jangan di-drop bersamaan dengan PR ini.
 - **Scope**: Refactor variant dari single-axis (`name`) jadi multi-axis (warna × ukuran). Stock & priceModifier per kombinasi.
 - **Konteks kode (audit 2026-07-29)** — siapa saja yang memegang `ProductVariant` sekarang:
   - Model: `ProductVariant { name, priceModifier, stock, isActive }` ([schema.prisma:299](packages/database/prisma/schema.prisma#L299)) — direferensikan `CartItem.variantId` dan `OrderItem { variantId, variantName }` (snapshot).
@@ -601,11 +603,11 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Guard: max 3 option per produk, total kombinasi ≤ 50 (zod + UI sebelum generate).
   - Cart berisi variant yang di-nonaktifkan → tampil "varian tidak tersedia" di keranjang, blokir checkout item itu (perilaku sama dengan produk nonaktif existing).
 - **Acceptance**:
-  - [ ] Produk lama (single-axis) tetap render benar setelah backfill, tanpa edit manual
-  - [ ] Cart/order lama yang mereferensikan variant lama tetap valid
-  - [ ] Pilih "Merah" → ukuran tanpa stok Merah disable
-  - [ ] Guard 50 kombinasi bekerja di FE dan API
-  - [ ] Drop `name` baru dijalankan setelah semua acceptance lain hijau
+  - [x] Produk lama (single-axis) tetap render benar setelah backfill, tanpa edit manual _(plus: tetap render walau **belum** di-backfill, lewat fallback 1 sumbu)_
+  - [x] Cart/order lama yang mereferensikan variant lama tetap valid _(id kombinasi dipertahankan saat edit; yang hilang dinonaktifkan)_
+  - [x] Pilih "Merah" → ukuran tanpa stok Merah disable
+  - [x] Guard 50 kombinasi bekerja di FE dan API
+  - [ ] Drop `name` baru dijalankan setelah semua acceptance lain hijau — **tahap 4, belum dikerjakan**
 - **Effort**: L (paling besar di milestone — kerjakan terakhir supaya tidak block B1/B4)
 
 ---

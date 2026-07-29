@@ -28,7 +28,16 @@ export interface ProductDetail extends Omit<ProductCard, 'originalPrice' | 'disc
   freeShippingEligible: boolean;
   viewCount: number;
   images: { id: string; url: string; order: number }[];
-  variants: { id: string; name: string; priceModifier: number; stock: number }[];
+  // Variant multi-axis (M11-A8). `optionValues` sejajar urutan `options`;
+  // kosong untuk produk lama yang belum di-backfill — FE jatuh ke mode 1 sumbu
+  // memakai `name`.
+  options: { id: string; name: string; order: number; values: { id: string; value: string; order: number }[] }[];
+  variants: {
+    id: string; name: string; priceModifier: number; stock: number;
+    imageUrl: string | null;
+    optionValues: string[];
+    optionValueIds: string[];
+  }[];
   category: { id: string; name: string; slug: string };
   shop: ProductCard['shop'] & {
     logoUrl: string | null;

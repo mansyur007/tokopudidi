@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  MAX_VARIANT_OPTIONS,
+  MAX_VARIANT_COMBINATIONS,
+  countCombinations,
+  comboKey,
+} from '../utils/variant';
 
 export const upgradeToSellerSchema = z.object({
   shopName: z.string().trim().min(3, 'Nama toko minimal 3 karakter').max(30),
@@ -23,11 +29,24 @@ export const updateShopSchema = z.object({
   autoReplyText: z.string().trim().max(300).optional().or(z.literal('')),
 });
 
+// ===== Variant multi-axis (M11-A8) =====
+// Kombinasi dirujuk lewat NILAI posisional (sejajar urutan `options`), bukan id.
+// Dengan begitu create dan edit memakai bentuk payload yang sama — client tidak
+// perlu bolak-balik mengambil id value yang baru dibuat.
+const optionInput = z.object({
+  name: z.string().trim().min(1, 'Nama opsi wajib diisi').max(30),
+  values: z
+    .array(z.string().trim().min(1).max(40))
+    .min(1, 'Setiap opsi butuh minimal 1 nilai')
+    .max(MAX_VARIANT_COMBINATIONS),
+});
+
 const variantInput = z.object({
-  id: z.string().uuid().optional(),     // ada kalau edit
-  name: z.string().trim().min(1).max(40),
+  values: z.array(z.string().trim().min(1).max(40)).min(1),
   priceModifier: z.number().int().default(0),
   stock: z.number().int().min(0),
+  imageUrl: z.string().min(5).nullable().optional(),
+  isActive: z.boolean().optional(),
 });
 
 const productBaseSchema = z.object({
@@ -48,10 +67,94 @@ const productBaseSchema = z.object({
   freeShippingEligible: z.boolean().default(false),
   isActive: z.boolean().default(true),
   imageUrls: z.array(z.string().min(5)).min(1, 'Minimal 1 foto produk').max(5, 'Maksimal 5 foto'),
-  variants: z.array(variantInput).max(20).optional(),
+  options: z.array(optionInput).max(MAX_VARIANT_OPTIONS, `Maksimal ${MAX_VARIANT_OPTIONS} opsi varian`).optional(),
+  variants: z.array(variantInput).max(MAX_VARIANT_COMBINATIONS).optional(),
 });
 
-export const productCreateSchema = productBaseSchema
+/** Bentuk longgar yang dibaca aturan di bawah — create & update sama-sama cocok. */
+interface VariantShape {
+  options?: { name: string; values: string[] }[];
+  variants?: { values: string[] }[];
+}
+
+/**
+ * Aturan yang mengikat `options` dengan `variants`. Ditulis sebagai data supaya
+ * create dan update (yang tipenya berbeda: satu wajib, satu partial) menolak
+ * payload tak konsisten dengan pesan yang persis sama.
+ */
+export const VARIANT_RULES: {
+  check: (v: VariantShape) => boolean;
+  message: string;
+  path: string[];
+}[] = [
+  {
+    check: (v) => !v.variants?.length || !!v.options?.length,
+    message: 'Varian butuh minimal 1 opsi (mis. "Warna")',
+    path: ['options'],
+  },
+  {
+    check: (v) => {
+      const names = (v.options ?? []).map((o) => o.name.trim().toLowerCase());
+      return new Set(names).size === names.length;
+    },
+    message: 'Nama opsi tidak boleh kembar',
+    path: ['options'],
+  },
+  {
+    check: (v) => (v.options ?? []).every((o) => {
+      const vals = o.values.map((x) => x.trim().toLowerCase());
+      return new Set(vals).size === vals.length;
+    }),
+    message: 'Nilai dalam satu opsi tidak boleh kembar',
+    path: ['options'],
+  },
+  {
+    check: (v) => countCombinations(v.options ?? []) <= MAX_VARIANT_COMBINATIONS,
+    message: `Total kombinasi varian maksimal ${MAX_VARIANT_COMBINATIONS}`,
+    path: ['options'],
+  },
+  {
+    check: (v) => (v.variants ?? []).every((vr) => vr.values.length === (v.options ?? []).length),
+    message: 'Setiap kombinasi harus punya satu nilai per opsi',
+    path: ['variants'],
+  },
+  {
+    // Tanpa aturan ini, kombinasi bisa menyimpan nilai yang tidak ada di daftar
+    // opsi dan varian itu jadi tidak akan pernah bisa dipilih pembeli.
+    check: (v) => (v.variants ?? []).every((vr) =>
+      vr.values.every((val, i) =>
+        (v.options ?? [])[i]?.values.some((x) => x.trim() === val.trim()),
+      ),
+    ),
+    message: 'Ada kombinasi yang memakai nilai di luar daftar opsi',
+    path: ['variants'],
+  },
+  {
+    check: (v) => {
+      const keys = (v.variants ?? []).map((vr) => comboKey(vr.values));
+      return new Set(keys).size === keys.length;
+    },
+    message: 'Ada kombinasi varian yang kembar',
+    path: ['variants'],
+  },
+];
+
+// Tipe kembalian dipertahankan eksplisit: `.refine()` berantai menghasilkan
+// ZodEffects bersarang yang membuat z.infer jatuh ke `any` kalau dibiarkan,
+// dan FE ikut kehilangan pengecekan tipe pada ProductCreateInput.
+function withVariantRules<S extends z.ZodTypeAny>(
+  schema: S,
+): z.ZodType<z.output<S>, z.ZodTypeDef, z.input<S>> {
+  return VARIANT_RULES.reduce(
+    (acc, rule) => acc.refine((v) => rule.check(v as VariantShape), {
+      message: rule.message,
+      path: rule.path,
+    }),
+    schema as z.ZodTypeAny,
+  ) as z.ZodType<z.output<S>, z.ZodTypeDef, z.input<S>>;
+}
+
+export const productCreateSchema = withVariantRules(productBaseSchema)
   .refine((v) => v.salePrice == null || v.salePrice < v.price, {
     message: 'Harga diskon harus lebih murah dari harga normal',
     path: ['salePrice'],
@@ -67,8 +170,9 @@ export const productCreateSchema = productBaseSchema
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 
 // Partial dari base (tanpa refinement create) — konsistensi salePrice vs price
-// divalidasi di route update karena price bisa tidak ikut dikirim.
-export const productUpdateSchema = productBaseSchema.partial();
+// divalidasi di route update karena price bisa tidak ikut dikirim. Aturan
+// varian tetap berlaku: kalau `options`/`variants` dikirim, harus konsisten.
+export const productUpdateSchema = withVariantRules(productBaseSchema.partial());
 
 export const shipOrderSchema = z.object({
   trackingNumber: z.string().trim().min(3, 'Nomor resi minimal 3 karakter').max(60),

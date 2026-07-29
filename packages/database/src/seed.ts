@@ -80,7 +80,11 @@ interface ProductSeed {
   weight: number;
   stock: number;
   description: string;
+  // Variant 1 sumbu (bentuk lama) — otomatis dibungkus jadi opsi "Varian".
   variants?: { name: string; priceModifier: number; stock: number }[];
+  // Variant multi-axis (M11-A8): `values` sejajar urutan `options`.
+  options?: { name: string; values: string[] }[];
+  combos?: { values: string[]; priceModifier: number; stock: number }[];
 }
 
 const PRODUCTS: ProductSeed[] = [
@@ -119,7 +123,23 @@ const PRODUCTS: ProductSeed[] = [
       { name: 'XL', priceModifier: 5000, stock: 4 },
     ],
   },
-  { shopSlug: 'konveksi-mbak-rina', catSlug: 'fashion-muslim', name: 'Baju Koko Lengan Pendek Katun', price: 95000, weight: 350, stock: 45, description: 'Baju koko bahan katun premium, jahitan rapi cocok untuk Idul Fitri.' },
+  // Produk 2 sumbu (M11-A8) — sengaja ada di seed supaya jalur multi-axis
+  // benar-benar terpakai di dev & e2e. Satu kombinasi (Navy/XL) sengaja
+  // berstok 0 untuk menguji penonaktifan chip.
+  { shopSlug: 'konveksi-mbak-rina', catSlug: 'fashion-muslim', name: 'Baju Koko Lengan Pendek Katun', price: 95000, weight: 350, stock: 45, description: 'Baju koko bahan katun premium, jahitan rapi cocok untuk Idul Fitri.',
+    options: [
+      { name: 'Warna', values: ['Putih', 'Navy'] },
+      { name: 'Ukuran', values: ['M', 'L', 'XL'] },
+    ],
+    combos: [
+      { values: ['Putih', 'M'], priceModifier: 0, stock: 10 },
+      { values: ['Putih', 'L'], priceModifier: 0, stock: 8 },
+      { values: ['Putih', 'XL'], priceModifier: 5000, stock: 5 },
+      { values: ['Navy', 'M'], priceModifier: 0, stock: 7 },
+      { values: ['Navy', 'L'], priceModifier: 0, stock: 6 },
+      { values: ['Navy', 'XL'], priceModifier: 5000, stock: 0 },
+    ],
+  },
   { shopSlug: 'konveksi-mbak-rina', catSlug: 'fashion-wanita', name: 'Daster Batik Lengan Pendek', price: 55000, weight: 300, stock: 60, description: 'Daster batik all size, bahan rayon adem cocok dipakai di rumah.' },
 
   // Warung Pak Bambang — otomotif
@@ -285,16 +305,49 @@ async function main() {
       },
     });
 
-    if (p.variants?.length) {
-      for (const v of p.variants) {
-        await prisma.productVariant.create({
+    // Variant + lapisan option/value (M11-A8). Bentuk lama (1 sumbu) dibungkus
+    // jadi opsi "Varian" — hasilnya sama persis dengan yang dihasilkan script
+    // backfill, supaya data dev/CI setara data produksi setelah di-backfill.
+    const options = p.options ?? (p.variants?.length ? [{
+      name: 'Varian',
+      values: [...new Set(p.variants.map((v) => v.name))],
+    }] : []);
+    const combos = p.combos ?? (p.variants ?? []).map((v) => ({
+      values: [v.name],
+      priceModifier: v.priceModifier,
+      stock: v.stock,
+    }));
+
+    if (options.length && combos.length) {
+      const valueId = new Map<string, string>(); // "optionIdx|value" -> id
+      for (const [oi, opt] of options.entries()) {
+        const option = await prisma.productOption.create({
+          data: { productId: product.id, name: opt.name, order: oi },
+        });
+        for (const [vi, value] of opt.values.entries()) {
+          const row = await prisma.productOptionValue.create({
+            data: { optionId: option.id, value, order: vi },
+          });
+          valueId.set(`${oi}|${value}`, row.id);
+        }
+      }
+
+      for (const c of combos) {
+        const variant = await prisma.productVariant.create({
           data: {
             productId: product.id,
-            name: v.name,
-            priceModifier: v.priceModifier,
-            stock: v.stock,
+            name: c.values.join(' / '),
+            priceModifier: c.priceModifier,
+            stock: c.stock,
           },
-        }).catch(() => undefined);
+        });
+        await prisma.productVariantValue.createMany({
+          data: c.values
+            .map((value, oi) => valueId.get(`${oi}|${value}`))
+            .filter((id): id is string => Boolean(id))
+            .map((optionValueId) => ({ variantId: variant.id, optionValueId })),
+          skipDuplicates: true,
+        });
       }
     }
     productCount++;

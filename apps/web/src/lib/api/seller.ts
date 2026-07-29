@@ -96,7 +96,14 @@ export interface SellerProductDetail extends SellerProductRow {
   salePrice: number | null;
   saleStartAt: string | null;
   saleEndAt: string | null;
-  variants: { id: string; name: string; priceModifier: number; stock: number }[];
+  // Variant multi-axis (M11-A8). `optionValues` kosong untuk produk lama yang
+  // belum di-backfill — form jatuh ke 1 nilai memakai `name`.
+  options?: { id: string; name: string; order: number; values: { id: string; value: string; order: number }[] }[];
+  variants: {
+    id: string; name: string; priceModifier: number; stock: number;
+    imageUrl?: string | null;
+    optionValues?: string[];
+  }[];
 }
 
 export const getSellerProduct = (token: string, id: string) =>

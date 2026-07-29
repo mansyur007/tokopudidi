@@ -9,7 +9,8 @@ import { useWishlistStore } from '@/store/wishlist';
 import { trackView } from '@/lib/api/products';
 import type { ProductDetail } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
-import { formatRupiah, getEffectivePrice, getSaleRemainingMs } from '@tokopudidi/shared';
+import { formatRupiah, getEffectivePrice, getSaleRemainingMs, findVariant } from '@tokopudidi/shared';
+import { VariantPicker, LegacyVariantPicker } from './VariantPicker';
 import { Icon } from '@/components/shell/Icon';
 import { clsx } from 'clsx';
 
@@ -47,7 +48,19 @@ export function BuyBox({ product }: Props) {
   const wishlisted = useWishlistStore((s) => s.has(product.id));
   const toggleWishlist = useWishlistStore((s) => s.toggle);
 
-  const [variantId, setVariantId] = useState<string | undefined>(product.variants[0]?.id);
+  // Produk dianggap multi-axis kalau punya opsi DAN variannya sudah tertaut ke
+  // nilai opsi. Produk lama yang belum di-backfill jatuh ke mode 1 sumbu.
+  const multiAxis =
+    product.options?.length > 0 && product.variants.some((v) => v.optionValues?.length > 0);
+
+  // Mode multi-axis: pilihan disimpan per sumbu, variantId diturunkan darinya.
+  const [selected, setSelected] = useState<(string | undefined)[]>(() =>
+    multiAxis ? new Array(product.options.length).fill(undefined) : [],
+  );
+  // Mode 1 sumbu: variantId dipegang langsung, seperti sebelum M11-A8.
+  const [legacyVariantId, setLegacyVariantId] = useState<string | undefined>(
+    multiAxis ? undefined : product.variants[0]?.id,
+  );
   const [qty, setQty] = useState<number>(product.minOrderQty);
   const [busy, setBusy] = useState(false);
   const [wishBusy, setWishBusy] = useState(false);
@@ -62,8 +75,19 @@ export function BuyBox({ product }: Props) {
     }
   }, [product.id, token]);
 
-  const selectedVariant = product.variants.find((v) => v.id === variantId);
-  const stockLeft = selectedVariant?.stock ?? product.stock;
+  const selectedVariant = multiAxis
+    ? findVariant(
+        product.variants.map((v) => ({ ...v, values: v.optionValues })),
+        selected,
+        product.options.length,
+      )
+    : product.variants.find((v) => v.id === legacyVariantId);
+  const variantId = selectedVariant?.id;
+
+  // Kombinasi belum lengkap dipilih → jangan pakai stok produk sebagai patokan,
+  // nanti pembeli bisa menekan "Beli" tanpa memilih varian.
+  const perluPilihVarian = multiAxis && !selectedVariant;
+  const stockLeft = selectedVariant?.stock ?? (multiAxis ? 0 : product.stock);
   // Harga efektif termasuk sale periodik (M9-B3) + variant modifier.
   const effectivePrice = getEffectivePrice(product) + (selectedVariant?.priceModifier ?? 0);
 
@@ -107,36 +131,36 @@ export function BuyBox({ product }: Props) {
     <div className="bg-white border border-line rounded-card p-4 md:sticky md:top-[160px]">
       <div className="font-extrabold text-[15px] mb-3 text-ink">Atur jumlah dan catatan</div>
 
-      {/* Variants (jika ada) */}
-      {product.variants.length > 0 && (
-        <div className="mb-3">
-          <p className="text-[12px] font-semibold text-ink-muted mb-1.5">Varian</p>
-          <div className="flex flex-wrap gap-1.5">
-            {product.variants.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                disabled={v.stock === 0}
-                onClick={() => { setVariantId(v.id); setQty(product.minOrderQty); }}
-                className={clsx(
-                  'text-xs px-2.5 py-1.5 rounded-md border min-h-[34px]',
-                  variantId === v.id
-                    ? 'border-primary bg-primary-50 text-primary font-semibold'
-                    : 'border-line text-ink-soft bg-white',
-                  v.stock === 0 && 'opacity-50 line-through',
-                )}
-              >
-                {v.name}
-                {v.priceModifier !== 0 && (
-                  <span className="ml-1 text-[10px] text-ink-muted">
-                    ({v.priceModifier > 0 ? '+' : ''}{formatRupiah(v.priceModifier)})
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Varian — multi-axis (M11-A8) atau 1 sumbu untuk data lama */}
+      {product.variants.length > 0 && (multiAxis ? (
+        <>
+          <VariantPicker
+            options={product.options}
+            variants={product.variants}
+            selected={selected}
+            onSelect={(oi, value) => {
+              setSelected((prev) => {
+                const next = [...prev];
+                next[oi] = next[oi] === value ? undefined : value;
+                // Pilihan di sumbu lain bisa jadi tidak valid lagi setelah ini;
+                // biarkan tetap terpilih dan VariantPicker yang menonaktifkan
+                // chip-nya, supaya pembeli tidak kehilangan pilihan diam-diam.
+                return next;
+              });
+              setQty(product.minOrderQty);
+            }}
+          />
+          {perluPilihVarian && (
+            <p className="text-[12px] text-ink-muted mb-3">Pilih varian dulu ya.</p>
+          )}
+        </>
+      ) : (
+        <LegacyVariantPicker
+          variants={product.variants}
+          variantId={legacyVariantId}
+          onSelect={(id) => { setLegacyVariantId(id); setQty(product.minOrderQty); }}
+        />
+      ))}
 
       {/* Qty stepper */}
       <div className="flex items-center gap-3 mb-3.5">
@@ -158,7 +182,13 @@ export function BuyBox({ product }: Props) {
           ><Icon name="plus" size={14} /></button>
         </div>
         <div className="text-xs text-ink-muted">
-          Stok Total <strong className="text-ink font-bold">{stockLeft}</strong>
+          {perluPilihVarian ? (
+            // Sebelum kombinasi dipilih, angka stok belum punya arti — jangan
+            // tampilkan "0" yang terbaca seolah produknya habis.
+            <>Stok <strong className="text-ink font-bold">—</strong></>
+          ) : (
+            <>Stok Total <strong className="text-ink font-bold">{stockLeft}</strong></>
+          )}
         </div>
       </div>
 
