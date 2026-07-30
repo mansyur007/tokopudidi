@@ -89,9 +89,11 @@ export const checkoutOrder = (token: string, body: CheckoutInput) =>
     method: 'POST', token, body: JSON.stringify(body),
   });
 
-export const listOrders = (token: string, status?: string, page = 1) =>
+// `limit` berguna saat pemanggil cuma butuh `total` (mis. badge bottom nav) —
+// tanpa itu, satu badge menarik 20 pesanan lengkap tiap kali.
+export const listOrders = (token: string, status?: string, page = 1, limit?: number) =>
   apiFetch<OrderListResult>(
-    `/api/v1/orders?status=${encodeURIComponent(status ?? 'ALL')}&page=${page}`,
+    `/api/v1/orders?status=${encodeURIComponent(status ?? 'ALL')}&page=${page}${limit ? `&limit=${limit}` : ''}`,
     { token },
   );
 

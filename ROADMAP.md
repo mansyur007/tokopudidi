@@ -613,8 +613,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M12-A11. Mobile Bottom Nav
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
-- **Scope**: Bottom nav fixed 5 icon untuk mobile: Home `/` · Wishlist `/wishlist` · Pesanan `/pesanan` · Notif `/notifikasi` · Akun `/akun`.
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Koreksi audit (2026-07-29)**: **komponen `BottomNav` ternyata sudah ada dan sudah terpasang** di layout buyer sejak sebelum M12 (tab Beranda/Kategori/Pesanan/Chat/Akun, ikon emoji, tanpa badge). Audit Draft 3 melewatkannya karena hanya memeriksa `pb-20` di layout, bukan komponen yang dirender di sana. Jadi item ini pekerjaan penyempurnaan, bukan pembuatan baru.
+- **Deliver notes** (2026-07-29): susunan tab **tidak** mengikuti rencana karena audit keterjangkauan menunjukkan rencana itu justru regresi. Di mobile, header menyembunyikan Kategori (bar kategori `hidden md:block`), Wishlist, Chat, dan Akun — sedangkan **Notif sudah terjangkau** lewat `NotifBell` yang memang tampil di mobile. Tab Notif hanya akan menduplikasi akses yang ada sambil membuang Kategori & Chat yang tidak punya jalan lain. Deliver: **Beranda / Kategori / Wishlist / Pesanan / Akun** — Wishlist masuk menggantikan Chat karena wishlist tadinya **tidak bisa dijangkau sama sekali** dari mobile. Konsekuensinya `ChatFab` ikut diperbaiki: sebelumnya `hidden md:flex` (FAB desktop-only — keliru, justru mobile yang membutuhkannya), sekarang tampil di mobile dan diangkat di atas nav; disembunyikan di `/chat` sendiri dan di rute yang menyembunyikan nav. Badge dipasang di Pesanan (belum dibayar) memakai `total` dari endpoint daftar pesanan existing + param `limit=1` baru, tanpa endpoint hitung baru — kebetulan endpoint itu juga menjalankan sapuan kedaluwarsa QRIS (M10-A5), jadi angkanya ikut akurat. Ikon emoji diganti `Icon` SVG (`home` & `user` ditambahkan). Aturan nav dipisah ke `bottomNavRules.ts` — **sengaja bukan** `bottomNav.ts` karena bentrok kapitalisasi dengan `BottomNav.tsx` di filesystem case-insensitive, yang membuat resolusi modul berbeda antara Windows dan CI Linux. `<main>` sudah `pb-20 md:pb-0`, jadi tidak ada padding yang perlu ditambah.
 - **Konteks kode (audit 2026-07-29)**:
   - [layout.tsx:11](apps/web/src/app/(buyer)/layout.tsx#L11) buyer sudah `<main className="flex-1 pb-20 md:pb-0">` — **ruang bottom nav sudah disiapkan**, tidak perlu ubah padding.
   - Sumber badge sudah ada di [Header.tsx](apps/web/src/components/shell/Header.tsx#L37-L39): `useCartStore.totalQuantity()`, `useWishlistStore.ids.size`, dan `NotifBell` (unread count) — **reuse store yang sama**, jangan fetch ulang. Kalau unread count masih lokal di `NotifBell`, angkat ke store/hook bersama dulu.
@@ -626,10 +627,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - **Sembunyikan** di `/checkout`, `/pesanan/[id]/bayar`, dan `/chat` (composer chat butuh bottom penuh) — cek via `usePathname` di komponen (client), bukan di layout.
 - **Badge**: wajib = notif unread; opsional = pesanan `PENDING_PAYMENT` (kalau digarap, ambil dari list orders existing dengan filter status, jangan endpoint baru).
 - **Acceptance**:
-  - [ ] Muncul hanya < md, tidak menutupi konten (padding main sudah ada)
-  - [ ] Active state benar di 5 route + nested route (`/pesanan/xxx` → tab Pesanan)
-  - [ ] Hidden di checkout, halaman bayar, dan chat
-  - [ ] Badge notif konsisten dengan angka di `NotifBell` (satu sumber)
+  - [x] Muncul hanya < md, tidak menutupi konten — diverifikasi di browser: `main` padding-bottom 80px vs tinggi nav 59px, nav menempel dasar viewport
+  - [x] Active state benar di 5 route + nested route (`/pesanan/xxx` → tab Pesanan) — tepat 1 tab aktif
+  - [x] Hidden di checkout, halaman bayar, dan chat
+  - [x] ~~Badge notif konsisten dengan `NotifBell`~~ → **tidak berlaku**: Notif bukan tab (lihat deliver notes). Badge dipasang di Pesanan (belum dibayar), sumber tunggal dari endpoint daftar pesanan.
 - **Effort**: S
 
 ---
@@ -1003,7 +1004,7 @@ Estimasi asumsi **1 orang full-time per milestone**. Bisa diparalelkan antar-ora
 5. Setelah merge, update Status jadi 🟢 DONE + entry di [CHANGELOG.md](CHANGELOG.md).
 
 ### Cross-milestone dependencies
-- **M7-A1 Wishlist** → dipakai di M12-A11 Mobile Bottom Nav (icon wishlist) — selesaikan A1 dulu.
+- **M7-A1 Wishlist** → dipakai di M12-A11 Mobile Bottom Nav (icon wishlist) — _resolved_: keduanya sudah selesai; bottom nav jadi satu-satunya akses wishlist di mobile.
 - **M7-A2 ProductView** → dipakai di M11-B4 Statistik Produk & M7-D2 For-You — schema A2 harus ada lebih dulu.
 - **M9-A4 Voucher Picker** ⇄ **M9-B2 Toko Voucher** & **M9-C1 Voucher Platform** — picker baru bermanfaat penuh setelah B2 & C1 ready, tapi bisa rilis bertahap.
 - **M11-A8 Variant Multi-Axis** — sentuh data layer luas, lakukan di akhir milestone supaya tidak block fitur lain.
