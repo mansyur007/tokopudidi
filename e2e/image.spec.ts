@@ -67,8 +67,10 @@ test(tc('146', 'Logo dari host terdaftar tetap lewat optimizer next/image'), asy
   const res = await page.goto(`/toko/${slug}`);
   expect(res?.status()).toBe(200);
 
-  // next/image menulis src-nya sebagai /_next/image?url=<encoded>&w=..&q=..
-  const img = page.locator('img[src*="_next/image"][src*="picsum.photos"]');
+  // Dicocokkan lewat seed `logo-e2e`, bukan lewat host: gambar produk seed juga
+  // dari picsum dan juga lewat optimizer, jadi mencari "picsum.photos" saja akan
+  // menjaring kartu produk di halaman yang sama.
+  const img = page.locator('img[src*="_next/image"][src*="logo-e2e"]');
   await expect(img).toHaveCount(1);
 });
 

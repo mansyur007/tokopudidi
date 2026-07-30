@@ -25,11 +25,18 @@ test(tc('136', 'Bottom nav tampil di mobile dengan 5 tab'), async ({ page }) => 
   await expect(bar.getByRole('link', { name: /Beranda/ })).toHaveAttribute('aria-current', 'page');
 });
 
+// Sengaja memakai `/kategori`, BUKAN `/wishlist`. Halaman wishlist melakukan
+// `router.push('/masuk')` di useEffect kalau belum ada user, dan browser di
+// suite ini tidak login (token hasil global-setup dipakai di level API saja).
+// `/masuk` ada di route group (auth) yang tidak punya bottom nav, jadi
+// assertion di `/wishlist` cuma menang kalau membaca DOM sebelum redirect
+// selesai — lomba yang memang sempat lolos, lalu gagal begitu timing hidrasi
+// bergeser sedikit. `/kategori` publik dan tidak pindah ke mana-mana.
 test(tc('137', 'Tab aktif mengikuti rute, termasuk rute bersarang'), async ({ page }) => {
-  await page.goto('/wishlist');
+  await page.goto('/kategori');
   const bar = page.locator(nav);
 
-  await expect(bar.getByRole('link', { name: /Wishlist/ })).toHaveAttribute('aria-current', 'page');
+  await expect(bar.getByRole('link', { name: /Kategori/ })).toHaveAttribute('aria-current', 'page');
   // Beranda tidak boleh ikut menyala — `/` hanya cocok persis.
   await expect(bar.getByRole('link', { name: /Beranda/ })).not.toHaveAttribute('aria-current', 'page');
 
