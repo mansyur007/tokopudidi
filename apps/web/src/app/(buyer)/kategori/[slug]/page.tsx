@@ -1,5 +1,7 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { absoluteUrl } from '@/lib/siteUrl';
 import { fetchCategories } from '@/lib/api/categories';
 import { listProducts, type ProductListParams } from '@/lib/api/products';
 import { ProductGrid } from '@/components/product/ProductGrid';
@@ -7,6 +9,22 @@ import { ProductGrid } from '@/components/product/ProductGrid';
 interface Props {
   params: { slug: string };
   searchParams: { sort?: ProductListParams['sort']; page?: string };
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const categories = await fetchCategories().catch(() => []);
+  const cat = categories.find((c) => c.slug === params.slug);
+  if (!cat) return {};
+
+  const deskripsi = `Belanja ${cat.name} dari UMKM Indonesia di Tokopudidi. Harga terjangkau, langsung dari toko tetangga.`;
+  const url = absoluteUrl(`/kategori/${cat.slug}`);
+
+  return {
+    title: cat.name,
+    description: deskripsi,
+    alternates: { canonical: url },
+    openGraph: { type: 'website', url, title: cat.name, description: deskripsi },
+  };
 }
 
 export default async function KategoriDetailPage({ params, searchParams }: Props) {

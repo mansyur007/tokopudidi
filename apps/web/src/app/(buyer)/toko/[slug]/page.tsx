@@ -1,4 +1,7 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { metaDescription, firstPublicImage } from '@tokopudidi/shared';
+import { absoluteUrl } from '@/lib/siteUrl';
 import { getShop } from '@/lib/api/shops';
 import { listProducts } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
@@ -7,6 +10,35 @@ import { ShopHeader } from '@/components/shop/ShopHeader';
 import { ShowcaseTabs } from '@/components/shop/ShowcaseTabs';
 
 interface Props { params: { slug: string } }
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  let shop;
+  try {
+    shop = await getShop(params.slug);
+  } catch {
+    return {};
+  }
+
+  const deskripsi = metaDescription(
+    shop.description ?? `Belanja produk ${shop.name} di ${shop.city}. ${shop.totalSold} produk terjual.`,
+  );
+  const url = absoluteUrl(`/toko/${shop.slug}`);
+  // Banner lebih pas untuk kartu pratinjau lebar; logo jadi cadangan.
+  const gambar = firstPublicImage([shop.bannerUrl, shop.logoUrl]);
+
+  return {
+    title: shop.name,
+    description: deskripsi,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      url,
+      title: `${shop.name} · ${shop.city}`,
+      description: deskripsi,
+      ...(gambar && { images: [{ url: gambar }] }),
+    },
+  };
+}
 
 export default async function TokoDetailPage({ params }: Props) {
   let shop;

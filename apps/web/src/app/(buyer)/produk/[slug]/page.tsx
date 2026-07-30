@@ -1,9 +1,14 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getProduct, getRelated, listProducts } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
-import { formatRupiah, getEffectivePrice, getDiscountPct } from '@tokopudidi/shared';
+import {
+  formatRupiah, getEffectivePrice, getDiscountPct,
+  metaDescription, firstPublicImage, buildProductJsonLd,
+} from '@tokopudidi/shared';
+import { SITE_URL, absoluteUrl } from '@/lib/siteUrl';
 import { ProductGallery } from '@/components/product/ProductGallery';
 import { InfoTabs } from '@/components/product/InfoTabs';
 import { BuyBox } from '@/components/product/BuyBox';
@@ -13,6 +18,39 @@ import { ReportButton } from '@/components/report/ReportButton';
 import { Icon } from '@/components/shell/Icon';
 
 interface Props { params: { slug: string } }
+
+// Metadata & JSON-LD (M12-D3). `getProduct` di sini dan di komponen memakai
+// fetch yang sama, jadi Next men-dedupe-nya dalam satu render — tidak ada
+// panggilan API tambahan.
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  let product;
+  try {
+    product = await getProduct(params.slug);
+  } catch {
+    // Produk tidak ada / API bermasalah: biarkan metadata default dari root
+    // layout yang dipakai. Halamannya sendiri yang memutuskan notFound().
+    return {};
+  }
+
+  const deskripsi = metaDescription(product.description);
+  const gambar = firstPublicImage(product.images.map((img) => img.url));
+  const url = absoluteUrl(`/produk/${product.slug}`);
+
+  return {
+    title: product.name,
+    description: deskripsi,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      url,
+      title: product.name,
+      description: deskripsi,
+      // Gambar base64 hasil upload seller sengaja disaring — lihat
+      // isPublicImageUrl di packages/shared/src/utils/seo.ts.
+      ...(gambar && { images: [{ url: gambar }] }),
+    },
+  };
+}
 
 export default async function ProductDetailPage({ params }: Props) {
   let product;
@@ -32,8 +70,34 @@ export default async function ProductDetailPage({ params }: Props) {
     getRelated(product.id).then((items) => items.slice(0, 6)).catch(() => []),
   ]);
 
+  const jsonLd = buildProductJsonLd(
+    {
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      price: product.price,
+      salePrice: product.salePrice,
+      saleStartAt: product.saleStartAt,
+      saleEndAt: product.saleEndAt,
+      stock: product.stock,
+      condition: product.condition,
+      ratingAvg: product.ratingAvg,
+      ratingCount: product.ratingCount,
+      images: product.images.map((img) => img.url),
+      shopName: product.shop.name,
+    },
+    SITE_URL,
+  );
+
   return (
     <div className="wrap py-3.5 pb-10">
+      {/* Rich result produk (M12-D3) */}
+      <script
+        type="application/ld+json"
+        // Konten disusun sendiri dari data terstruktur, bukan input mentah.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-ink-muted mb-4 flex-wrap">
         <Link href="/" className="text-primary font-semibold no-underline">Home</Link>
