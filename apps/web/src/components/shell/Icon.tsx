@@ -30,6 +30,9 @@ const PATHS: Record<string, React.ReactNode> = {
   heart:         (<><path d="M20.8 7.6a5 5 0 0 0-8.8-2.4 5 5 0 0 0-8.8 2.4c0 5.2 8.8 11.6 8.8 11.6s8.8-6.4 8.8-11.6Z" /></>),
   share:         (<><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" /><path d="M16 6 12 2 8 6" /><path d="M12 2v13" /></>),
   dots:          (<><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>),
+  // Ditambahkan untuk bottom nav mobile (M12-A11).
+  home:          (<><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V20h13V9.5" /></>),
+  user:          (<><circle cx="12" cy="8" r="3.5" /><path d="M4.5 20a7.5 7.5 0 0 1 15 0" /></>),
 };
 
 export function Icon({ name, size = 18, stroke = 1.8, className, style, filled }: Props) {

@@ -3,6 +3,22 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M12-A11: Mobile Bottom Nav
+
+### Changed
+- **Bottom nav mobile** (`M12-A11`) — komponen `BottomNav` yang sudah ada disempurnakan (bukan dibuat baru).
+  - Susunan tab: **Beranda / Kategori / Wishlist / Pesanan / Akun**. Tab **Chat** digantikan **Wishlist** karena wishlist tidak bisa dijangkau sama sekali dari mobile (header-nya `hidden md:inline-grid`), sementara chat masih punya `ChatFab`.
+  - Notifikasi sengaja **tidak** dijadikan tab meski rencana menyebutnya: `NotifBell` di header sudah tampil di mobile, jadi tab notif hanya menduplikasi akses sambil membuang tujuan yang belum punya akses.
+  - Ikon emoji diganti `Icon` SVG (menambah `home` & `user`), badge **pesanan belum dibayar**, ruang aman iOS (`env(safe-area-inset-bottom)`), dan nav menyingkir di `/checkout`, `/pesanan/[id]/bayar`, serta `/chat`.
+  - Badge memakai `total` dari endpoint daftar pesanan yang sudah ada + param `limit` baru pada client — tanpa endpoint hitung baru.
+  - Test: e2e `bottom-nav.spec.ts` (TC-TKPDD-136–139) di viewport mobile.
+
+### Fixed
+- **`ChatFab` kini tampil di mobile.** Sebelumnya `hidden md:flex` — FAB yang hanya muncul di desktop, padahal justru mobile yang membutuhkannya (header menyembunyikan link chat di bawah `md`). Kini tampil di mobile dan diangkat di atas bottom nav agar tidak saling menutupi; disembunyikan di `/chat` sendiri dan di rute yang menyembunyikan nav.
+
+### Notes
+- Berkas aturan nav dinamai `bottomNavRules.ts`, **bukan** `bottomNav.ts`, karena beda kapitalisasi saja dengan `BottomNav.tsx` — di filesystem case-insensitive (Windows/macOS) resolusi modulnya bentrok dan hasilnya bisa berbeda dari CI Linux.
+
 ## [Unreleased] — M11-A8: Variant Kombinasi Multi-Axis (tahap 1–3)
 
 ### Added
