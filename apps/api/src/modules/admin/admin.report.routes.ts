@@ -5,6 +5,7 @@ import { ok } from '../../lib/response';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { logAdmin } from '../../lib/adminLog';
 
 export const adminReportRouter = Router();
 adminReportRouter.use(requireAuth, requireRole('ADMIN'));
@@ -154,6 +155,9 @@ adminReportRouter.post('/:id/resolve', validateBody(resolveReportSchema), async 
       });
     });
 
+    logAdmin(req.user!.sub, 'RESOLVE_REPORT', {
+      targetType: 'REPORT', targetId: report.id, payload: req.body,
+    });
     return ok(res, null, action === 'ACTIONED' ? 'Laporan ditindaklanjuti' : 'Laporan diabaikan');
   } catch (err) { next(err); }
 });

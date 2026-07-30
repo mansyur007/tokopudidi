@@ -5,6 +5,7 @@ import { ok, created } from '../../lib/response';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { logAdmin } from '../../lib/adminLog';
 
 export const adminCategoryRouter = Router();
 adminCategoryRouter.use(requireAuth, requireRole('ADMIN'));
@@ -43,6 +44,9 @@ adminCategoryRouter.post('/', validateBody(categoryCreateSchema), async (req, re
     const cat = await prisma.category.create({
       data: { name, slug, parentId: parentId || null, iconUrl: iconUrl || null, order, isActive },
     });
+    logAdmin(req.user!.sub, 'CREATE_CATEGORY', {
+      targetType: 'CATEGORY', targetId: cat.id, payload: req.body, note: cat.name,
+    });
     return created(res, cat, 'Kategori ditambahkan');
   } catch (err) { next(err); }
 });
@@ -64,6 +68,9 @@ adminCategoryRouter.patch('/:id', validateBody(categoryUpdateSchema), async (req
         ...(isActive !== undefined ? { isActive } : {}),
       },
     });
+    logAdmin(req.user!.sub, 'UPDATE_CATEGORY', {
+      targetType: 'CATEGORY', targetId: cat.id, payload: req.body, note: cat.name,
+    });
     return ok(res, cat, 'Kategori diupdate');
   } catch (err) { next(err); }
 });
@@ -79,6 +86,9 @@ adminCategoryRouter.delete('/:id', async (req, res, next) => {
     if (existing._count.products > 0) throw new BadRequestError('Masih ada produk di kategori ini. Pindahkan dulu.');
     if (existing._count.children > 0) throw new BadRequestError('Masih ada subkategori. Hapus dulu subkategorinya.');
     await prisma.category.delete({ where: { id: existing.id } });
+    logAdmin(req.user!.sub, 'DELETE_CATEGORY', {
+      targetType: 'CATEGORY', targetId: existing.id, note: existing.name,
+    });
     return ok(res, null, 'Kategori dihapus');
   } catch (err) { next(err); }
 });

@@ -17,6 +17,7 @@ const NAV = [
   { href: '/admin/voucher',  label: 'Voucher',    emoji: '🎟️' },
   { href: '/admin/banner',   label: 'Banner',     emoji: '🖼️' },
   { href: '/admin/kategori', label: 'Kategori',   emoji: '🗂️' },
+  { href: '/admin/log',      label: 'Jejak Audit', emoji: '📜' },
   { href: '/scrap',          label: 'Scraper',    emoji: '🔎' },
 ];
 

@@ -240,3 +240,43 @@ export const updateAdminVoucher = (token: string, id: string, body: Partial<Admi
 
 export const deleteAdminVoucher = (token: string, id: string) =>
   apiFetch(`/api/v1/admin/voucher/${id}`, { method: 'DELETE', token });
+
+// ===== Jejak audit aksi admin (M12-C3) =====
+// Tidak ada create/update/delete di sini — tabelnya append-only, ditulis
+// server lewat helper `logAdmin` di route aksinya masing-masing.
+export interface AdminLogRow {
+  id: string;
+  adminId: string;
+  admin: { id: string; fullName: string; phone: string };
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  payload: unknown;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface AdminLogFilter {
+  adminId?: string;
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const listAdminLogs = (token: string, filter: AdminLogFilter = {}) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(filter)) {
+    if (v !== undefined && v !== '') q.set(k, String(v));
+  }
+  return apiFetch<{ items: AdminLogRow[]; total: number; page: number; limit: number }>(
+    `/api/v1/admin/logs?${q.toString()}`,
+    { token },
+  );
+};
+
+export const listAdminLogActors = (token: string) =>
+  apiFetch<{ id: string; fullName: string; count: number }[]>('/api/v1/admin/logs/admins', { token });

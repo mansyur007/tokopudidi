@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
 import { settleOrderRefund } from '../order/refund.settlement';
+import { logAdmin } from '../../lib/adminLog';
 
 export const adminRefundRouter = Router();
 adminRefundRouter.use(requireAuth, requireRole('ADMIN'));
@@ -70,6 +71,9 @@ adminRefundRouter.post('/:id/resolve', validateBody(resolveRefundSchema), async 
           },
         });
       });
+      logAdmin(req.user!.sub, 'RESOLVE_REFUND', {
+        targetType: 'REFUND', targetId: refund.id, payload: req.body, note: refund.order.orderNumber,
+      });
       return ok(res, null, 'Refund ditolak');
     }
 
@@ -91,6 +95,9 @@ adminRefundRouter.post('/:id/resolve', validateBody(resolveRefundSchema), async 
           linkUrl: `/pesanan/${order.id}`,
         },
       });
+    });
+    logAdmin(req.user!.sub, 'RESOLVE_REFUND', {
+      targetType: 'REFUND', targetId: refund.id, payload: req.body, note: refund.order.orderNumber,
     });
     return ok(res, null, 'Refund disetujui');
   } catch (err) { next(err); }

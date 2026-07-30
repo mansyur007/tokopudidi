@@ -12,6 +12,7 @@ import {
   listComplaintsForShop,
   listComplaintsForAdmin,
 } from './complaint.service';
+import { logAdmin } from '../../lib/adminLog';
 
 function readFilter(query: Record<string, unknown>) {
   return {
@@ -72,6 +73,9 @@ adminComplaintRouter.get('/', async (req, res, next) => {
 adminComplaintRouter.post('/:id/decide', validateBody(decideComplaintSchema), async (req, res, next) => {
   try {
     const complaint = await decideComplaint(req.params.id, req.body);
+    logAdmin(req.user!.sub, 'DECIDE_COMPLAINT', {
+      targetType: 'COMPLAINT', targetId: complaint.id, payload: req.body,
+    });
     return ok(res, complaint, 'Keputusan tersimpan');
   } catch (err) { next(err); }
 });

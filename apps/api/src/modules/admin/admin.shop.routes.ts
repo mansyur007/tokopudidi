@@ -5,6 +5,7 @@ import { ok } from '../../lib/response';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { logAdmin } from '../../lib/adminLog';
 
 export const adminShopRouter = Router();
 adminShopRouter.use(requireAuth, requireRole('ADMIN'));
@@ -84,6 +85,9 @@ adminShopRouter.post('/:id/verify-ktp', async (req, res, next) => {
         linkUrl: '/seller',
       },
     });
+    logAdmin(req.user!.sub, 'VERIFY_KTP', {
+      targetType: 'SHOP', targetId: shop.id, note: shop.name,
+    });
     return ok(res, null, 'KTP toko diverifikasi');
   } catch (err) { next(err); }
 });
@@ -108,6 +112,9 @@ adminShopRouter.post('/:id/official-store', async (req, res, next) => {
         linkUrl: '/seller',
       },
     });
+    logAdmin(req.user!.sub, 'TOGGLE_OFFICIAL_STORE', {
+      targetType: 'SHOP', targetId: shop.id, payload: { isOfficialStore }, note: shop.name,
+    });
     return ok(res, { isOfficialStore }, isOfficialStore ? 'Toko ditandai Official Store' : 'Status Official Store dicabut');
   } catch (err) { next(err); }
 });
@@ -131,6 +138,9 @@ adminShopRouter.post('/:id/suspend', validateBody(suspendSchema), async (req, re
         },
       });
     });
+    logAdmin(req.user!.sub, 'SUSPEND_SHOP', {
+      targetType: 'SHOP', targetId: shop.id, payload: req.body, note: shop.name,
+    });
     return ok(res, null, 'Toko ditangguhkan');
   } catch (err) { next(err); }
 });
@@ -142,6 +152,9 @@ adminShopRouter.post('/:id/unsuspend', async (req, res, next) => {
     if (!shop) throw new NotFoundError('Toko tidak ditemukan');
     if (!shop.deletedAt) throw new BadRequestError('Toko tidak sedang ditangguhkan');
     await prisma.shop.update({ where: { id: shop.id }, data: { deletedAt: null, closedReason: null } });
+    logAdmin(req.user!.sub, 'UNSUSPEND_SHOP', {
+      targetType: 'SHOP', targetId: shop.id, note: shop.name,
+    });
     return ok(res, null, 'Penangguhan toko dicabut');
   } catch (err) { next(err); }
 });

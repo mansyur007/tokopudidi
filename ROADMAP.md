@@ -677,7 +677,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M12-C3. Audit Log Aksi Admin
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-30): **inventaris di bawah melewatkan dua aksi** — suspend & unsuspend **toko** ([admin.shop.routes.ts:116,139](apps/api/src/modules/admin/admin.shop.routes.ts#L116-L139)); yang tercatat hanya suspend/unsuspend *user*. Totalnya 20 endpoint tulis admin, semuanya kini terpasang (21 aksi, 22 panggilan — `RESOLVE_REFUND` dua kali karena route-nya punya cabang setuju & tolak yang masing-masing `return` sendiri). **`SCRAPE_TOKOPEDIA` ditambahkan di luar inventaris**: memang tidak menulis data kita, tapi menjalankan headless Chromium ke pihak ketiga atas nama platform — justru jenis aksi yang audit log ada untuknya. **Jebakan payload, terkonfirmasi bukan hipotesis**: `bannerCreateSchema.imageUrl` hanya `z.string().min(5)` dan halaman admin/banner mengunggah lewat `FileReader.readAsDataURL`, jadi mencatat `req.body` apa adanya akan menaruh base64 megabyte-an di **setiap** baris log — tabel audit yang mestinya termurah malah jadi yang terbesar di DB. Karena itu semua payload lewat `redactAdminPayload` di `packages/shared`: data-URI diganti penanda mime+ukuran, string >300 karakter dipotong, array dipangkas 20 elemen, kedalaman dibatasi 4. **FK `AdminLog.adminId` sengaja TANPA `onDelete: Cascade`** — default Prisma di Postgres adalah `ON DELETE RESTRICT`, dan itulah yang benar untuk jejak audit: log tidak boleh ikut hilang bersama pelakunya. Aman karena app ini soft-delete user lewat `deletedAt`, tidak pernah hard delete (sudah diperiksa). **Append-only ditegakkan struktural, bukan oleh flag**: router `/admin/logs` hanya punya `GET`, jadi tidak ada endpoint tulis yang perlu dijaga permission. Acceptance "semua aksi tercatat" **tidak** cuma dicentang manual — ada 21 test struktural yang mem-grep sumber `apps/api/src/modules` dan gagal kalau ada aksi terdaftar tanpa call site (non-vacuity-nya dibuktikan dengan menyisipkan aksi palsu dan melihat test-nya merah). Filter tanggal `to` dimajukan ke awal hari berikutnya dan dibandingkan `lt`, bukan `lte` pada tengah malam — kalau tidak, seluruh isi hari terakhir hilang dari hasil filter; ada e2e khusus untuk itu.
 - **Scope**: Catat semua aksi tulis admin (siapa, apa, kapan, payload) — append-only + viewer.
 - **Konteks kode (audit 2026-07-29)**:
   - Guard admin = `requireRole('ADMIN')` ([middleware/auth.ts:28](apps/api/src/middleware/auth.ts#L28)); route admin tersebar di `admin.*.routes.ts` ([app.ts:111-121](apps/api/src/app.ts#L111-L121)).
@@ -692,9 +693,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **Schema**: model `AdminLog` sesuai rencana lama (id uuid, adminId, action string konstanta `"TAKEDOWN_PRODUCT"` dst, targetType/targetId, payload Json, note, createdAt; index `[adminId, createdAt]` + `[action, createdAt]`). Tanpa route delete — append-only by construction.
 - **UI**: Baru `apps/web/src/app/admin/log/page.tsx` — filter adminId/action/rentang tanggal + pagination; tambah entry nav di [AdminShell.tsx:10-20](apps/web/src/components/admin/AdminShell.tsx#L10-L20) (array `navItems`, emoji 📜).
 - **Acceptance**:
-  - [ ] Semua aksi di inventaris di atas tercatat (checklist di PR)
-  - [ ] Log gagal ditulis → aksi utama tetap sukses, error masuk pino
-  - [ ] Viewer filter & paginated; tidak ada endpoint hapus/edit log
+  - [x] Semua aksi di inventaris di atas tercatat (checklist di PR) — **plus dua yang inventarisnya lewat** (suspend/unsuspend toko). Ditegakkan 21 test struktural, bukan cuma checklist.
+  - [x] Log gagal ditulis → aksi utama tetap sukses, error masuk pino — `logAdmin` sengaja bukan `async` dan tidak untuk di-`await`; kegagalannya ditangkap `.catch()` sendiri dan jadi `logger.error`, tidak pernah naik ke jalur respons.
+  - [x] Viewer filter & paginated; tidak ada endpoint hapus/edit log — e2e TC-151 menembak DELETE/PATCH/PUT/POST ke `/admin/logs` dan memastikan semuanya ≥400.
 - **Effort**: S
 
 ---
