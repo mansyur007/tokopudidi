@@ -3,6 +3,25 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M12-D3: SEO & Meta
+
+### Added
+- **SEO & metadata** (`M12-D3`) — sitemap dinamis, robots, dan metadata per halaman.
+  - `GET /api/v1/sitemap` — satu panggilan mengembalikan slug + `updatedAt` produk aktif (cap 5.000 terbaru), toko, dan kategori. Jauh lebih hemat daripada FE menyusuri endpoint listing paginated.
+  - `apps/web/src/app/sitemap.ts` & `robots.ts` (Next metadata route). Robots menutup `/admin`, `/seller`, `/scrap`, `/akun`, `/checkout`, `/keranjang`, `/chat`, `/notifikasi`, dan halaman auth.
+  - `generateMetadata` untuk `/produk/[slug]`, `/toko/[slug]`, `/kategori/[slug]` — title, description, canonical absolut, dan Open Graph. Plus `metadataBase` + OG/Twitter default di root layout.
+  - JSON-LD `schema.org/Product` di halaman produk.
+  - Helper murni di `packages/shared/src/utils/seo.ts` — 23 unit test + e2e `seo.spec.ts` (TC-TKPDD-140–144).
+
+### Fixed
+- **`<head>` tidak lagi memancarkan `<link rel="manifest">` ke 404.** Root layout menyetel `manifest: '/manifest.webmanifest'` padahal berkasnya tidak pernah ada. Field itu dilepas; manifest sesungguhnya menyusul di M15-D1 lewat `app/manifest.ts` yang ditautkan Next otomatis.
+
+### Notes
+- ⚠️ **ENV baru wajib di produksi: `NEXT_PUBLIC_SITE_URL`** (mis. `https://toko.emha.space`). Sudah ditambahkan ke `.env.example` dan `docker-compose.prod.yml` sebagai build arg **dan** runtime env. Kalau kosong, `metadataBase` jatuh ke `localhost` dan canonical/OG jadi tidak sah bagi crawler.
+- **Gambar base64 disaring dari semua metadata.** Upload seller memakai `FileReader.readAsDataURL`, jadi sebagian `ProductImage.url` berisi data-URI — tidak sah sebagai `og:image` dan bisa menggelembungkan `<head>` sampai megabyte. Produk yang semua gambarnya base64 tetap menghasilkan meta sah, hanya tanpa `og:image`.
+- Harga JSON-LD memakai **harga efektif** (sale M9-B3 ikut terhitung) agar sama dengan yang dilihat pembeli; harga yang tidak cocok bisa membuat rich result ditolak. `aggregateRating` hanya disertakan saat `ratingCount > 0`.
+- `sitemap.ts` mengembalikan entri statis saja kalau API tidak terjangkau, alih-alih melempar — build produksi tidak boleh gagal karena API belum siap. `revalidate = 3600`.
+
 ## [Unreleased] — M12-A11: Mobile Bottom Nav
 
 ### Changed

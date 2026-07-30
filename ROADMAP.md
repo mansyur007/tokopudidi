@@ -636,7 +636,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M12-D3. SEO & Meta
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-30): jebakan data-URI **terkonfirmasi nyata** — upload seller memakai `FileReader.readAsDataURL` sehingga sebagian `ProductImage.url` di produksi berisi base64; semua gambar meta disaring lewat `isPublicImageUrl` (hanya http(s)), dan produk yang semua gambarnya base64 tetap menghasilkan meta sah tanpa `og:image`. Helper SEO ditaruh di `packages/shared/src/utils/seo.ts` (bukan di `apps/web`) supaya bisa diuji di suite vitest yang sudah ada — `apps/web` belum punya test runner, dan menambahkannya di dalam item S ini scope creep. Harga JSON-LD memakai `getEffectivePrice` agar sama dengan yang dilihat pembeli (harga yang tidak cocok bisa membuat rich result ditolak); `aggregateRating` hanya disertakan saat `ratingCount > 0` karena Google menolak `reviewCount: 0`. `sitemap.ts` **tidak melempar** saat API mati — mengembalikan entri statis saja, karena build produksi tidak boleh gagal gara-gara API belum siap, dan sitemap sebagian lebih baik daripada sitemap kosong (URL yang hilang adalah sinyal untuk melepas indeks). `revalidate = 3600` supaya sitemap tidak membeku di hasil build. **Butuh ENV baru `NEXT_PUBLIC_SITE_URL`** — sudah ditambahkan ke `.env.example` dan `docker-compose.prod.yml` (build arg + runtime); kalau kosong jatuh ke `localhost` dan canonical/OG jadi tidak sah. **Perbaikan sampingan**: root layout menunjuk `manifest: '/manifest.webmanifest'` yang tidak pernah ada, jadi `<head>` memancarkan `<link rel="manifest">` ke 404 — field itu dilepas; manifest sesungguhnya menyusul di M15-D1 lewat `app/manifest.ts` yang ditautkan Next otomatis.
 - **Scope**: Sitemap dinamis, robots, JSON-LD produk, OG meta per produk/toko/kategori. Domain: `https://toko.emha.space`.
 - **Konteks kode (audit 2026-07-29)**:
   - **Belum ada satu pun `generateMetadata`** di `apps/web` — halaman buyer adalah server component yang fetch via `apps/web/src/lib/api/*`; `generateMetadata` bisa pakai helper fetch yang sama (Next dedup request per render).
@@ -648,10 +649,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - [produk/[slug]/page.tsx](apps/web/src/app/(buyer)/produk/[slug]/page.tsx) — `generateMetadata()` + JSON-LD `Product`: `offers.price` = **harga efektif** (`getEffectivePrice` — konsisten M9-B3), `priceCurrency: "IDR"`, `availability` dari stock, `aggregateRating` hanya jika `ratingCount > 0`
   - Sama untuk `/toko/[slug]` & `/kategori/[slug]` (OG title/description saja, tanpa JSON-LD Product)
 - **Acceptance**:
-  - [ ] `/sitemap.xml` valid, berisi produk/toko/kategori + lastmod
-  - [ ] Google Rich Results Test pass untuk halaman produk (dengan & tanpa rating)
-  - [ ] Produk yang semua gambarnya data-URI → meta tetap valid tanpa og:image (tidak menyisipkan base64 ke head)
-  - [ ] Harga di JSON-LD = harga sale saat sale aktif
+  - [x] `/sitemap.xml` valid, berisi produk/toko/kategori + lastmod — diverifikasi lokal (XML sah) & e2e TC-141
+  - [ ] **Google Rich Results Test pass** — JSON-LD sudah sesuai spesifikasi & tervalidasi struktur + parse-ability (23 unit test + e2e TC-143), tapi **uji Google-nya sendiri butuh URL publik**, jadi baru bisa dijalankan setelah deploy. Satu-satunya kriteria yang belum bisa dicentang dari sini.
+  - [x] Produk yang semua gambarnya data-URI → meta tetap valid tanpa og:image
+  - [x] Harga di JSON-LD = harga sale saat sale aktif (ada test untuk di dalam & di luar periode)
 - **Effort**: S
 
 ---

@@ -49,6 +49,7 @@ import { sellerShowcaseRouter } from './modules/seller/seller.showcase.routes';
 import { sellerVoucherRouter } from './modules/seller/seller.voucher.routes';
 import { shippingRouter } from './modules/shipping/shipping.routes';
 import { shopRouter } from './modules/shop/shop.routes';
+import { sitemapRouter } from './modules/product/sitemap.routes';
 import { wishlistRouter } from './modules/wishlist/wishlist.routes';
 
 export function createApp(): Application {
@@ -92,6 +93,7 @@ export function createApp(): Application {
   app.use('/api/v1/search', searchRouter);
   app.use('/api/v1/shipping', shippingRouter);
   app.use('/api/v1/shops', shopRouter);
+  app.use('/api/v1/sitemap', sitemapRouter);
   app.use('/api/v1/users/me/addresses', addressRouter);
   app.use('/api/v1/users/me/wishlist', wishlistRouter);
   app.use('/api/v1/users/me/recent-products', recentlyViewedRouter);

@@ -15,4 +15,5 @@ export * from './schemas/seller';
 export * from './types/api';
 export * from './utils/format';
 export * from './utils/price';
+export * from './utils/seo';
 export * from './utils/variant';
