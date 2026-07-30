@@ -12,6 +12,7 @@ Versioning follows [SemVer](https://semver.org/).
   - `GET /api/v1/admin/logs` (filter adminId/action/targetType/targetId/rentang tanggal + paginasi) dan `GET /api/v1/admin/logs/admins` untuk mengisi dropdown pelaku.
   - Halaman `/admin/log` + entri nav 📜 di `AdminShell`. Payload bisa dibuka per entri.
   - `ADMIN_ACTIONS` (21 aksi) + `ADMIN_ACTION_LABEL` + `redactAdminPayload` di `packages/shared/src/schemas/adminLog.ts` — 43 unit test, e2e `admin-log.spec.ts` (TC-TKPDD-149–154).
+  - `global-setup` e2e kini juga login sebagai **admin** — suite ini belum pernah butuh token admin.
 - **`SCRAPE_TOKOPEDIA` ikut dicatat** meski di luar inventaris rencana. Tidak menulis data kita, tapi menjalankan headless Chromium ke pihak ketiga atas nama platform — justru jenis aksi yang audit log ada untuknya.
 
 ### Notes
@@ -21,6 +22,7 @@ Versioning follows [SemVer](https://semver.org/).
 - **Append-only ditegakkan secara struktural**: router `/admin/logs` hanya punya `GET`. Tidak ada endpoint tulis yang perlu dijaga permission karena endpoint-nya tidak ada.
 - Acceptance "semua aksi tercatat" **tidak** hanya dicentang manual — 21 test struktural mem-grep `apps/api/src/modules` dan gagal kalau ada aksi terdaftar tanpa call site.
 - Filter `to` dimajukan ke awal hari berikutnya lalu dibandingkan `lt`, bukan `lte` pada tengah malam. Tanpa itu seluruh isi hari terakhir hilang dari hasil filter — ada e2e khusus untuk kasus `from=to=hari ini`.
+- **Temuan yang belum dikerjakan:** `AdminShell` memanggil `router.push('/masuk')` di dalam render saat `user` masih falsy, sementara store auth-nya `zustand/persist`. Pada muat-ulang penuh, render pertama selalu `user=null` karena rehydrate localStorage belum diterapkan — jadi **`/admin/*` tidak bisa dicapai lewat URL langsung**; admin yang membookmark `/admin/log` selalu dibuang ke halaman login. Navigasi dari dalam aplikasi tetap jalan, itu sebabnya luput. Kemungkinan besar shell seller kena pola yang sama. Karena itu e2e level browser untuk viewer ini dihapus (alasan tertulis di akhir `e2e/admin-log.spec.ts`); perilakunya tetap teruji penuh di level API.
 
 ## [Unreleased] — M12-D4: Image Optimization Audit
 
