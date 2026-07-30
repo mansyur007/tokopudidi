@@ -3,6 +3,59 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — Perbaikan: Guard Halaman Menunggu Hidrasi Sesi
+
+### Fixed
+- **`/admin/*`, `/seller/*`, dan `/scrap` bisa dibuka lewat URL langsung lagi.** Sebelum ini,
+  admin/seller yang sudah masuk selalu dibuang ke `/masuk` pada setiap muat-ulang penuh atau
+  kunjungan dari bookmark. Navigasi dari dalam aplikasi tetap jalan, itu sebabnya luput lama.
+  - Akar masalahnya bukan sekadar "rehydrate belum selesai". `zustand` menyerahkan
+    `getInitialState` sebagai **server snapshot** ke `useSyncExternalStore`, dan React memakai
+    snapshot itu untuk **seluruh render hidrasi**. Jadi pada render pertama di klien `user`
+    pasti `null` — kondisi awal store, bukan isi localStorage — walaupun `persist.hasHydrated()`
+    sudah `true` (localStorage sinkron; rehydrate-nya rampung saat modul store dievaluasi).
+  - Konsekuensinya: **membaca `hasHydrated()` di badan render tidak memperbaiki apa pun.**
+    Penanda bahwa snapshot asli sudah dipakai adalah commit pertama. Karena itu
+    `useAuthHydrated()` (`apps/web/src/store/auth.ts`) menyalakan flag-nya dari effect, dengan
+    `onFinishHydration` sebagai cadangan untuk storage asinkron.
+  - `AdminShell` tidak lagi memanggil `router.push` **di badan render** — itu efek samping saat
+    render yang React peringatkan lewat "Cannot update a component while rendering a different
+    component", dan StrictMode menjalankannya dua kali. Sekarang di effect.
+  - Redirect guard memakai `router.replace`, bukan `push`, supaya tombol Back tidak memantul
+    kembali ke halaman yang baru saja ditolak.
+  - Efek samping yang ikut beres: hydration mismatch di kedua shell. Markup server dan render
+    hidrasi kini sama-sama "Memuat...", padahal sebelumnya server merender `null` dan klien
+    merender seluruh shell.
+- **`SellerShell` kena pola yang sama walau redirect-nya sudah di dalam `useEffect`.** Sempat
+  diduga hanya `AdminShell` (yang push-nya di badan render) yang rusak; ternyata effect pun
+  berjalan pada commit hidrasi, saat `user` masih `null`. Diverifikasi langsung: dengan sesi
+  seller yang sah, `/seller/produk` lewat URL langsung mendarat di `/masuk` sebelum perbaikan.
+
+### Added
+- **TC-TKPDD-155 kembali** (`e2e/admin-log.spec.ts`) — dihapus di M12-C3 justru karena bug ini.
+  Membuka `/admin/log` lewat URL langsung dengan sesi disuntik ke localStorage (bentuk
+  `{ state, version }` milik zustand/persist, token & profil dari API sungguhan), lalu memeriksa
+  entri tampil, dropdown aksi berisi 22 opsi, filter aksi memuat ulang, toggle payload
+  buka/tutup, dan nav memuat "Jejak Audit".
+- `useAuthHydrated()` diekspor dari `apps/web/src/store/auth.ts` — satu pintu untuk semua guard
+  yang perlu membedakan "belum login" dari "sesi belum terbaca".
+
+### Notes
+- **Pemeriksaan URL ditaruh di akhir test, bukan cuma sesudah `goto()`.** Navigasi klien itu
+  asinkron: pada versi yang rusak halaman sempat tergambar utuh lebih dulu, lalu redirect-nya
+  menyusul. Test yang hanya memeriksa URL tepat setelah `goto()` lolos secara kebetulan; yang
+  memeriksa di akhir gagal 3 dari 3 kali pada kode sebelum perbaikan.
+- **Temuan yang belum dikerjakan — halaman pembeli kena pola yang sama.** `akun`, `alamat`,
+  `wishlist`, `keranjang`, `checkout`, `pesanan`, `pesanan/[id]`, `pesanan/[id]/bayar`,
+  `pesanan/ulasan`, `notifikasi`, `komplain`, dan `chat` semuanya `router.push('/masuk')` di
+  effect tanpa menunggu hidrasi, jadi pembeli yang membookmark halamannya juga terbuang ke
+  login. Perbaikannya sama persis (`useAuthHydrated`), tapi 12 berkas dengan keputusan tampilan
+  "memuat" masing-masing di luar lingkup PR ini.
+- **Temuan yang belum dikerjakan — nama aksesibilitas filter `/admin/log` berantakan.** Tiap
+  filter dibungkus `<label>` yang memuat `<span>` judul **dan** `<select>`-nya, sehingga nama
+  aksesibilitas select ikut menyerap seluruh teks option ("Aksi Semua aksi Tangguhkan
+  pengguna …"). Itu sebabnya TC-155 memakai locator struktural alih-alih `getByLabel`.
+
 ## [Unreleased] — M12-C3: Audit Log Aksi Admin
 
 ### Added
@@ -22,7 +75,7 @@ Versioning follows [SemVer](https://semver.org/).
 - **Append-only ditegakkan secara struktural**: router `/admin/logs` hanya punya `GET`. Tidak ada endpoint tulis yang perlu dijaga permission karena endpoint-nya tidak ada.
 - Acceptance "semua aksi tercatat" **tidak** hanya dicentang manual — 21 test struktural mem-grep `apps/api/src/modules` dan gagal kalau ada aksi terdaftar tanpa call site.
 - Filter `to` dimajukan ke awal hari berikutnya lalu dibandingkan `lt`, bukan `lte` pada tengah malam. Tanpa itu seluruh isi hari terakhir hilang dari hasil filter — ada e2e khusus untuk kasus `from=to=hari ini`.
-- **Temuan yang belum dikerjakan:** `AdminShell` memanggil `router.push('/masuk')` di dalam render saat `user` masih falsy, sementara store auth-nya `zustand/persist`. Pada muat-ulang penuh, render pertama selalu `user=null` karena rehydrate localStorage belum diterapkan — jadi **`/admin/*` tidak bisa dicapai lewat URL langsung**; admin yang membookmark `/admin/log` selalu dibuang ke halaman login. Navigasi dari dalam aplikasi tetap jalan, itu sebabnya luput. Kemungkinan besar shell seller kena pola yang sama. Karena itu e2e level browser untuk viewer ini dihapus (alasan tertulis di akhir `e2e/admin-log.spec.ts`); perilakunya tetap teruji penuh di level API.
+- ~~**Temuan yang belum dikerjakan:**~~ **SUDAH DIPERBAIKI** — lihat "Perbaikan: Guard Halaman Menunggu Hidrasi Sesi" di atas. `AdminShell` memanggil `router.push('/masuk')` di dalam render saat `user` masih falsy, sementara store auth-nya `zustand/persist`, sehingga **`/admin/*` tidak bisa dicapai lewat URL langsung**; admin yang membookmark `/admin/log` selalu dibuang ke halaman login. Navigasi dari dalam aplikasi tetap jalan, itu sebabnya luput. Dugaan "shell seller kena pola yang sama" terbukti benar. E2E level browser untuk viewer (TC-155) yang dihapus karena ini sudah dikembalikan.
 
 ## [Unreleased] — M12-D4: Image Optimization Audit
 

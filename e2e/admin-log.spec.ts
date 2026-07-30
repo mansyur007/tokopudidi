@@ -189,20 +189,80 @@ test(tc('154', 'Aksi hapus juga tercatat, dan entri pelaku tetap ada setelahnya'
   expect(daftar[0].count).toBeGreaterThan(0);
 });
 
-// TC-155 (halaman /admin/log dibuka di browser) DIHAPUS, bukan di-skip.
-//
-// Alasannya bug yang sudah ada sebelum item ini: `AdminShell` memanggil
-// `router.push('/masuk')` DI DALAM render begitu `user` masih falsy, dan store
-// auth-nya zustand/persist — pada muat-ulang penuh, render pertama selalu
-// user=null karena rehydrate dari localStorage belum diterapkan. Jadi redirect-nya
-// sudah terbang sebelum sesi tersimpan terbaca, dan /admin/* tidak bisa dicapai
-// lewat URL langsung sama sekali (menyuntikkan token ke localStorage pun tidak
-// menolong — itu yang sudah dicoba dan gagal di CI dengan 0 <select> ditemukan).
-//
-// Memperbaiki hidrasi auth di shell admin & seller jelas di luar lingkup item
-// audit log, dan mengubahnya diam-diam di PR ini justru menyembunyikan bug yang
-// dampaknya jauh lebih luas: admin yang menandai `/admin/log` di bookmark akan
-// selalu dibuang ke halaman login. Dicatat sebagai temuan terpisah.
-//
-// Perilaku viewer-nya sendiri tetap teruji penuh di level API oleh TC-149–154:
-// filter, paginasi, urutan, RBAC, dan append-only.
+// TC-155 dulu dihapus karena `/admin/*` memang tidak bisa dicapai lewat URL
+// langsung: guard shell menyimpulkan "belum login" sebelum sesi tersimpan
+// terbaca. Sekarang guard-nya menunggu hidrasi (`useAuthHydrated`), jadi test
+// ini balik — sekaligus jadi penjaga regresi untuk bug tersebut.
+test(tc('155', 'Viewer /admin/log terbuka lewat URL langsung: entri, filter aksi, payload & nav'), async ({ page, request }) => {
+  const t = auth(tokenFor('admin'));
+
+  // Profil admin sungguhan, bukan objek karangan — bentuknya persis yang
+  // ditulis store setelah login (`UserPublic`).
+  const me = await request.get(`${V1}/auth/me`, { headers: t });
+  expect(me.status(), await me.text()).toBe(200);
+  const user = (await me.json()).data;
+
+  // Sesi disuntik dalam bentuk yang dipakai zustand/persist: key
+  // `tokopudidi-auth` berisi `{ state, version }`. Lewat addInitScript supaya
+  // sudah ada SEBELUM skrip halaman jalan — persis kondisi "buka bookmark".
+  // `refreshToken` sengaja kosong: halaman admin tidak pernah memakainya
+  // (satu-satunya pemakai adalah wizard /seller/daftar).
+  const sesi = JSON.stringify({
+    state: { user, tokens: { accessToken: tokenFor('admin'), refreshToken: '' } },
+    version: 0,
+  });
+  await page.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key, value),
+    ['tokopudidi-auth', sesi],
+  );
+
+  await page.goto('/admin/log');
+
+  // INTI REGRESINYA: URL harus tetap di /admin/log. Sebelum perbaikan hidrasi,
+  // langkah ini selalu mendarat di /masuk walau sesinya sah.
+  await expect(page).toHaveURL(/\/admin\/log$/);
+  await expect(page.getByRole('heading', { name: /Jejak Audit Admin/ })).toBeVisible();
+
+  // Nav shell admin punya entri Jejak Audit.
+  await expect(page.getByRole('link', { name: 'Jejak Audit' })).toBeVisible();
+
+  // `getByLabel('Aksi')` TIDAK bisa dipakai di sini: label pembungkusnya juga
+  // memuat <select>, jadi teks label yang dihitung Playwright ikut berisi
+  // seluruh isi option ("Aksi Semua aksi Tangguhkan pengguna ..."). Itu juga
+  // berarti nama aksesibilitas select-select filter ini memang berantakan —
+  // dicatat sebagai temuan terpisah, bukan diperbaiki di PR ini.
+  const aksi = page.locator('label:has(span:text-is("Aksi")) select');
+
+  // Dropdown aksi = 21 aksi di ADMIN_ACTIONS + opsi "Semua aksi".
+  // Angkanya sengaja literal: kalau nanti ada aksi admin baru, test ini gagal
+  // dan memaksa orangnya sadar bahwa daftar filter ikut berubah.
+  await expect(aksi.locator('option')).toHaveCount(22);
+
+  // Halaman benar-benar berisi entri hasil TC-149–154, bukan empty state.
+  await expect(page.getByText(/\d+ entri/)).toBeVisible();
+  await expect(page.getByText('Belum ada aksi admin yang tercatat.')).toHaveCount(0);
+
+  // Filter aksi dari UI memicu pemuatan ulang ke endpoint yang benar.
+  const terfilter = page.waitForResponse(
+    (r) => r.url().includes('/admin/logs?') && r.url().includes('action=CREATE_CATEGORY'),
+  );
+  await aksi.selectOption('CREATE_CATEGORY');
+  await terfilter;
+  // Tunggu render hasil filter benar-benar terpasang sebelum mengklik apa pun —
+  // penanda "(terfilter)" hanya muncul setelah daftar barunya dipakai.
+  await expect(page.getByText(/entri \(terfilter\)/)).toBeVisible();
+
+  // Toggle payload: buka -> isinya tampil, tutup -> hilang lagi.
+  await page.getByRole('button', { name: 'Lihat payload' }).first().click();
+  // Entri terbaru untuk aksi ini adalah kategori yang dibuat TC-149, jadi
+  // payload yang terbuka wajib memuat namanya.
+  await expect(page.locator('pre').first()).toContainText(NAMA);
+  await page.getByRole('button', { name: 'Sembunyikan payload' }).first().click();
+  await expect(page.locator('pre')).toHaveCount(0);
+
+  // Cek URL sekali lagi di akhir, dan ini yang menentukan. Navigasi klien itu
+  // asinkron: guard yang keliru bisa saja baru mendarat setelah halaman sempat
+  // tergambar, sehingga pemeriksaan tepat setelah goto() belum membuktikan apa
+  // pun. Kalau redirect palsu masih ada, di titik ini pasti sudah terlihat.
+  await expect(page).toHaveURL(/\/admin\/log$/);
+});

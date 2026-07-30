@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { SmartImage } from '@/components/media/SmartImage';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatRupiah, type ScrapeResult, type ScrapedProduct } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { scrapeTokopedia } from '@/lib/api/scraper';
 import { ApiClientError } from '@/lib/api/client';
 
@@ -43,6 +43,7 @@ function downloadJson(result: ScrapeResult) {
 export default function ScrapPage() {
   const router = useRouter();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
 
   const [url, setUrl] = useState('');
   const [maxProducts, setMaxProducts] = useState(20);
@@ -51,10 +52,14 @@ export default function ScrapPage() {
   const [result, setResult] = useState<ScrapeResult | null>(null);
 
   // --- Guard admin (mirror pola AdminShell) ---
-  if (!user) {
-    if (typeof window !== 'undefined') router.push('/masuk');
-    return null;
+  useEffect(() => {
+    if (hydrated && !user) router.replace('/masuk');
+  }, [hydrated, user, router]);
+
+  if (!hydrated) {
+    return <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Memuat...</div>;
   }
+  if (!user) return null;
   if (user.role !== 'ADMIN') {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
