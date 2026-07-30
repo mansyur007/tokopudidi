@@ -25,7 +25,8 @@ test(tc('141', '/sitemap.xml sah dan memuat URL produk'), async ({ request }) =>
 
   const xml = await res.text();
   expect(xml).toContain('<urlset');
-  expect(xml).toContain('http://schemas.sitemaps.org/');
+  // Namespace sitemap protocol 0.9 — persis seperti ini, bukan schemas.sitemaps.org.
+  expect(xml).toContain('http://www.sitemaps.org/schemas/sitemap/0.9');
 
   // Ambil slug produk nyata, lalu pastikan URL-nya ada di sitemap.
   const list = await request.get(`${V1}/products?limit=1`);
