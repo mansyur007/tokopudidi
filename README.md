@@ -2,7 +2,7 @@
 
 Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederhana, tanpa iklan, tanpa fitur premium yang bikin lemot.
 
-> **Status:** Milestone 12 berjalan — M8–M11 selesai, M12 tersisa satu item (Audit Log Aksi Admin). **🌐 Live:** https://toko.emha.space
+> **Status:** Milestone 12 **selesai** — M8–M12 kelar; berikutnya M13–M15. **🌐 Live:** https://toko.emha.space
 
 ---
 
@@ -19,7 +19,7 @@ Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederh
 - **Milestone 9 — Promo & Diskon:** voucher picker di checkout, voucher toko, harga diskon periodik (sale price), voucher platform global.
 - **Milestone 10 — Pembayaran & Sengketa:** QRIS mock lengkap (render QR + countdown + expiry), komplain/return di luar refund, filter pencarian lengkap.
 - **Milestone 11 — Toko & Varian:** etalase/showcase toko (tab produk di halaman toko), statistik per produk, varian kombinasi multi-axis (mis. Warna × Ukuran).
-- **Milestone 12 — Polish & SEO:** bottom nav mobile, SEO & metadata (sitemap dinamis, robots, Open Graph, JSON-LD produk), audit optimasi gambar.
+- **Milestone 12 — Polish, SEO & Audit:** bottom nav mobile, SEO & metadata (sitemap dinamis, robots, Open Graph, JSON-LD produk), audit optimasi gambar, dan jejak audit aksi admin (`/admin/log`).
 - **Alat admin — Scraper Tokopedia:** halaman `/scrap` (khusus admin) untuk ambil data produk dari URL toko/produk Tokopedia via headless browser, hasil bisa diunduh JSON siap-impor.
 
 Riwayat lengkap tiap milestone ada di [CHANGELOG.md](CHANGELOG.md).
@@ -160,7 +160,7 @@ subprocess cloudflared).
 ```bash
 npm run test
 ```
-140 test di 9 berkas — semuanya logika murni tanpa DB: normalisasi nomor HP & schema auth, harga efektif produk, kombinasi varian, urutan etalase, statistik produk, helper SEO, dan klasifikasi sumber gambar.
+183 test di 10 berkas — semuanya logika murni tanpa DB: normalisasi nomor HP & schema auth, harga efektif produk, kombinasi varian, urutan etalase, statistik produk, helper SEO, klasifikasi sumber gambar, dan redaksi payload jejak audit.
 
 > `apps/web` **belum punya test runner.** Karena itu logika murni yang dipakai FE ditaruh di `packages/shared/src/utils/` supaya ikut teruji suite `apps/api`; perilaku UI-nya diuji lewat Playwright.
 
@@ -228,6 +228,7 @@ Empat hal yang bikin PR gagal atau bug halus kalau dilewatkan:
 2. **`packages/shared` & `packages/database` dikonsumsi sebagai `dist` hasil build.** Setelah mengubahnya, jalankan `npm run build -w @tokopudidi/shared` (atau `-w @tokopudidi/database`) sebelum berharap `apps/web`/`apps/api` melihat perubahannya.
 3. **Logika murni yang dipakai FE ditaruh di `packages/shared/src/utils/`.** `apps/web` belum punya test runner, jadi itulah satu-satunya cara logikanya ikut teruji.
 4. **Migration ditulis manual, lalu diverifikasi** terhadap keluaran `npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`. Jangan jalankan `prisma format` — formatter-nya menyentuh ratusan baris yang tidak berkaitan dan membuat diff-nya tidak bisa ditinjau.
+5. **Endpoint tulis admin baru wajib memanggil `logAdmin`** ([lib/adminLog.ts](apps/api/src/lib/adminLog.ts)), dengan nama aksinya didaftarkan di `ADMIN_ACTIONS`. Ada test yang gagal kalau aksi terdaftar tidak punya call site — tapi arah sebaliknya (endpoint baru yang tidak mencatat apa pun) hanya bisa dijaga oleh reviewer, jadi tolong diperiksa saat review.
 
 ---
 

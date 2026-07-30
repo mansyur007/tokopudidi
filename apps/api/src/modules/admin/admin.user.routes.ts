@@ -5,6 +5,7 @@ import { ok } from '../../lib/response';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { logAdmin } from '../../lib/adminLog';
 
 export const adminUserRouter = Router();
 adminUserRouter.use(requireAuth, requireRole('ADMIN'));
@@ -76,6 +77,9 @@ adminUserRouter.post('/:id/suspend', validateBody(suspendSchema), async (req, re
         },
       });
     });
+    logAdmin(req.user!.sub, 'SUSPEND_USER', {
+      targetType: 'USER', targetId: user.id, payload: req.body, note: user.phone,
+    });
     return ok(res, null, 'User dinonaktifkan');
   } catch (err) { next(err); }
 });
@@ -86,6 +90,9 @@ adminUserRouter.post('/:id/unsuspend', async (req, res, next) => {
     const user = await prisma.user.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!user) throw new NotFoundError('User tidak ditemukan');
     await prisma.user.update({ where: { id: user.id }, data: { isSuspended: false } });
+    logAdmin(req.user!.sub, 'UNSUSPEND_USER', {
+      targetType: 'USER', targetId: user.id, note: user.phone,
+    });
     return ok(res, null, 'User diaktifkan kembali');
   } catch (err) { next(err); }
 });

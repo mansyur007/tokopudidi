@@ -3,6 +3,27 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M12-C3: Audit Log Aksi Admin
+
+### Added
+- **Jejak audit aksi admin** (`M12-C3`) — setiap aksi tulis admin tercatat: siapa, apa, kapan, payload.
+  - Model `AdminLog` (migration `20260730100000_m12_c3_admin_log`) — index `[adminId, createdAt]`, `[action, createdAt]`, `[targetType, targetId]`.
+  - Helper `logAdmin()` di `apps/api/src/lib/adminLog.ts` — **fire-and-forget**, dipanggil setelah aksinya sukses dan sengaja tidak di-`await`.
+  - `GET /api/v1/admin/logs` (filter adminId/action/targetType/targetId/rentang tanggal + paginasi) dan `GET /api/v1/admin/logs/admins` untuk mengisi dropdown pelaku.
+  - Halaman `/admin/log` + entri nav 📜 di `AdminShell`. Payload bisa dibuka per entri.
+  - `ADMIN_ACTIONS` (21 aksi) + `ADMIN_ACTION_LABEL` + `redactAdminPayload` di `packages/shared/src/schemas/adminLog.ts` — 43 unit test, e2e `admin-log.spec.ts` (TC-TKPDD-149–154).
+  - `global-setup` e2e kini juga login sebagai **admin** — suite ini belum pernah butuh token admin.
+- **`SCRAPE_TOKOPEDIA` ikut dicatat** meski di luar inventaris rencana. Tidak menulis data kita, tapi menjalankan headless Chromium ke pihak ketiga atas nama platform — justru jenis aksi yang audit log ada untuknya.
+
+### Notes
+- **Rencananya melewatkan dua aksi:** suspend & unsuspend **toko**. Inventaris hanya menyebut suspend/unsuspend *user*, padahal `admin.shop.routes.ts` punya endpoint terpisah. Totalnya 20 endpoint tulis admin, 21 aksi, 22 panggilan (`RESOLVE_REFUND` dua kali — route-nya punya cabang setuju & tolak yang masing-masing `return` sendiri).
+- **Payload wajib diredaksi, bukan opsional.** `bannerCreateSchema.imageUrl` hanya `z.string().min(5)` dan halaman admin/banner mengunggah lewat `FileReader.readAsDataURL`, jadi mencatat `req.body` apa adanya menaruh base64 megabyte-an di **setiap** baris log. `redactAdminPayload` membuang data-URI (diganti penanda mime + ukuran), memotong string >300 karakter, memangkas array ke 20 elemen, dan membatasi kedalaman objek.
+- **FK `AdminLog.adminId` sengaja tanpa `onDelete: Cascade`** — default Prisma di Postgres `ON DELETE RESTRICT`, dan itu yang benar untuk jejak audit: log tidak boleh ikut hilang bersama pelakunya. Aman karena aplikasi ini soft-delete user lewat `deletedAt`.
+- **Append-only ditegakkan secara struktural**: router `/admin/logs` hanya punya `GET`. Tidak ada endpoint tulis yang perlu dijaga permission karena endpoint-nya tidak ada.
+- Acceptance "semua aksi tercatat" **tidak** hanya dicentang manual — 21 test struktural mem-grep `apps/api/src/modules` dan gagal kalau ada aksi terdaftar tanpa call site.
+- Filter `to` dimajukan ke awal hari berikutnya lalu dibandingkan `lt`, bukan `lte` pada tengah malam. Tanpa itu seluruh isi hari terakhir hilang dari hasil filter — ada e2e khusus untuk kasus `from=to=hari ini`.
+- **Temuan yang belum dikerjakan:** `AdminShell` memanggil `router.push('/masuk')` di dalam render saat `user` masih falsy, sementara store auth-nya `zustand/persist`. Pada muat-ulang penuh, render pertama selalu `user=null` karena rehydrate localStorage belum diterapkan — jadi **`/admin/*` tidak bisa dicapai lewat URL langsung**; admin yang membookmark `/admin/log` selalu dibuang ke halaman login. Navigasi dari dalam aplikasi tetap jalan, itu sebabnya luput. Kemungkinan besar shell seller kena pola yang sama. Karena itu e2e level browser untuk viewer ini dihapus (alasan tertulis di akhir `e2e/admin-log.spec.ts`); perilakunya tetap teruji penuh di level API.
+
 ## [Unreleased] — M12-D4: Image Optimization Audit
 
 ### Fixed

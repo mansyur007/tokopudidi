@@ -114,9 +114,37 @@ model User {
   discussionHelpfuls DiscussionHelpful[]
   reports       Report[]
   complaints    Complaint[]
+  adminLogs     AdminLog[]
 
   @@index([phone])
   @@index([referralCode])
+}
+
+// Jejak audit aksi tulis admin (M12-C3). Append-only: tidak ada route
+// update/delete, dan tidak ada relasi yang bisa menghapusnya secara kaskade.
+model AdminLog {
+  id      String @id @default(uuid())
+  adminId String
+  // Sengaja TANPA onDelete: Cascade — default Prisma di Postgres adalah
+  // ON DELETE RESTRICT, dan itulah yang benar untuk jejak audit: log tidak
+  // boleh ikut hilang bersama pelakunya. Aman karena app ini soft-delete user
+  // lewat `deletedAt`, tidak pernah hard delete.
+  admin   User   @relation(fields: [adminId], references: [id])
+  // Konstanta dari ADMIN_ACTIONS di @tokopudidi/shared, mis. "TAKEDOWN_PRODUCT".
+  // Disimpan sebagai String, bukan enum, supaya menambah aksi baru tidak butuh
+  // migration — daftar sahnya dijaga zod di sisi tulis.
+  action     String
+  targetType String?
+  targetId   String?
+  // Body request yang sudah dilewatkan redactAdminPayload — data-URI dibuang
+  // dan string panjang dipotong. Tanpa itu satu banner base64 2MB masuk ke sini.
+  payload Json?
+  note    String?
+  createdAt DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
 }
 
 model RefreshToken {

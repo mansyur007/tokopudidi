@@ -5,6 +5,7 @@ import { ok } from '../../lib/response';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError } from '../../lib/errors';
+import { logAdmin } from '../../lib/adminLog';
 
 export const adminProductRouter = Router();
 adminProductRouter.use(requireAuth, requireRole('ADMIN'));
@@ -63,6 +64,9 @@ adminProductRouter.post('/:id/takedown', validateBody(suspendSchema), async (req
         linkUrl: `/seller/produk/${product.id}/edit`,
       },
     });
+    logAdmin(req.user!.sub, 'TAKEDOWN_PRODUCT', {
+      targetType: 'PRODUCT', targetId: product.id, payload: req.body, note: product.name,
+    });
     return ok(res, null, 'Produk diturunkan');
   } catch (err) { next(err); }
 });
@@ -73,6 +77,9 @@ adminProductRouter.post('/:id/restore', async (req, res, next) => {
     const product = await prisma.product.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!product) throw new NotFoundError('Produk tidak ditemukan');
     await prisma.product.update({ where: { id: product.id }, data: { isActive: true } });
+    logAdmin(req.user!.sub, 'RESTORE_PRODUCT', {
+      targetType: 'PRODUCT', targetId: product.id, note: product.name,
+    });
     return ok(res, null, 'Produk dikembalikan ke etalase');
   } catch (err) { next(err); }
 });

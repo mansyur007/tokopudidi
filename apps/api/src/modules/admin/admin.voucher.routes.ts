@@ -5,6 +5,7 @@ import { ok, created } from '../../lib/response';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { logAdmin } from '../../lib/adminLog';
 
 export const adminVoucherRouter = Router();
 adminVoucherRouter.use(requireAuth, requireRole('ADMIN'));
@@ -44,6 +45,9 @@ adminVoucherRouter.post('/', validateBody(voucherCreateSchema), async (req, res,
         validUntil: new Date(req.body.validUntil),
       },
     });
+    logAdmin(req.user!.sub, 'CREATE_VOUCHER', {
+      targetType: 'VOUCHER', targetId: item.id, payload: req.body, note: item.code,
+    });
     return created(res, item, 'Voucher platform dibuat');
   } catch (err) { next(err); }
 });
@@ -69,6 +73,9 @@ adminVoucherRouter.put('/:id', validateBody(voucherUpdateSchema), async (req, re
         ...(req.body.isActive !== undefined && { isActive: req.body.isActive }),
       },
     });
+    logAdmin(req.user!.sub, 'UPDATE_VOUCHER', {
+      targetType: 'VOUCHER', targetId: item.id, payload: req.body, note: item.code,
+    });
     return ok(res, item, 'Voucher diperbarui');
   } catch (err) { next(err); }
 });
@@ -81,6 +88,9 @@ adminVoucherRouter.delete('/:id', async (req, res, next) => {
     });
     if (!existing) throw new NotFoundError('Voucher platform tidak ditemukan');
     await prisma.promoCode.delete({ where: { id: existing.id } });
+    logAdmin(req.user!.sub, 'DELETE_VOUCHER', {
+      targetType: 'VOUCHER', targetId: existing.id, note: existing.code,
+    });
     return ok(res, null, 'Voucher dihapus');
   } catch (err) { next(err); }
 });

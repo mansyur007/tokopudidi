@@ -10,6 +10,7 @@ import { notFound } from './middleware/notFound';
 import { addressRouter } from './modules/address/address.routes';
 import { adminBannerRouter } from './modules/admin/admin.banner.routes';
 import { adminCategoryRouter } from './modules/admin/admin.category.routes';
+import { adminLogRouter } from './modules/admin/admin.log.routes';
 import { adminDashboardRouter } from './modules/admin/admin.dashboard.routes';
 import { adminProductRouter } from './modules/admin/admin.product.routes';
 import { adminRefundRouter } from './modules/admin/admin.refund.routes';
@@ -122,6 +123,7 @@ export function createApp(): Application {
   app.use('/api/v1/admin/voucher', adminVoucherRouter);
   app.use('/api/v1/admin/banners', adminBannerRouter);
   app.use('/api/v1/admin/categories', adminCategoryRouter);
+  app.use('/api/v1/admin/logs', adminLogRouter);        // jejak audit (M12-C3) — GET saja
   app.use('/api/v1/admin/scrape', scraperRouter);
 
   // 404 + error
