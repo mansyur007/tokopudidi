@@ -10,6 +10,7 @@ import {
   type SellerShowcaseRow, type SellerProductRow,
 } from '@/lib/api/seller';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 export default function SellerEtalasePage() {
   const { tokens } = useAuthStore();
@@ -306,13 +307,9 @@ export default function SellerEtalasePage() {
                       onChange={() => toggleSelect(p.id)}
                       className="shrink-0"
                     />
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.images[0]?.url ?? ''}
-                      alt=""
-                      loading="lazy"
-                      className="w-10 h-10 rounded object-cover bg-gray-100 shrink-0"
-                    />
+                    <div className="relative w-10 h-10 rounded overflow-hidden bg-gray-100 shrink-0">
+                      <SmartImage src={p.images[0]?.url} alt="" fill sizes="40px" className="object-cover" />
+                    </div>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm truncate">{p.name}</span>
                       <span className="block text-xs text-gray-500">

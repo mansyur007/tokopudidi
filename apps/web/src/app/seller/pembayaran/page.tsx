@@ -9,6 +9,7 @@ import {
   type PaymentProofRow,
 } from '@/lib/api/seller';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 const TABS = [
   { key: 'PENDING',  label: 'Menunggu' },
@@ -102,8 +103,7 @@ export default function SellerPaymentPage() {
               )}
             </div>
             <div className="mt-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.proofImageUrl} alt="Bukti transfer" className="max-h-64 rounded border" />
+              <SmartImage src={p.proofImageUrl} alt="Bukti transfer" className="max-h-64 rounded border" />
             </div>
             {!p.verifiedAt && !p.rejectedAt && (
               <div className="flex gap-2 mt-3">

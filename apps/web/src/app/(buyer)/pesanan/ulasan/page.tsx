@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
 import {
@@ -55,7 +55,7 @@ export default function PendingReviewPage() {
           <div key={it.id} className="card p-3 flex gap-3">
             <div className="relative w-16 h-16 rounded bg-gray-100 overflow-hidden shrink-0">
               {it.productImage && (
-                <Image src={it.productImage} alt="" fill sizes="64px" className="object-cover" />
+                <SmartImage src={it.productImage} alt="" fill sizes="64px" className="object-cover" />
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -161,8 +161,7 @@ function ReviewModal({ item, onClose, onDone }: {
             <div className="flex gap-2 flex-wrap">
               {imageUrls.map((url, i) => (
                 <div key={i} className="relative w-16 h-16 rounded border overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <SmartImage src={url} alt="" fill sizes="64px" className="object-cover" />
                   <button
                     onClick={() => setImageUrls((p) => p.filter((_, idx) => idx !== i))}
                     aria-label="Hapus"

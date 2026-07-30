@@ -18,6 +18,7 @@ import {
 } from '@/lib/api/seller';
 import { ApiClientError } from '@/lib/api/client';
 import { VariantMatrixEditor, type OptionState, type ComboState } from './VariantMatrixEditor';
+import { SmartImage } from '@/components/media/SmartImage';
 
 interface Props {
   initial?: SellerProductDetail;
@@ -172,8 +173,7 @@ export function ProductForm({ initial, productId }: Props) {
         <div className="flex gap-2 flex-wrap">
           {state.imageUrls.map((url, i) => (
             <div key={i} className="relative w-20 h-20 rounded border overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="w-full h-full object-cover" />
+              <SmartImage src={url} alt="" fill sizes="80px" className="object-cover" />
               <button
                 type="button"
                 onClick={() => removeImage(i)}

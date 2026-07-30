@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { clsx } from 'clsx';
 import { timeAgo } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
@@ -136,10 +136,8 @@ export function ChatRoom({ roomId, title, subtitle, quickReplies = [], templates
                 'max-w-[80%] rounded-2xl px-3 py-2 text-sm',
                 mine ? 'bg-primary text-white rounded-br-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm',
               )}>
-                {m.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.imageUrl} alt="" className="rounded mb-1 max-h-64" />
-                )}
+                {/* Gambar chat = data-URI base64; lazy-load-nya terasa di ruang chat panjang. */}
+                <SmartImage src={m.imageUrl} alt="" className="rounded mb-1 max-h-64" />
                 {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
                 <p className={clsx('text-[10px] mt-1', mine ? 'text-primary-100' : 'text-gray-500')}>
                   {timeAgo(m.sentAt)}{mine && m.readAt ? ' · dibaca' : ''}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { formatRupiah } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
@@ -107,7 +107,7 @@ export default function SellerProductListPage() {
           <div key={p.id} className="card p-3 flex gap-3 items-start">
             <div className="relative w-16 h-16 rounded bg-gray-100 overflow-hidden shrink-0">
               {p.images[0] && (
-                <Image src={p.images[0].url} alt="" fill sizes="64px" className="object-cover" />
+                <SmartImage src={p.images[0].url} alt="" fill sizes="64px" className="object-cover" />
               )}
             </div>
             <div className="flex-1 min-w-0">

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatRupiah, type ScrapeResult, type ScrapedProduct } from '@tokopudidi/shared';
@@ -172,16 +172,20 @@ export default function ScrapPage() {
                 className="card overflow-hidden hover:shadow-md transition-shadow"
               >
                 <div className="relative aspect-square bg-gray-100">
-                  {p.imageUrls[0] && (
-                    <Image
-                      src={p.imageUrls[0]}
-                      alt={p.name}
-                      fill
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                      className="object-cover"
-                      unoptimized
-                    />
-                  )}
+                  {/*
+                    `unoptimized` dulu dipasang di sini karena URL hasil scrape
+                    (images.tokopedia.net) tidak ada di remotePatterns. Sekarang
+                    host-nya terdaftar dan SmartImage yang memutuskan, jadi
+                    gambar yang host-nya dikenal tetap dioptimasi dan yang tidak
+                    dikenal jatuh ke <img> alih-alih rusak (M12-D4).
+                  */}
+                  <SmartImage
+                    src={p.imageUrls[0]}
+                    alt={p.name}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    className="object-cover"
+                  />
                 </div>
                 <div className="p-2">
                   <p className="text-xs line-clamp-2 min-h-[2rem]">{p.name}</p>

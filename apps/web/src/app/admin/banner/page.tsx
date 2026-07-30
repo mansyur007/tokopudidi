@@ -7,6 +7,7 @@ import {
   type AdminBanner,
 } from '@/lib/api/admin';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 const PLACEMENTS = [
   { key: 'HOME_TOP', label: 'Beranda Atas' },
@@ -102,8 +103,14 @@ export default function AdminBannerPage() {
       <div className="space-y-2">
         {items.map((b) => (
           <div key={b.id} className="card p-3 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={b.imageUrl} alt="banner" className="w-24 h-12 object-cover rounded bg-gray-100 shrink-0" />
+            {/*
+              imageUrl banner bisa data-URI (dari file picker) atau URL yang
+              ditempel admin dengan host apa pun — SmartImage yang memilih
+              jalurnya, jadi host tak terdaftar tidak lagi bikin gambar rusak.
+            */}
+            <div className="relative w-24 h-12 rounded overflow-hidden bg-gray-100 shrink-0">
+              <SmartImage src={b.imageUrl} alt="banner" fill sizes="96px" className="object-cover" />
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">{PLACEMENTS.find((p) => p.key === b.placement)?.label}</p>
               <p className="text-xs text-gray-500 truncate">Urutan {b.order} · {b.linkUrl || 'tanpa link'}</p>
@@ -120,10 +127,7 @@ export default function AdminBannerPage() {
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b font-semibold">{draft.id ? 'Edit Banner' : 'Banner Baru'}</div>
             <div className="p-4 space-y-3 text-sm">
-              {draft.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={draft.imageUrl} alt="preview" className="w-full rounded border" />
-              )}
+              <SmartImage src={draft.imageUrl} alt="preview" className="w-full rounded border" />
               <label className="block">
                 <span className="text-xs text-gray-500">Gambar (maks 2MB)</span>
                 <input type="file" accept="image/*" onChange={onPickImage} className="block w-full text-xs mt-1" />

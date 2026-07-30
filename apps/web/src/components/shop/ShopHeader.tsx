@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { formatTanggal } from '@tokopudidi/shared';
 import { ReportButton } from '@/components/report/ReportButton';
 import type { ShopDetail } from '@/lib/api/shops';
@@ -12,7 +12,7 @@ export function ShopHeader({ shop }: { shop: ShopDetail }) {
     <>
       <div className="relative aspect-[4/1] bg-gray-100">
         {shop.bannerUrl && (
-          <Image src={shop.bannerUrl} alt="" fill priority sizes="100vw" className="object-cover" />
+          <SmartImage src={shop.bannerUrl} alt="" fill priority sizes="100vw" className="object-cover" />
         )}
       </div>
 
@@ -20,7 +20,7 @@ export function ShopHeader({ shop }: { shop: ShopDetail }) {
         <div className="wrap flex items-start gap-3">
           <div className="relative w-16 h-16 rounded-full bg-gray-100 overflow-hidden shrink-0 -mt-10 ring-4 ring-white">
             {shop.logoUrl && (
-              <Image src={shop.logoUrl} alt={shop.name} fill sizes="64px" className="object-cover" />
+              <SmartImage src={shop.logoUrl} alt={shop.name} fill sizes="64px" className="object-cover" />
             )}
           </div>
           <div className="flex-1 min-w-0">

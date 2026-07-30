@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { formatRupiah, formatTanggal } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
@@ -104,7 +104,7 @@ export default function SellerOrderDetailPage() {
           {order.items.map((it) => (
             <div key={it.id} className="flex gap-3">
               <div className="relative w-12 h-12 rounded bg-gray-100 overflow-hidden shrink-0">
-                {it.productImage && <Image src={it.productImage} alt="" fill sizes="48px" className="object-cover" />}
+                {it.productImage && <SmartImage src={it.productImage} alt="" fill sizes="48px" className="object-cover" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="line-clamp-2">{it.productName}</p>

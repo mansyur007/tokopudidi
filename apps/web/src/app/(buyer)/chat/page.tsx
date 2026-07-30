@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { timeAgo } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
@@ -88,7 +88,7 @@ function ChatPageInner() {
                 >
                   <div className="relative w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0">
                     {r.shop.logoUrl && (
-                      <Image src={r.shop.logoUrl} alt="" fill sizes="40px" className="object-cover" />
+                      <SmartImage src={r.shop.logoUrl} alt="" fill sizes="40px" className="object-cover" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">

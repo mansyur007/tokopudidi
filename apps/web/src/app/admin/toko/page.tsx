@@ -8,6 +8,7 @@ import {
   type AdminShopRow, type AdminShopDetail,
 } from '@/lib/api/admin';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 const STATUS = [
   { key: 'ALL', label: 'Semua' },
@@ -172,9 +173,9 @@ export default function AdminShopsPage() {
               {detail.description && <p className="text-gray-600">{detail.description}</p>}
               <div>
                 <p className="text-xs text-gray-500 mb-1">Foto KTP</p>
+                {/* Sama seperti seller/daftar: foto identitas tidak dilewatkan ke optimizer. */}
                 {detail.ktpUrl
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={detail.ktpUrl} alt="KTP" className="w-full rounded border" />
+                  ? <SmartImage src={detail.ktpUrl} alt="KTP" className="w-full rounded border" />
                   : <p className="text-gray-400 text-xs">Tidak ada foto KTP.</p>}
               </div>
             </div>

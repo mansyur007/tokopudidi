@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { formatRupiah } from '@tokopudidi/shared';
 import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
@@ -74,7 +74,7 @@ export function ProductCard({ product, variant = 'grid', onAdded }: Props) {
       {/* image */}
       <div className="relative aspect-square bg-page overflow-hidden">
         {product.imageUrl && (
-          <Image
+          <SmartImage
             src={product.imageUrl}
             alt={product.name}
             fill

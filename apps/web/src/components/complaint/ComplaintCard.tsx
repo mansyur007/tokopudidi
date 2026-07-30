@@ -10,6 +10,7 @@ import {
   type ComplaintStatusValue,
 } from '@tokopudidi/shared';
 import type { Complaint } from '@/lib/api/complaints';
+import { SmartImage } from '@/components/media/SmartImage';
 
 const STATUS_COLOR: Record<ComplaintStatusValue, string> = {
   OPEN: 'bg-orange-100 text-orange-700',
@@ -58,8 +59,9 @@ export function ComplaintCard({ complaint: c, perspective, actions }: Props) {
       {c.evidenceUrls.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           {c.evidenceUrls.map((url, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={url} alt={`Bukti ${i + 1}`} className="w-16 h-16 object-cover rounded border" />
+            <div key={i} className="relative w-16 h-16 rounded border overflow-hidden">
+              <SmartImage src={url} alt={`Bukti ${i + 1}`} fill sizes="64px" className="object-cover" />
+            </div>
           ))}
         </div>
       )}

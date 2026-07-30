@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { formatRupiah, formatTanggal, formatTanggalWaktu, isComplaintWindowOpen } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
@@ -194,7 +194,7 @@ export default function OrderDetailPage() {
         <Link href={`/toko/${order.shop.slug}`} className="flex items-center gap-3">
           <div className="relative w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0">
             {order.shop.logoUrl && (
-              <Image src={order.shop.logoUrl} alt="" fill sizes="40px" className="object-cover" />
+              <SmartImage src={order.shop.logoUrl} alt="" fill sizes="40px" className="object-cover" />
             )}
           </div>
           <p className="font-medium flex-1">🏪 {order.shop.name}</p>
@@ -210,7 +210,7 @@ export default function OrderDetailPage() {
             <div key={it.id} className="flex gap-3 text-sm">
               <div className="relative w-12 h-12 rounded bg-gray-100 overflow-hidden shrink-0">
                 {it.productImage && (
-                  <Image src={it.productImage} alt="" fill sizes="48px" className="object-cover" />
+                  <SmartImage src={it.productImage} alt="" fill sizes="48px" className="object-cover" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
