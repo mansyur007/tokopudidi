@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { listOrders, type OrderListItem } from '@/lib/api/orders';
@@ -79,7 +79,7 @@ function PesananListInner() {
                 <div key={it.id} className="flex gap-3 text-sm">
                   <div className="relative w-12 h-12 rounded bg-gray-100 overflow-hidden shrink-0">
                     {it.productImage && (
-                      <Image src={it.productImage} alt="" fill sizes="48px" className="object-cover" />
+                      <SmartImage src={it.productImage} alt="" fill sizes="48px" className="object-cover" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth';
 import { getSellerShop } from '@/lib/api/seller';
 import { listShopReviews, replyReview, type ReviewItem } from '@/lib/api/reviews';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 export default function SellerReviewsPage() {
   const { tokens } = useAuthStore();
@@ -95,8 +96,9 @@ export default function SellerReviewsPage() {
             {r.imageUrls.length > 0 && (
               <div className="flex gap-2 mt-2">
                 {r.imageUrls.map((url, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={url} alt="" className="w-16 h-16 rounded object-cover" />
+                  <div key={i} className="relative w-16 h-16 rounded overflow-hidden bg-gray-100">
+                    <SmartImage src={url} alt="" fill sizes="64px" className="object-cover" />
+                  </div>
                 ))}
               </div>
             )}

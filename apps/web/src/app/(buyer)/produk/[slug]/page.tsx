@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { notFound } from 'next/navigation';
 import { getProduct, getRelated, listProducts } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
@@ -172,7 +172,7 @@ export default async function ProductDetailPage({ params }: Props) {
             <div className="flex items-center gap-3 border border-line rounded-card p-3.5 mt-1">
               <div className="relative w-10 h-10 rounded-full bg-page overflow-hidden shrink-0 border border-line">
                 {product.shop.logoUrl && (
-                  <Image src={product.shop.logoUrl} alt={product.shop.name} fill sizes="40px" className="object-cover" />
+                  <SmartImage src={product.shop.logoUrl} alt={product.shop.name} fill sizes="40px" className="object-cover" />
                 )}
               </div>
               <div className="flex-1 min-w-0">

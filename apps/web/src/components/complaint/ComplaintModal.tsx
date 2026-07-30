@@ -11,6 +11,7 @@ import { formatRupiah } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import { createComplaint } from '@/lib/api/complaints';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 interface OrderItemOption {
   id: string;
@@ -151,8 +152,7 @@ export function ComplaintModal({ orderId, items, onClose, onSubmitted }: Props) 
               <div className="flex gap-2 flex-wrap">
                 {evidenceUrls.map((url, i) => (
                   <div key={i} className="relative w-16 h-16 rounded border overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={`Bukti ${i + 1}`} className="w-full h-full object-cover" />
+                    <SmartImage src={url} alt={`Bukti ${i + 1}`} fill sizes="64px" className="object-cover" />
                     <button
                       onClick={() => setEvidenceUrls((prev) => prev.filter((_, j) => j !== i))}
                       aria-label="Hapus bukti"

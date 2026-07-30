@@ -2,7 +2,7 @@
 
 Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederhana, tanpa iklan, tanpa fitur premium yang bikin lemot.
 
-> **Status:** Milestone 7 (Wishlist & Discovery) — wishlist/favorit, "Baru Dilihat", autocomplete pencarian, feed "Untuk Anda" personalized. Plus alat admin **Scraper Tokopedia**.
+> **Status:** Milestone 12 berjalan — M8–M11 selesai, M12 tersisa satu item (Audit Log Aksi Admin). **🌐 Live:** https://toko.emha.space
 
 ---
 
@@ -15,11 +15,18 @@ Marketplace e-commerce **pro rakyat** untuk UMKM kecil Indonesia. Ringan, sederh
 - **Milestone 5 — Chat, Ulasan & Notifikasi:** chat realtime (Socket.IO), ulasan produk, notifikasi.
 - **Milestone 6 — Admin Panel:** dashboard platform, moderasi pengguna & toko, verifikasi KTP, takedown produk, arbitrase refund (buyer bisa ajukan refund), CRUD banner & kategori.
 - **Milestone 7 — Wishlist & Discovery:** wishlist/favorit (heart toggle + halaman `/wishlist`), "Baru Dilihat" (`/baru-dilihat`, guest ke-track via cookie), autocomplete pencarian (produk/kategori/toko + riwayat), feed "Untuk Anda" personalized.
+- **Milestone 8 — Interaksi & Kepercayaan:** diskusi produk (tanya jawab publik), timeline tracking pesanan + AWB, pelaporan produk/toko, template reply chat penjual.
+- **Milestone 9 — Promo & Diskon:** voucher picker di checkout, voucher toko, harga diskon periodik (sale price), voucher platform global.
+- **Milestone 10 — Pembayaran & Sengketa:** QRIS mock lengkap (render QR + countdown + expiry), komplain/return di luar refund, filter pencarian lengkap.
+- **Milestone 11 — Toko & Varian:** etalase/showcase toko (tab produk di halaman toko), statistik per produk, varian kombinasi multi-axis (mis. Warna × Ukuran).
+- **Milestone 12 — Polish & SEO:** bottom nav mobile, SEO & metadata (sitemap dinamis, robots, Open Graph, JSON-LD produk), audit optimasi gambar.
 - **Alat admin — Scraper Tokopedia:** halaman `/scrap` (khusus admin) untuk ambil data produk dari URL toko/produk Tokopedia via headless browser, hasil bisa diunduh JSON siap-impor.
 
 Riwayat lengkap tiap milestone ada di [CHANGELOG.md](CHANGELOG.md).
 
-Rencana fitur berikutnya (M7–M15) ada di [ROADMAP.md](ROADMAP.md) — silakan klaim item yang masih `🔵 TODO`.
+Rencana fitur berikutnya (M12–M15) ada di [ROADMAP.md](ROADMAP.md) — silakan klaim item yang masih `🔵 TODO`. Rencana test automation ada di [TESTING.md](TESTING.md).
+
+**Utang teknis yang masih terbuka:** kolom `ProductVariant.name` belum di-drop (tahap 4 M11-A8, menunggu verifikasi backfill di produksi), dan belum ada endpoint upload berkas — semua gambar unggahan disimpan sebagai data-URI base64 di kolom string.
 
 ---
 
@@ -31,7 +38,8 @@ Rencana fitur berikutnya (M7–M15) ada di [ROADMAP.md](ROADMAP.md) — silakan 
 | Backend | Node.js 20 + Express + TypeScript |
 | Database | PostgreSQL 15 + Prisma ORM |
 | Cache | Redis 7 |
-| Storage | MinIO (dev) → Cloudflare R2 (production) |
+| Storage | MinIO ikut jalan di compose, **tapi belum dipakai** — belum ada endpoint upload berkas, gambar unggahan masih disimpan sebagai data-URI base64 di kolom string |
+| Test | Vitest (unit, `apps/api`) + Playwright (E2E) |
 
 ---
 
@@ -54,7 +62,7 @@ npm install
 cp .env.example .env
 cp apps/web/.env.example apps/web/.env.local
 ```
-Edit `JWT_ACCESS_SECRET` dan `JWT_REFRESH_SECRET` jadi string acak panjang.
+Edit `JWT_ACCESS_SECRET` dan `JWT_REFRESH_SECRET` jadi string acak panjang. Nilai default lainnya sudah cocok untuk dev.
 
 ### 4. Jalankan database & service
 ```bash
@@ -68,16 +76,23 @@ docker compose ps
 ### 5. Migrasi database
 ```bash
 npm run db:generate
-npm run db:migrate -- --name init
+npm run db:migrate
 ```
+Migration-nya sudah ter-commit, jadi `db:migrate` (`prisma migrate dev`) tinggal menerapkannya — tidak perlu `--name`.
 
 ### 6. Isi data awal
 ```bash
 npm run db:seed
 ```
-Akan dibuat:
-- 15 kategori (Sembako, Makanan & Minuman, Fashion Muslim, dst).
-- 1 admin: `+6281200000001` / password `admin123`.
+Akan dibuat kategori, produk contoh (termasuk produk bervarian multi-axis), dan tiga akun seed:
+
+| Peran | Nomor HP | Password |
+|---|---|---|
+| Admin | `+6281200000001` | `admin123` |
+| Seller | `+6281200000101` | `seller123` |
+| Buyer | `+6281200000201` | `buyer123` |
+
+Akun-akun inilah yang dipakai suite E2E ([e2e/helpers/testforge.ts](e2e/helpers/testforge.ts)).
 
 ### 7. Jalankan aplikasi
 ```bash
@@ -141,12 +156,27 @@ subprocess cloudflared).
 
 ## 🧪 Testing
 
+### Unit (Vitest, di `apps/api`)
 ```bash
 npm run test
 ```
+140 test di 9 berkas — semuanya logika murni tanpa DB: normalisasi nomor HP & schema auth, harga efektif produk, kombinasi varian, urutan etalase, statistik produk, helper SEO, dan klasifikasi sumber gambar.
 
-Test unit happy-path saat ini:
-- `apps/api/src/modules/auth/auth.test.ts` — validasi schema register/login + normalisasi nomor HP.
+> `apps/web` **belum punya test runner.** Karena itu logika murni yang dipakai FE ditaruh di `packages/shared/src/utils/` supaya ikut teruji suite `apps/api`; perilaku UI-nya diuji lewat Playwright.
+
+### E2E (Playwright)
+Butuh Postgres + web + api jalan (langkah 4–7 di atas).
+```bash
+npm run e2e          # headless
+npm run e2e:ui       # mode UI
+```
+Nama tiap test memuat id `TC-TKPDD-<n>` supaya hasilnya ter-map ke test case di TestForge — lihat [e2e/helpers/testforge.ts](e2e/helpers/testforge.ts). Suite ini berjalan **serial** (`workers: 1`) karena berbagi data seed, dan login dilakukan sekali di `global-setup` (API membatasi 5 login/menit/IP).
+
+### CI
+- [ci.yml](.github/workflows/ci.yml) — `prisma generate` → build `database` + `shared` → lint → test → build web.
+- [e2e.yml](.github/workflows/e2e.yml) — spin up `postgres:15`, `prisma:deploy`, `db:seed`, lalu jalankan Playwright.
+
+Rencana pengembangan test lebih lanjut ada di [TESTING.md](TESTING.md).
 
 ---
 
@@ -155,37 +185,49 @@ Test unit happy-path saat ini:
 ```
 tokopudidi/
 ├── apps/
-│   ├── web/                    # Next.js (buyer + seller + admin nanti)
-│   │   └── src/app/(auth)/     # halaman daftar/masuk/lupa-password
-│   │   └── src/app/(buyer)/    # halaman pembeli
-│   └── api/                    # Express server
-│       └── src/modules/auth/   # auth.routes, auth.service, otp.service
+│   ├── web/                      # Next.js 14 App Router
+│   │   └── src/app/(auth)/       # daftar / masuk / lupa-password
+│   │   └── src/app/(buyer)/      # halaman pembeli
+│   │   └── src/app/seller/       # panel penjual
+│   │   └── src/app/admin/        # panel admin
+│   │   └── src/app/scrap/        # scraper Tokopedia (admin)
+│   │   └── src/components/       # per domain: product, shop, order, chat, seller, admin, media, shell
+│   │   └── src/lib/api/          # client fetch per domain (cache: 'no-store')
+│   │   └── src/store/            # Zustand (auth, cart, wishlist, …)
+│   └── api/                      # Express, dijalankan via tsx (tanpa build)
+│       └── src/modules/<domain>/ # *.routes.ts, *.service.ts, *.test.ts berdampingan
+│       └── src/middleware/       # auth, optionalAuth, requireRole, validateBody, rate limit
 ├── packages/
-│   ├── database/               # Prisma schema + seed
-│   └── shared/                 # types & Zod schemas dipakai oleh web+api
-├── docker-compose.yml
-├── package.json                # workspaces root
-└── README.md
+│   ├── database/                 # Prisma schema, migration, seed
+│   └── shared/                   # Zod schema + util murni, dipakai web & api
+├── e2e/                          # Playwright + helpers TestForge
+├── scripts/                      # tunnel.sh, upload-junit.mjs, backfill-*.mjs
+├── Dockerfile                    # multi-stage, target `api` & `web`
+├── docker-compose.yml            # dev: postgres, redis, minio
+├── docker-compose.prod.yml       # produksi + caddy
+└── playwright.config.ts
 ```
 
 ---
 
-## 🔌 API Endpoints (Milestone 1)
+## 🔌 Konvensi API
 
-Semua respons format `{ success, data, message?, errors? }`.
+- Base path `/api/v1/…`, health check di `/api/health`.
+- Semua respons berformat `{ success, data, message?, errors? }`.
+- Auth pakai Bearer access token (JWT) + refresh token; peran `BUYER` / `SELLER` / `ADMIN` dijaga `requireRole`.
+- Body divalidasi `validateBody(<zodSchema>)` dengan schema dari `@tokopudidi/shared` — schema yang sama dipakai FE, jadi validasi client & server tidak bisa berbeda.
+- Endpointnya sudah ~40 berkas route; daftar lengkapnya tidak diduplikasi di sini karena cepat basi. Sumber yang akurat: registrasi router di [apps/api/src/app.ts](apps/api/src/app.ts) lalu berkas `*.routes.ts` di modul yang bersangkutan.
 
-| Method | Path                              | Deskripsi |
-|--------|-----------------------------------|-----------|
-| GET    | `/api/health`                     | Health check |
-| POST   | `/api/v1/auth/register`           | Daftar user baru |
-| POST   | `/api/v1/auth/login`              | Login dengan HP + password |
-| POST   | `/api/v1/auth/refresh`            | Tukar refresh → access token baru |
-| POST   | `/api/v1/auth/logout`             | Revoke refresh token |
-| POST   | `/api/v1/auth/otp/send`           | Kirim OTP (mock: lihat console) |
-| POST   | `/api/v1/auth/otp/verify`         | Verifikasi OTP |
-| POST   | `/api/v1/auth/forgot-password`    | Reset password via OTP |
-| GET    | `/api/v1/auth/me`                 | Profil user (perlu Bearer token) |
-| GET    | `/api/v1/categories`              | Daftar kategori |
+---
+
+## ⚠️ Aturan kode yang mudah kelewat
+
+Empat hal yang bikin PR gagal atau bug halus kalau dilewatkan:
+
+1. **Render gambar lewat `SmartImage`**, bukan `<img>` atau `next/image` langsung ([apps/web/src/components/media/SmartImage.tsx](apps/web/src/components/media/SmartImage.tsx)). URL gambar di aplikasi ini bisa data-URI, bisa host sembarang yang ditempel seller — `next/image` menolak host di luar `remotePatterns` (halaman 500 di dev, gambar 400 di produksi). Kalau perlu menambah host, tambahkan ke `ALLOWED_IMAGE_HOSTS` di `packages/shared/src/utils/image.ts`; `next.config.js` menurunkan `remotePatterns` dari situ.
+2. **`packages/shared` & `packages/database` dikonsumsi sebagai `dist` hasil build.** Setelah mengubahnya, jalankan `npm run build -w @tokopudidi/shared` (atau `-w @tokopudidi/database`) sebelum berharap `apps/web`/`apps/api` melihat perubahannya.
+3. **Logika murni yang dipakai FE ditaruh di `packages/shared/src/utils/`.** `apps/web` belum punya test runner, jadi itulah satu-satunya cara logikanya ikut teruji.
+4. **Migration ditulis manual, lalu diverifikasi** terhadap keluaran `npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`. Jangan jalankan `prisma format` — formatter-nya menyentuh ratusan baris yang tidak berkaitan dan membuat diff-nya tidak bisa ditinjau.
 
 ---
 
@@ -220,8 +262,9 @@ git clone https://github.com/mansyur007/tokopudidi.git /opt/tokopudidi
 cd /opt/tokopudidi
 
 # 3. Buat .env.production (JANGAN commit — sudah di .gitignore).
-#    Isi DATABASE_URL (host: postgres), JWT secrets acak, WEB_ORIGIN & NEXT_PUBLIC_API_URL
-#    ke URL publik (mis. https://<host>), kredensial MinIO, dll. Lihat .env.example.
+#    Isi DATABASE_URL (host: postgres), JWT secrets acak, WEB_ORIGIN,
+#    NEXT_PUBLIC_API_URL dan NEXT_PUBLIC_SITE_URL ke URL publik
+#    (mis. https://toko.emha.space), kredensial MinIO, dll. Lihat .env.example.
 
 # 4. Build & jalankan
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
@@ -233,7 +276,7 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec -w /ap
   npm run db:seed
 ```
 
-> Catatan: `NEXT_PUBLIC_*` di-_inline_ saat build, jadi setiap ganti URL publik perlu **rebuild** image web.
+> Catatan: `NEXT_PUBLIC_*` di-_inline_ saat build, jadi setiap ganti URL publik perlu **rebuild** image web. `NEXT_PUBLIC_SITE_URL` sudah diteruskan sebagai build arg **dan** runtime env di `docker-compose.prod.yml`; kalau kosong, canonical/Open Graph/sitemap menunjuk `localhost` dan diabaikan crawler.
 
 ### Auto-deploy (CI/CD)
 Setiap **push/merge ke `main`** memicu GitHub Actions ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) yang SSH ke VPS lalu:
@@ -256,9 +299,16 @@ cd /opt/tokopudidi && git pull && \
 Project ini terbuka untuk developer Indonesia yang mau bantu UMKM. Aturan main singkat:
 
 1. **Bahasa:** UI dan komentar untuk user → Bahasa Indonesia santai. Komentar teknis → English boleh.
-2. **Commit:** Pakai format konvensional: `feat: tambah halaman keranjang`, `fix: validasi nomor HP`, `chore: update deps`.
-3. **PR:** Pastikan `npm run lint && npm run test && npm run build` lulus.
-4. **Performa > fitur cantik.** Kalau ragu, tanya: "ini bakal jalan di HP entry-level RAM 2GB?"
+2. **Satu item ROADMAP = satu PR.** Klaim dulu dengan mengisi **Owner** + Status `🟡 IN PROGRESS` di [ROADMAP.md](ROADMAP.md).
+3. **Penamaan** mengikuti ID item roadmap:
+   - Branch: `feat/M12-D4-image-optimization`
+   - Commit: `feat(M12-D4): ringkasan singkat`
+   - Judul PR: `M12-D4 Image Optimization Audit`
+4. **Sebelum PR:** update Status + tulis **Deliver notes** di ROADMAP, tambahkan entri [CHANGELOG.md](CHANGELOG.md), lalu pastikan gerbang ini lulus:
+   ```bash
+   npm run lint && npm run test && npm run build
+   ```
+5. **Performa > fitur cantik.** Kalau ragu, tanya: "ini bakal jalan di HP entry-level RAM 2GB?" Menambah dependency berat untuk kebutuhan kecil (mis. library chart untuk 30 batang) bukan pilihan — dan lihat juga **Scope guard** di ROADMAP untuk fitur yang sudah diputuskan di luar lingkup.
 
 ---
 

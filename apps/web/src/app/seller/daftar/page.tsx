@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/auth';
 import { upgradeToSeller } from '@/lib/api/seller';
 import { ApiClientError, apiFetch } from '@/lib/api/client';
 import type { AuthTokens } from '@tokopudidi/shared';
+import { SmartImage } from '@/components/media/SmartImage';
 
 export default function DaftarSellerPage() {
   const router = useRouter();
@@ -107,8 +108,12 @@ export default function DaftarSellerPage() {
           <input type="file" accept="image/jpeg,image/png" onChange={handleKtpFile} />
           {ktpDataUrl && (
             <div className="mt-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ktpDataUrl} alt="Preview KTP" className="max-h-40 rounded border" />
+              {/*
+                KTP tidak boleh lewat /_next/image: optimizer men-cache hasilnya
+                ke disk server. SmartImage mengenali data-URI dan merendernya
+                langsung, jadi foto identitas tidak pernah ikut ter-cache.
+              */}
+              <SmartImage src={ktpDataUrl} alt="Preview KTP" className="max-h-40 rounded border" />
             </div>
           )}
           {errors.ktpUrl && <p className="text-sm text-red-600 mt-1">{errors.ktpUrl.message}</p>}

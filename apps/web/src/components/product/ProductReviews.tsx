@@ -6,6 +6,7 @@ import { timeAgo } from '@tokopudidi/shared';
 import { listProductReviews, type ReviewItem } from '@/lib/api/reviews';
 import { Icon } from '@/components/shell/Icon';
 import { ReportButton } from '@/components/report/ReportButton';
+import { SmartImage } from '@/components/media/SmartImage';
 
 interface Props {
   productId: string;
@@ -189,8 +190,7 @@ export function ProductReviews({ productId, ratingAvg, ratingCount }: Props) {
               <div className="flex gap-2 mb-5">
                 {photoTiles.map((src, k) => (
                   <div key={k} className="relative w-16 h-16 rounded-md overflow-hidden border border-line">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <SmartImage src={src} alt="" fill sizes="64px" className="object-cover" />
                     {k === photoTiles.length - 1 && extraPhotos > 0 && (
                       <div className="absolute inset-0 bg-black/50 text-white grid place-items-center font-bold">
                         +{extraPhotos}
@@ -242,9 +242,8 @@ export function ProductReviews({ productId, ratingAvg, ratingCount }: Props) {
                 {r.imageUrls.length > 0 && (
                   <div className="flex gap-1.5 mb-2">
                     {r.imageUrls.map((u, i) => (
-                      <div key={i} className="w-[52px] h-[52px] rounded-lg overflow-hidden border border-line">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={u} alt="" className="w-full h-full object-cover" />
+                      <div key={i} className="relative w-[52px] h-[52px] rounded-lg overflow-hidden border border-line">
+                        <SmartImage src={u} alt="" fill sizes="52px" className="object-cover" />
                       </div>
                     ))}
                   </div>

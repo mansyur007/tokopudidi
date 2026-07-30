@@ -17,6 +17,7 @@ import {
 } from '@/lib/api/orders';
 import { QrisPanel } from '@/components/order/QrisPanel';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 export default function BayarPage() {
   const router = useRouter();
@@ -227,8 +228,7 @@ export default function BayarPage() {
               <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="text-sm" />
               {proofImageUrl && (
                 <div className="mt-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={proofImageUrl} alt="Preview bukti" className="max-h-48 rounded border" />
+                  <SmartImage src={proofImageUrl} alt="Preview bukti" className="max-h-48 rounded border" />
                 </div>
               )}
             </div>

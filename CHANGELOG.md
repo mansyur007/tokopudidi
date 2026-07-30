@@ -3,6 +3,28 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M12-D4: Image Optimization Audit
+
+### Fixed
+- **Logo/banner toko dari host sembarang tidak lagi merusak halaman** (`M12-D4`). `logoUrl` & `bannerUrl` diisi seller lewat input teks bebas (validasinya cuma `z.string().min(5)`) lalu dirender `next/image`. Host di luar `images.remotePatterns` ditolak: **di dev `next/image` melempar dan halaman jadi HTTP 500**; di produksi throw-nya dimatikan tapi `/_next/image` menjawab **400** sehingga logonya rusak. Artinya seller bisa merusak halaman tokonya sendiri hanya dengan menempel URL gambar biasa. Hal yang sama berlaku untuk URL hasil scrape (`images.tokopedia.net`) di `/scrap`.
+- **`admin/produk` tidak lagi meminta `/placeholder.png` yang 404.** `apps/web/public` tidak pernah ada di repo ini, jadi setiap produk tanpa foto memuat berkas yang tidak ada. Sekarang kotak abu-abu induknya yang jadi placeholder.
+
+### Added
+- **`SmartImage`** (`apps/web/src/components/media/SmartImage.tsx`) — satu pintu render gambar yang memilih jalur **per-src**: host terdaftar → `next/image`; data-URI & host tak terdaftar → `<img>` biasa; skema aneh (`data:text/html`, `javascript:`, `//host`) → tidak dirender sama sekali.
+- **`classifyImageSrc` + `ALLOWED_IMAGE_HOSTS`** di `packages/shared/src/utils/image.ts` — 15 unit test, plus e2e `image.spec.ts` (TC-TKPDD-145–148) yang mengubah `logoUrl` toko seed ke host asing dan memastikan halaman tokonya tetap 200.
+- `images.tokopedia.net` & `assets.tokopedia.net` masuk allowlist — tanpa itu gambar hasil impor scraper selalu rusak.
+
+### Changed
+- Seluruh **20 `<img>` mentah** dan **15 pemakai `next/image`** dialihkan ke `SmartImage`. `<img>` mentah kini tinggal **satu** di seluruh `apps/web` (di dalam `SmartImage`), dan jalur itu selalu memasang `loading="lazy"` + `decoding="async"` — yang paling terasa untuk data-URI base64 di daftar panjang (chat, komplain, ulasan).
+- `images.remotePatterns` di `next.config.js` **diturunkan** dari `ALLOWED_IMAGE_HOSTS` (`require('@tokopudidi/shared')`) alih-alih ditulis manual, supaya allowlist config dan allowlist runtime tidak bisa berbeda.
+
+### Notes
+- **Tidak ada endpoint upload berkas di `apps/api`.** Semua gambar buatan UI adalah data-URI base64 di kolom string (8 pemanggil `FileReader.readAsDataURL`). Konsekuensinya rencana awal item ini keliru: thumbnail admin/seller yang disebut "URL remote" sebenarnya data-URI, dan mengonversinya ke `next/image` tidak memberi apa pun — `next/image` melewati data-URI tanpa optimasi.
+- **`remotePatterns` sengaja tetap allowlist eksplisit, bukan `hostname: '**'`.** Wildcard memang menghilangkan error, tapi mengubah `/_next/image` jadi proxy terbuka yang bisa disuruh menarik URL sembarang. Ada test yang menjaga ini (TC-147 + unit test anti-wildcard).
+- Foto KTP dan bukti transfer dengan sendirinya tidak pernah lewat `/_next/image`, yang juga berarti tidak ikut ter-cache ke disk server.
+- **Temuan yang belum dikerjakan:** `BannerCarousel` di homepage isinya array hardcoded dan tidak pernah merender `Banner.imageUrl` — CRUD banner admin praktis write-only.
+- Acceptance "Lighthouse *Properly size images*" belum dicentang: butuh URL publik + DB berisi, jadi langkah pasca-deploy.
+
 ## [Unreleased] — M12-D3: SEO & Meta
 
 ### Added

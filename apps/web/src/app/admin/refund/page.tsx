@@ -8,6 +8,7 @@ import {
   type AdminRefundRow,
 } from '@/lib/api/admin';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 const TABS = [
   { key: 'PENDING', label: 'Menunggu' },
@@ -112,8 +113,7 @@ export default function AdminRefundPage() {
             {r.evidenceImages.length > 0 && (
               <div className="flex gap-2 overflow-x-auto">
                 {r.evidenceImages.map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={src} alt={`Bukti ${i + 1}`} className="h-24 rounded border shrink-0" />
+                  <SmartImage key={i} src={src} alt={`Bukti ${i + 1}`} className="h-24 rounded border shrink-0" />
                 ))}
               </div>
             )}

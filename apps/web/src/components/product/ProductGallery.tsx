@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import { clsx } from 'clsx';
 
 interface Props {
@@ -35,12 +35,12 @@ export function ProductGallery({ images, alt }: Props) {
               i === active ? 'border-2 border-primary' : 'border border-line',
             )}
           >
-            <Image src={img.url} alt="" fill sizes="50px" className="object-cover" />
+            <SmartImage src={img.url} alt="" fill sizes="50px" className="object-cover" />
           </button>
         ))}
       </div>
       <div className="flex-1 relative aspect-square rounded-card overflow-hidden border border-line bg-page">
-        <Image
+        <SmartImage
           src={images[active].url}
           alt={alt}
           fill

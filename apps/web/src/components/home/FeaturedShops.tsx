@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import type { ShopCard } from '@/lib/api/shops';
 
 interface Props { shops: ShopCard[] }
@@ -19,7 +19,7 @@ export function FeaturedShops({ shops }: Props) {
             <div className="flex items-center gap-2">
               <div className="relative w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0">
                 {s.logoUrl && (
-                  <Image src={s.logoUrl} alt={s.name} fill sizes="40px" className="object-cover" />
+                  <SmartImage src={s.logoUrl} alt={s.name} fill sizes="40px" className="object-cover" />
                 )}
               </div>
               <div className="flex-1 min-w-0">

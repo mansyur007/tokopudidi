@@ -9,6 +9,7 @@ import {
   type AdminProductRow,
 } from '@/lib/api/admin';
 import { ApiClientError } from '@/lib/api/client';
+import { SmartImage } from '@/components/media/SmartImage';
 
 const STATUS = [
   { key: 'ALL', label: 'Semua' },
@@ -81,12 +82,14 @@ export default function AdminProductsPage() {
       <div className="space-y-2">
         {items.map((p) => (
           <div key={p.id} className="card p-3 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={p.images[0]?.url || '/placeholder.png'}
-              alt={p.name}
-              className="w-12 h-12 rounded object-cover bg-gray-100 shrink-0"
-            />
+            {/*
+              Dulu fallback-nya `/placeholder.png`, padahal `apps/web/public`
+              tidak ada sama sekali — jadi produk tanpa foto selalu memuat 404.
+              Sekarang kotak abu-abu induknya yang jadi placeholder.
+            */}
+            <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-100 shrink-0">
+              <SmartImage src={p.images[0]?.url} alt={p.name} fill sizes="48px" className="object-cover" />
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <Link href={`/produk/${p.slug}`} className="font-medium truncate hover:text-primary">{p.name}</Link>

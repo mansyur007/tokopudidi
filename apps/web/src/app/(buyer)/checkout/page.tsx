@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatRupiah } from '@tokopudidi/shared';
@@ -307,7 +307,7 @@ export default function CheckoutPage() {
                 <div key={it.id} className="flex gap-3 text-sm">
                   <div className="relative w-12 h-12 rounded bg-gray-100 overflow-hidden shrink-0">
                     {it.product.imageUrl && (
-                      <Image src={it.product.imageUrl} alt="" fill sizes="48px" className="object-cover" />
+                      <SmartImage src={it.product.imageUrl} alt="" fill sizes="48px" className="object-cover" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import Image from 'next/image';
+import { SmartImage } from '@/components/media/SmartImage';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatRupiah } from '@tokopudidi/shared';
@@ -107,7 +107,7 @@ export default function KeranjangPage() {
                   />
                   <div className="relative w-16 h-16 rounded bg-gray-100 overflow-hidden shrink-0">
                     {it.product.imageUrl && (
-                      <Image src={it.product.imageUrl} alt={it.product.name} fill sizes="64px" className="object-cover" />
+                      <SmartImage src={it.product.imageUrl} alt={it.product.name} fill sizes="64px" className="object-cover" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">

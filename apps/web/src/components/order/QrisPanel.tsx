@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatRupiah } from '@tokopudidi/shared';
 import type { QrisPayment } from '@/lib/api/orders';
+import { SmartImage } from '@/components/media/SmartImage';
 
 /** Sisa waktu bayar dalam milidetik, dihitung ulang tiap detik. */
 function useCountdown(expiresAt: string) {
@@ -72,9 +73,11 @@ export function QrisPanel({ qris, paying, onPay, onExpired }: Props) {
         </p>
       </div>
 
-      {/* Data URI dari API — next/image tidak memberi nilai tambah untuk QR statis. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      {/*
+        Data URI dari API. SmartImage mengenalinya sebagai `data` dan tetap
+        merender <img> biasa — QR statis tidak perlu (dan tidak bisa) dioptimasi.
+      */}
+      <SmartImage
         src={qris.qrImageDataUrl}
         alt="Kode QR pembayaran"
         className="mx-auto w-56 h-56 rounded border bg-white p-2"
