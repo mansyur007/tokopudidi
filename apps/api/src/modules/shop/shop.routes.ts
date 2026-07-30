@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { prisma, Prisma } from '@tokopudidi/database';
 import { ok } from '../../lib/response';
 import { NotFoundError } from '../../lib/errors';
+import { requireAuth } from '../../middleware/auth';
 import { toProductCard } from '../product/product.service';
+import { followShop, unfollowShop } from '../follow/follow.service';
 
 export const shopRouter = Router();
 
@@ -40,6 +42,13 @@ shopRouter.get('/:slug', async (req, res, next) => {
         logoUrl: true, bannerUrl: true, city: true, province: true,
         isOpen: true, closedReason: true, joinedAt: true,
         ratingAvg: true, ratingCount: true, totalSold: true, ktpVerified: true,
+        // Follower (M13-A1) — dihitung langsung, tanpa kolom counter.
+        // Sengaja TIDAK ada `isFollowing` di sini: halaman toko dirender di
+        // server dan token buyer hidup di localStorage (zustand persist), jadi
+        // request SSR tidak pernah membawa Authorization — nilainya akan selalu
+        // `false` dan menyamar sebagai kebenaran. Status follow diambil client
+        // -side dari `/users/me/following/ids` (pola wishlist M7-A1).
+        _count: { select: { followers: true } },
         // Etalase (M11-B1) — count di-filter ke produk yang benar-benar tampil.
         showcases: {
           orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
@@ -53,13 +62,30 @@ shopRouter.get('/:slug', async (req, res, next) => {
     if (!shop) throw new NotFoundError('Toko tidak ditemukan');
 
     // Etalase kosong disembunyikan dari buyer (tetap terlihat di panel seller).
-    const { showcases, ...rest } = shop;
+    const { showcases, _count, ...rest } = shop;
     return ok(res, {
       ...rest,
+      followerCount: _count.followers,
       showcases: showcases
         .filter((s) => s._count.products > 0)
         .map((s) => ({ id: s.id, name: s.name, slug: s.slug, productCount: s._count.products })),
     });
+  } catch (err) { next(err); }
+});
+
+// POST/DELETE /api/v1/shops/:slug/follow (M13-A1) — idempoten dua-duanya:
+// follow dua kali tetap 1 baris, unfollow saat belum follow tetap 200.
+shopRouter.post('/:slug/follow', requireAuth, async (req, res, next) => {
+  try {
+    await followShop(req.user!.sub, req.params.slug);
+    return ok(res, null, 'Toko diikuti');
+  } catch (err) { next(err); }
+});
+
+shopRouter.delete('/:slug/follow', requireAuth, async (req, res, next) => {
+  try {
+    await unfollowShop(req.user!.sub, req.params.slug);
+    return ok(res, null, 'Berhenti mengikuti toko');
   } catch (err) { next(err); }
 });
 

@@ -1,6 +1,7 @@
 import { SmartImage } from '@/components/media/SmartImage';
 import { formatTanggal } from '@tokopudidi/shared';
 import { ReportButton } from '@/components/report/ReportButton';
+import { ShopFollow } from './ShopFollow';
 import type { ShopDetail } from '@/lib/api/shops';
 
 /**
@@ -36,7 +37,14 @@ export function ShopHeader({ shop }: { shop: ShopDetail }) {
               <span>{shop.totalSold} terjual</span>
             </div>
           </div>
-          <ReportButton targetType="SHOP" targetId={shop.id} targetLabel={shop.name} />
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <ShopFollow
+              shopId={shop.id}
+              shopSlug={shop.slug}
+              initialFollowerCount={shop.followerCount}
+            />
+            <ReportButton targetType="SHOP" targetId={shop.id} targetLabel={shop.name} />
+          </div>
         </div>
         {shop.description && (
           <p className="wrap text-sm text-ink-soft mt-3">{shop.description}</p>

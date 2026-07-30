@@ -29,6 +29,9 @@ export interface ShopDetail extends ShopCard {
   joinedAt: string;
   ktpVerified: boolean;
   showcases: ShopShowcaseSummary[];
+  // M13-A1. Tidak ada `isFollowing` di sini — SSR tidak membawa token buyer,
+  // status follow diambil client-side lewat store `follow`.
+  followerCount: number;
 }
 
 export async function fetchFeaturedShops(): Promise<ShopCard[]> {

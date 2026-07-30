@@ -115,6 +115,7 @@ model User {
   reports       Report[]
   complaints    Complaint[]
   adminLogs     AdminLog[]
+  followedShops ShopFollower[]
 
   @@index([phone])
   @@index([referralCode])
@@ -239,6 +240,7 @@ model Shop {
   chatTemplates ChatTemplate[]
   promoCodes PromoCode[]
   showcases ShopShowcase[]
+  followers ShopFollower[]
 
   @@index([slug])
   @@index([city])
@@ -849,4 +851,22 @@ model ShopShowcaseProduct {
   @@id([showcaseId, productId])
   @@index([showcaseId, order])
   @@index([productId])
+}
+
+// ============= FOLLOW TOKO (M13-A1) =============
+
+// Tanpa kolom `id` sendiri: PK gabungan sudah unik dan sekaligus mencegah
+// follow ganda saat tombol di-klik dua kali (upsert menabrak PK yang sama).
+// Jumlah follower dihitung lewat `_count.followers`, bukan kolom counter —
+// skalanya belum menuntut denormalisasi dan counter gampang melenceng.
+model ShopFollower {
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([shopId, userId])
+  // Daftar "Toko Favorit" milik user, terbaru dulu.
+  @@index([userId, createdAt])
 }

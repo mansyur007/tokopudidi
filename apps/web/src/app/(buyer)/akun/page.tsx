@@ -11,6 +11,7 @@ const MENU = [
   { href: '/komplain',        label: 'Komplain Saya',    emoji: '🛠️' },
   { href: '/chat',            label: 'Chat',             emoji: '💬' },
   { href: '/wishlist',        label: 'Wishlist',         emoji: '❤️' },
+  { href: '/akun/toko-favorit', label: 'Toko Favorit',   emoji: '🏬' },
   { href: '/baru-dilihat',    label: 'Baru Dilihat',     emoji: '👀' },
   { href: '/akun/referral',   label: 'Kode Referral',    emoji: '🎁' },
   { href: '/seller',          label: 'Daftar Jadi Penjual', emoji: '🏪' },
