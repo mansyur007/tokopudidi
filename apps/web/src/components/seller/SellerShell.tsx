@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { getSellerShop, type SellerShop } from '@/lib/api/seller';
 import { ApiClientError } from '@/lib/api/client';
 
@@ -26,6 +26,7 @@ export function SellerShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [shop, setShop] = useState<SellerShop | null>(null);
   const [needsRegister, setNeedsRegister] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -35,7 +36,11 @@ export function SellerShell({ children }: { children: React.ReactNode }) {
   const isRegisterPage = pathname === '/seller/daftar';
 
   useEffect(() => {
-    if (!user) { router.push('/masuk'); return; }
+    // Sebelum rehydrate selesai `user` selalu null (lihat useAuthHydrated) —
+    // menyimpulkan apa pun di sini membuang seller yang sudah masuk ke /masuk
+    // setiap kali /seller/* dibuka lewat URL langsung atau dimuat ulang.
+    if (!hydrated) return;
+    if (!user) { router.replace('/masuk'); return; }
     if (isRegisterPage) { setLoading(false); return; }
     if (!tokens?.accessToken) return;
     getSellerShop(tokens.accessToken)
@@ -46,11 +51,12 @@ export function SellerShell({ children }: { children: React.ReactNode }) {
         }
       })
       .finally(() => setLoading(false));
-  }, [user, tokens?.accessToken, router, isRegisterPage]);
+  }, [hydrated, user, tokens?.accessToken, router, isRegisterPage]);
 
-  if (!user) return null;
+  // Effect di atas sedang mengalihkan ke /masuk.
+  if (hydrated && !user) return null;
 
-  if (loading) {
+  if (!hydrated || loading) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Memuat...</div>;
   }
 

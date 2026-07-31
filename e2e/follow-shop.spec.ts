@@ -21,7 +21,7 @@ async function followerCountOf(
   return (await res.json()).data.followerCount as number;
 }
 
-test(tc('155', 'Follow toko: toggle, idempoten, dan jumlah follower ikut bergerak'), async ({ request }) => {
+test(tc('156', 'Follow toko: toggle, idempoten, dan jumlah follower ikut bergerak'), async ({ request }) => {
   const token = tokenFor('buyer');
   const shop = await pickShop(request);
 
@@ -66,7 +66,7 @@ test(tc('155', 'Follow toko: toggle, idempoten, dan jumlah follower ikut bergera
   expect(twice.status()).toBe(200);
 });
 
-test(tc('156', 'Follow toko: butuh login, tolak toko sendiri & toko tak dikenal'), async ({ request }) => {
+test(tc('157', 'Follow toko: butuh login, tolak toko sendiri & toko tak dikenal'), async ({ request }) => {
   const shop = await pickShop(request);
 
   // 1. Tanpa token -> 401 (bukan diam-diam sukses).
@@ -90,7 +90,7 @@ test(tc('156', 'Follow toko: butuh login, tolak toko sendiri & toko tak dikenal'
   expect(ghost.status()).toBe(404);
 });
 
-test(tc('157', 'Halaman toko: jumlah pengikut tampil, guest diarahkan ke login dengan return URL'), async ({ page, request }) => {
+test(tc('158', 'Halaman toko: jumlah pengikut tampil, guest diarahkan ke login dengan return URL'), async ({ page, request }) => {
   const shop = await pickShop(request);
 
   await page.goto(`/toko/${shop.slug}`);

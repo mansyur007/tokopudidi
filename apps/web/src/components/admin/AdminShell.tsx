@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 
 const NAV = [
   { href: '/admin',          label: 'Dashboard',  emoji: '📊' },
@@ -25,12 +25,22 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [navOpen, setNavOpen] = useState(false);
 
-  if (!user) {
-    if (typeof window !== 'undefined') router.push('/masuk');
-    return null;
+  // Dua hal yang sengaja: keputusan "belum login" ditahan sampai sesi tersimpan
+  // benar-benar terbaca (lihat useAuthHydrated), dan redirect-nya di effect —
+  // menavigasi di badan render itu efek samping yang React larang.
+  useEffect(() => {
+    if (hydrated && !user) router.replace('/masuk');
+  }, [hydrated, user, router]);
+
+  if (!hydrated) {
+    return <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Memuat...</div>;
   }
+
+  // Effect di atas sedang mengalihkan ke /masuk.
+  if (!user) return null;
 
   if (user.role !== 'ADMIN') {
     return (
