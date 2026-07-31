@@ -7,6 +7,7 @@ import {
   productCreateSchema,
   type ProductCreateInput,
   formatRupiah,
+  MAX_WHOLESALE_TIERS,
 } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
@@ -47,6 +48,8 @@ interface FormState {
   salePrice: number;
   saleStartAt: string;
   saleEndAt: string;
+  // Harga grosir (M13-B1).
+  wholesaleTiers: { minQty: number; price: number }[];
 }
 
 // ISO → format input datetime-local ("YYYY-MM-DDTHH:mm", waktu lokal).
@@ -83,6 +86,7 @@ function initialFromProduct(p?: SellerProductDetail): FormState {
     salePrice:   p?.salePrice   ?? 0,
     saleStartAt: toLocalInput(p?.saleStartAt),
     saleEndAt:   toLocalInput(p?.saleEndAt),
+    wholesaleTiers: p?.wholesaleTiers?.map((t) => ({ minQty: t.minQty, price: t.price })) ?? [],
   };
 }
 
@@ -130,7 +134,9 @@ export function ProductForm({ initial, productId }: Props) {
     if (!tokens?.accessToken) return;
     setError(null);
 
-    const { saleEnabled, salePrice, saleStartAt, saleEndAt, options, combos, ...base } = state;
+    const {
+      saleEnabled, salePrice, saleStartAt, saleEndAt, options, combos, wholesaleTiers, ...base
+    } = state;
     // Buang opsi setengah jadi (nama/nilai kosong) supaya tidak ditolak zod
     // hanya karena baris yang belum diisi seller.
     const opsiValid = options.filter((o) => o.name.trim() && o.values.length > 0);
@@ -143,6 +149,12 @@ export function ProductForm({ initial, productId }: Props) {
       salePrice: saleEnabled ? salePrice : null,
       saleStartAt: saleEnabled && saleStartAt ? new Date(saleStartAt).toISOString() : null,
       saleEndAt: saleEnabled && saleEndAt ? new Date(saleEndAt).toISOString() : null,
+      // Selalu dikirim (termasuk array kosong): update bersifat replace-all,
+      // jadi menghapus semua baris di form memang berarti mematikan grosir.
+      // Baris setengah jadi dibuang supaya tidak ditolak zod.
+      wholesaleTiers: wholesaleTiers
+        .filter((t) => t.minQty >= 2 && t.price >= 100)
+        .sort((a, b) => a.minQty - b.minQty),
     };
     const parsed = productCreateSchema.safeParse(candidate);
     if (!parsed.success) {
@@ -277,6 +289,95 @@ export function ProductForm({ initial, productId }: Props) {
                 onChange={(e) => setField('saleEndAt', e.target.value)}
               />
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Harga Grosir (M13-B1) */}
+      <div className="border rounded-lg p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <span className="font-medium text-sm">📦 Harga Grosir</span>
+            <span className="text-xs text-gray-500 ml-1">
+              — makin banyak beli, makin murah per pcs
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const terakhir = state.wholesaleTiers[state.wholesaleTiers.length - 1];
+              setField('wholesaleTiers', [
+                ...state.wholesaleTiers,
+                {
+                  // Usulan default yang sudah memenuhi aturan naik/turun, supaya
+                  // seller tidak langsung ditolak validasi saat menambah baris.
+                  minQty: terakhir ? terakhir.minQty + 5 : 5,
+                  price: Math.max(100, (terakhir?.price ?? state.price) - 1000),
+                },
+              ]);
+            }}
+            disabled={state.wholesaleTiers.length >= MAX_WHOLESALE_TIERS}
+            className="ghost-btn text-xs disabled:opacity-50"
+          >
+            + Tambah tingkat
+          </button>
+        </div>
+
+        {state.wholesaleTiers.length === 0 ? (
+          <p className="text-xs text-gray-500">
+            Belum ada harga grosir. Pembeli membayar harga normal berapa pun jumlahnya.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {state.wholesaleTiers.map((t, i) => (
+              <div key={i} className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="label text-xs">Minimal beli (pcs)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    min={2}
+                    value={t.minQty}
+                    onChange={(e) => {
+                      const next = [...state.wholesaleTiers];
+                      next[i] = { ...next[i], minQty: Number(e.target.value) };
+                      setField('wholesaleTiers', next);
+                    }}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="label text-xs">Harga per pcs (Rp)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    min={100}
+                    value={t.price}
+                    onChange={(e) => {
+                      const next = [...state.wholesaleTiers];
+                      next[i] = { ...next[i], price: Number(e.target.value) };
+                      setField('wholesaleTiers', next);
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setField('wholesaleTiers', state.wholesaleTiers.filter((_, x) => x !== i))
+                  }
+                  className="ghost-btn text-red-600 text-xs mb-1"
+                  aria-label={`Hapus tingkat ${i + 1}`}
+                >
+                  Hapus
+                </button>
+              </div>
+            ))}
+            {/* Aturan yang sama ditegakkan server; ditampilkan di sini supaya
+                seller tahu sebelum menekan Simpan. */}
+            <p className="text-xs text-gray-500">
+              Maksimal {MAX_WHOLESALE_TIERS} tingkat. Minimal beli harus makin besar,
+              harganya makin murah, dan semuanya di bawah harga normal
+              {state.price > 0 ? ` (${formatRupiah(state.price)})` : ''}.
+            </p>
           </div>
         )}
       </div>

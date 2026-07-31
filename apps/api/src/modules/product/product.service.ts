@@ -151,6 +151,9 @@ export async function getProductBySlug(slug: string) {
         },
       },
       options: { orderBy: { order: 'asc' }, include: { values: { orderBy: { order: 'asc' } } } },
+      // Harga grosir (M13-B1) — dikirim mentah; FE menghitung harga per qty
+      // lewat `getUnitPrice` yang sama dengan yang dipakai server.
+      wholesaleTiers: { orderBy: { minQty: 'asc' }, select: { minQty: true, price: true } },
       category: { select: { id: true, name: true, slug: true } },
       shop: {
         select: {

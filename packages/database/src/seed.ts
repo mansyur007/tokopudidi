@@ -85,13 +85,23 @@ interface ProductSeed {
   // Variant multi-axis (M11-A8): `values` sejajar urutan `options`.
   options?: { name: string; values: string[] }[];
   combos?: { values: string[]; priceModifier: number; stock: number }[];
+  // Harga grosir (M13-B1) — minQty menaik, harga menurun, semua < `price`.
+  wholesaleTiers?: { minQty: number; price: number }[];
 }
 
 const PRODUCTS: ProductSeed[] = [
   // Warung Bu Siti — sembako
   { shopSlug: 'warung-bu-siti', catSlug: 'sembako', name: 'Beras Pandan Wangi 5kg', price: 68000, weight: 5000, stock: 50, description: 'Beras premium pandan wangi, pulen dan harum. Cocok untuk konsumsi keluarga.' },
   { shopSlug: 'warung-bu-siti', catSlug: 'sembako', name: 'Minyak Goreng Bimoli 2 Liter', price: 35000, weight: 2000, stock: 80, description: 'Minyak goreng kemasan pillow pack, segel pabrik.' },
-  { shopSlug: 'warung-bu-siti', catSlug: 'sembako', name: 'Gula Pasir Gulaku 1kg', price: 16500, weight: 1000, stock: 100, description: 'Gula pasir putih bersih, kemasan 1 kilogram.' },
+  // Harga grosir (M13-B1) sengaja ada di seed supaya jalurnya benar-benar
+  // terpakai di dev & e2e — tanpa ini tabel tier di BuyBox tidak pernah muncul.
+  { shopSlug: 'warung-bu-siti', catSlug: 'sembako', name: 'Gula Pasir Gulaku 1kg', price: 16500, weight: 1000, stock: 100, description: 'Gula pasir putih bersih, kemasan 1 kilogram. Tersedia harga grosir untuk pembelian banyak.',
+    wholesaleTiers: [
+      { minQty: 5, price: 15500 },
+      { minQty: 12, price: 14500 },
+      { minQty: 24, price: 13500 },
+    ],
+  },
   { shopSlug: 'warung-bu-siti', catSlug: 'sembako', name: 'Telur Ayam Negeri 1kg', price: 28000, weight: 1000, stock: 40, description: 'Telur segar dari peternakan lokal, isi 16-17 butir per kilogram.' },
   { shopSlug: 'warung-bu-siti', catSlug: 'sembako', name: 'Indomie Goreng Original (Dus 40 pcs)', price: 124000, weight: 3500, stock: 20, description: 'Indomie goreng spesial, isi 40 bungkus dalam satu dus.' },
 
@@ -304,6 +314,19 @@ async function main() {
         },
       },
     });
+
+    // Harga grosir (M13-B1). `createMany` + skipDuplicates supaya seed tetap
+    // idempoten: produknya di-upsert, tier-nya bisa saja sudah ada.
+    if (p.wholesaleTiers?.length) {
+      await prisma.productWholesaleTier.createMany({
+        data: p.wholesaleTiers.map((t) => ({
+          productId: product.id,
+          minQty: t.minQty,
+          price: t.price,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     // Variant + lapisan option/value (M11-A8). Bentuk lama (1 sumbu) dibungkus
     // jadi opsi "Varian" — hasilnya sama persis dengan yang dihasilkan script

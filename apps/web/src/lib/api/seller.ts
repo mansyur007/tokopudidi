@@ -104,6 +104,8 @@ export interface SellerProductDetail extends SellerProductRow {
     imageUrl?: string | null;
     optionValues?: string[];
   }[];
+  // Harga grosir (M13-B1), terurut menaik menurut minQty.
+  wholesaleTiers?: { minQty: number; price: number }[];
 }
 
 export const getSellerProduct = (token: string, id: string) =>

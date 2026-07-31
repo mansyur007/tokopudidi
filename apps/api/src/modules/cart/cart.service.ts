@@ -1,5 +1,5 @@
 import { prisma } from '@tokopudidi/database';
-import { getEffectivePrice } from '@tokopudidi/shared';
+import { getUnitPrice } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
 
 // Cart dijamin ada (auto-create di register). Tapi defensive: upsert kalau belum ada.
@@ -25,6 +25,9 @@ export async function getCartForUser(userId: string) {
               salePrice: true, saleStartAt: true, saleEndAt: true,
               isActive: true, weight: true,
               codAvailable: true, freeShippingEligible: true,
+              // Harga grosir (M13-B1) — harga satuan keranjang ikut turun
+              // begitu qty melewati ambang tier.
+              wholesaleTiers: { select: { minQty: true, price: true } },
               images: { orderBy: { order: 'asc' }, take: 1 },
               shop:   { select: { id: true, name: true, slug: true, isOpen: true } },
             },
@@ -36,9 +39,11 @@ export async function getCartForUser(userId: string) {
   });
   if (!cart) return { items: [], grouped: [] };
 
-  // Effective price (base termasuk sale M9-B3 + variant modifier).
+  // Harga satuan (sale M9-B3 + grosir M13-B1) + variant modifier.
+  // `getUnitPrice` butuh qty karena tier grosir bergantung padanya — itu
+  // sebabnya harga di keranjang bisa berubah saat qty diedit.
   const items = cart.items.map((it) => {
-    const effectivePrice = getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0);
+    const effectivePrice = getUnitPrice(it.product, it.quantity) + (it.variant?.priceModifier ?? 0);
     return {
       id: it.id,
       productId: it.productId,

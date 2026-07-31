@@ -3,6 +3,31 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M13-B1: Harga Grosir (Tiered Pricing)
+
+### Added
+- **Harga grosir bertingkat** (`M13-B1`) — seller set harga per tingkat kuantitas (maks 5), harga satuan turun otomatis begitu qty melewati ambang.
+  - Model `ProductWholesaleTier` (migration `20260731100000_m13_b1_wholesale_tier`) — `@@unique([productId, minQty])` mencegah ambang kembar yang membuat harganya ambigu; index itu sekaligus melayani pengurutan, jadi tidak ada index tambahan.
+  - `getUnitPrice(p, qty, now)`, `getWholesaleTierPrice`, dan `getNextWholesaleTier` di `packages/shared/src/utils/price.ts` — 25 unit test.
+  - Ditegakkan server di **keranjang** (`cart.service`) dan **checkout** (`order.service`, tersimpan di snapshot `OrderItem.price`), bukan cuma tampilan.
+  - BuyBox: tabel tingkat harga dengan baris aktif tersorot, harga satuan + subtotal ikut qty, dan ajakan "Tambah N lagi → Rp X".
+  - ProductForm seller: section "📦 Harga Grosir" (tambah/hapus tingkat, aturannya tertulis di form).
+  - `WHOLESALE_RULES` di `packages/shared/src/schemas/seller.ts` — satu daftar aturan yang dipakai create **dan** update, jadi pesan penolakannya identik.
+  - Seed: "Gula Pasir Gulaku 1kg" diberi 3 tingkat harga supaya jalurnya benar-benar terpakai di dev & e2e.
+  - E2E `wholesale.spec.ts` (TC-TKPDD-161–164).
+
+### Fixed
+- **`OrderItem.price` dan `subtotal` tidak lagi menghitung rumus harga dua kali.** Sebelumnya rumusnya ditulis ulang di dua baris berdampingan dan wajib selalu identik; sekarang dihitung sekali lalu dipakai bersama. Kalau keduanya sempat berbeda, total order tidak akan sama dengan jumlah subtotal itemnya — e2e TC-162 membandingkan keduanya.
+
+### Notes
+- **Kontrak harganya `min`, bukan "tier menang".** Tier hanya dipakai kalau memang lebih murah dari harga efektif saat itu. Tanpa itu, produk yang sedang diskon (M9-B3) justru jadi **lebih mahal** ketika dibeli banyak — kebalikan dari arti kata "grosir". Ada test properti yang menjaga harga satuan tidak pernah naik saat qty bertambah.
+- **`getWholesaleTierPrice` sengaja tidak mengandalkan urutan array.** Validasi memang mewajibkan tier terurut, tapi helper ini juga membaca data langsung dari DB yang urutannya tidak dijamin — dan salah pilih tier berarti salah menagih pembeli.
+- **Jebakan yang dicegat saat implementasi:** `productUpdateSchema` bersifat partial dan route update men-`spread` sisa payload ke `product.update({ data: rest })`. `wholesaleTiers` wajib ikut di-destructure keluar, kalau tidak Prisma menolaknya saat runtime.
+- **Guard tambahan di route update, di luar zod:** menurunkan harga normal saja (tanpa menyertakan tier) akan membuat tier lama diam-diam lebih mahal dari harga biasa. Zod tidak bisa melihat itu karena payload-nya parsial, jadi route memeriksa tier existing terhadap harga hasil update dan menolak 400.
+- **`minQty` minimal 2.** Tier ber-`minQty` 1 bukan grosir — itu mengganti harga normal lewat pintu belakang dan menciptakan dua sumber kebenaran untuk harga satuan produk.
+- Update bersifat **replace-all**: array kosong berarti mematikan harga grosir, tanpa perlu endpoint terpisah.
+- **Temuan di luar lingkup item ini:** `apps/web/next.config.js` memasang `typescript: { ignoreBuildErrors: true }` **dan** `eslint: { ignoreDuringBuilds: true }`. Artinya `npm run build` tidak pernah memeriksa tipe frontend — dan klaim "tsc seluruh workspace lolos" di beberapa PR sebelumnya **tidak berlaku untuk `apps/web`**. Di PR ini tipenya diperiksa terpisah (`npx tsc --noEmit -p apps/web/tsconfig.json`, bersih). Menjadikannya gate CI adalah pekerjaan tersendiri, bersinggungan dengan `OPS-9` di TESTING.md.
+
 ## [Unreleased] — M13-A2: Invoice Pesanan (Buyer)
 
 ### Added

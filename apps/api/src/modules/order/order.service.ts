@@ -1,6 +1,6 @@
 import { prisma, Prisma } from '@tokopudidi/database';
 import type { OrderStatus, PaymentMethod } from '@tokopudidi/database';
-import { getEffectivePrice } from '@tokopudidi/shared';
+import { getUnitPrice } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
 import { quoteShipping, isCodAvailable } from '../shipping/shipping.service';
@@ -78,7 +78,14 @@ export async function checkout(userId: string, input: CheckoutInput) {
     include: {
       items: {
         include: {
-          product: { include: { shop: true, images: { take: 1, orderBy: { order: 'asc' } } } },
+          product: {
+            include: {
+              shop: true,
+              images: { take: 1, orderBy: { order: 'asc' } },
+              // Harga grosir (M13-B1) — ikut menentukan snapshot OrderItem.price.
+              wholesaleTiers: { select: { minQty: true, price: true } },
+            },
+          },
           variant: true,
         },
       },
@@ -148,8 +155,11 @@ export async function checkout(userId: string, input: CheckoutInput) {
     let subtotal = 0;
     let weightGr = 0;
     for (const it of items) {
-      // Harga efektif (termasuk sale M9-B3) — tersimpan di OrderItem.price (snapshot saat beli).
-      const price = getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0);
+      // Harga satuan (sale M9-B3 + grosir M13-B1) — tersimpan di OrderItem.price
+      // (snapshot saat beli). Rumusnya WAJIB sama persis dengan yang dipakai
+      // saat membuat OrderItem di bawah; kalau berbeda, total order tidak akan
+      // sama dengan jumlah itemnya.
+      const price = getUnitPrice(it.product, it.quantity) + (it.variant?.priceModifier ?? 0);
       subtotal += price * it.quantity;
       weightGr += it.product.weight * it.quantity;
     }
@@ -219,16 +229,22 @@ export async function checkout(userId: string, input: CheckoutInput) {
           promoCode: promoApplied?.code,
           paidAt: input.paymentMethod === 'COD' ? new Date() : null,
           items: {
-            create: so.items.map((it) => ({
-              productId: it.productId,
-              variantId: it.variantId,
-              productName: it.product.name,
-              productImage: it.product.images[0]?.url ?? null,
-              variantName: it.variant?.name,
-              price: getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0),
-              quantity: it.quantity,
-              subtotal: (getEffectivePrice(it.product) + (it.variant?.priceModifier ?? 0)) * it.quantity,
-            })),
+            create: so.items.map((it) => {
+              // Dihitung sekali lalu dipakai untuk `price` dan `subtotal` —
+              // sebelumnya rumusnya ditulis dua kali dan wajib selalu identik.
+              const hargaSatuan =
+                getUnitPrice(it.product, it.quantity) + (it.variant?.priceModifier ?? 0);
+              return {
+                productId: it.productId,
+                variantId: it.variantId,
+                productName: it.product.name,
+                productImage: it.product.images[0]?.url ?? null,
+                variantName: it.variant?.name,
+                price: hargaSatuan,
+                quantity: it.quantity,
+                subtotal: hargaSatuan * it.quantity,
+              };
+            }),
           },
         },
         include: { items: true },

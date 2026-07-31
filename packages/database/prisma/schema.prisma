@@ -311,12 +311,31 @@ model Product {
   views      ProductView[]
   discussions Discussion[]
   showcaseItems ShopShowcaseProduct[]
+  wholesaleTiers ProductWholesaleTier[]
   // searchVector dikelola via raw SQL trigger di migration
 
   @@index([shopId])
   @@index([categoryId])
   @@index([slug])
   @@index([isActive])
+}
+
+// Harga grosir bertingkat (M13-B1). Satu baris = "beli minimal N, harganya X".
+// Tanpa kolom `order`: urutannya sudah ditentukan `minQty`, dan menyimpan urutan
+// terpisah hanya membuka peluang urutan yang bertentangan dengan angkanya.
+model ProductWholesaleTier {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Kuantitas minimum agar harga tier ini berlaku (selalu >= 2 — lihat validasi).
+  minQty    Int
+  // Harga satuan pada tier ini, dalam rupiah.
+  price     Int
+
+  // Satu produk tidak boleh punya dua tier dengan ambang yang sama: harganya
+  // jadi ambigu. Unique index ini sekaligus melayani pengurutan per produk,
+  // jadi tidak ada @@index terpisah.
+  @@unique([productId, minQty])
 }
 
 model ProductImage {
