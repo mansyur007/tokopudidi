@@ -3,6 +3,26 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M13-A1: Follow / Favorit Toko
+
+### Added
+- **Follow toko** (`M13-A1`) — buyer bisa mengikuti toko dan melihat daftarnya.
+  - Model `ShopFollower` (migration `20260730120000_m13_a1_shop_follower`) — **tanpa kolom `id`**: PK gabungan `(shopId, userId)` sekaligus jadi penjaga anti-duplikat, plus index `[userId, createdAt]` untuk daftar favorit.
+  - `POST`/`DELETE /api/v1/shops/:slug/follow` — keduanya idempoten (upsert & `deleteMany`), jadi klik ganda maupun unfollow ganda tidak pernah jadi error.
+  - `GET /api/v1/users/me/following` (paginated, bentuk kartu sama dengan `/shops/featured`) dan `GET /api/v1/users/me/following/ids` untuk status tombol.
+  - `GET /api/v1/shops/:slug` kini mengirim `followerCount` (dari `_count.followers`, bukan kolom counter).
+  - FE: `ShopFollow` di header toko (tombol + jumlah pengikut), store `follow` (optimistic + rollback, pola wishlist M7-A1), halaman `/akun/toko-favorit` + entri menu 🏬.
+  - E2E `follow-shop.spec.ts` (TC-TKPDD-155–157) — **TC baru ini perlu didaftarkan di TestForge.**
+- **Halaman `/masuk` kini menghormati `?return=`** — sebelumnya selalu `router.push('/')`. Validasinya di `safeReturnPath` (`packages/shared/src/utils/returnUrl.ts`, 6 unit test) yang menolak URL absolut, `//host` dan `/\host` protocol-relative, path relatif, serta karakter kontrol.
+
+### Notes
+- **Acceptance "redirect ke `/masuk` dengan return URL (pola M7-A1)" mengacu pada pola yang tidak pernah ada.** M7-A1 hanya memanggil `router.push('/masuk')` polos dan halaman login tidak membaca parameter apa pun. Jadi dukungan return URL-nya dibuat di item ini. Sengaja tidak sekalian mengubah `ProductCard`/`BuyBox` — itu perubahan perilaku di luar lingkup M13-A1, tapi helper-nya sudah siap dipakai.
+- **`isFollowing` sengaja TIDAK ditambahkan ke `GET /shops/:slug`** meski disebut di rencana. Halaman toko dirender di server dan token buyer hidup di `localStorage` (zustand persist), jadi request SSR tidak pernah membawa `Authorization` — nilainya akan selalu `false` sambil menyamar sebagai kebenaran. Status follow diambil client-side dari `/users/me/following/ids`, yang juga dipakai halaman toko favorit untuk menghapus kartu tanpa reload.
+- **Jumlah follower dilacak sebagai selisih aksi, bukan dikoreksi dari status follow.** Percobaan pertama mengunci `base = angkaSSR - (following ? 1 : 0)` begitu store selesai memuat; itu meleset satu setiap kali urutan datanya berbeda (mis. flag "sudah dimuat" masih menyala dari sesi guest sebelumnya, sehingga basisnya terkunci sebelum id yang benar datang). `ShopFollow` sekarang hanya menambah/mengurangi 1 setelah aksi user **berhasil** — `initialFollowerCount` dari SSR sudah benar apa adanya, termasuk kalau user ini terhitung di dalamnya.
+- **Follow toko sendiri ditolak (400)**, di luar rencana. Kalau dibiarkan, angka follower menipu dan broadcast M13-B2 akan mengirim notifikasi balik ke penjualnya sendiri. Guardnya di server; tombolnya tetap tampil di halaman toko sendiri dan pesan errornya muncul inline (`ShopDetail` publik tidak memuat `ownerId`, jadi FE tidak bisa tahu lebih awal tanpa membocorkan id pemilik toko).
+- Follow ke toko yang sudah di-soft-delete ditolak 404, dan daftar favorit menyaring `shop.deletedAt: null` — tanpa itu daftarnya bisa berisi toko hantu yang tidak bisa dibuka.
+- **Belum terverifikasi jalan di lingkungan lokal**: mesin ini tidak punya Postgres maupun Docker, jadi migration belum pernah diterapkan dan e2e-nya belum pernah dijalankan. Yang lolos di sini: `tsc` seluruh workspace, 189 unit test, dan `playwright test --list`. Sisanya bergantung pada workflow `e2e.yml` di CI.
+
 ## [Unreleased] — M12-C3: Audit Log Aksi Admin
 
 ### Added

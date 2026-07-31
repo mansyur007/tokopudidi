@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@tokopudidi/shared';
 import { apiLogin } from '@/lib/api/auth';
 import { ApiClientError } from '@/lib/api/client';
+import { readReturnPath } from '@/lib/returnUrl';
 import { useAuthStore } from '@/store/auth';
 
 export default function MasukPage() {
@@ -26,7 +27,9 @@ export default function MasukPage() {
     try {
       const result = await apiLogin(data.phone, data.password);
       setAuth(result.user, result.tokens);
-      router.push('/');
+      // Kembali ke halaman asal kalau dikirim ke sini dengan `?return=`
+      // (mis. tombol Follow toko, M13-A1); selain itu ke beranda seperti biasa.
+      router.push(readReturnPath() ?? '/');
     } catch (err) {
       if (err instanceof ApiClientError) setSubmitError(err.message);
       else setSubmitError('Yah, ada masalah. Coba lagi ya?');

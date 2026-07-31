@@ -1,9 +1,11 @@
 # 🗺️ Tokopudidi — Roadmap M7–M15
 
-> **Status dokumen**: Draft 3 · Terakhir di-update: **2026-07-29**
+> **Status dokumen**: Draft 3 · Terakhir di-update: **2026-07-30**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
+>
+> **Progress (2026-07-30)** — **M12 tuntas** (A11 Bottom Nav, D3 SEO & Meta, D4 Image Optimization, C3 Audit Log). **M13-A1 Follow Toko** selesai — blokir **M13-B2 Broadcast** ikut lepas. Sisa M13 yang bebas di-klaim: **A2 Invoice**, **B1 Harga Grosir**, **B2 Broadcast**.
 >
 > **Progress (2026-07-29)** — **M11-B1 Etalase Toko** & **M11-B4 Statistik Produk** selesai. **M11-A8 Variant Multi-Axis** tahap 1–3 selesai (migration `m11_a8_variant_options` + backfill `npm run db:backfill-variants`); **tahap 4 (drop kolom `ProductVariant.name`) sengaja ditunda** sampai backfill terverifikasi di produksi. Setelah itu M11 tuntas dan **M12** bebas di-klaim.
 >
@@ -705,7 +707,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 > Gap terhadap fitur Tokopedia yang **belum ada di kode dan belum tercakup M7–M12**. Fitur yang sudah ternyata ada (mode libur toko, share produk, COD, QRIS mock) tidak dibuatkan item. Fitur out-of-scope (payment gateway real, live shopping, TopAds, koin/loyalty, afiliasi) tetap di luar lingkup sesuai scope guard.
 
 ### M13-A1. Follow / Favorit Toko ⭐
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-30): **acceptance "redirect `/masuk` dengan return URL (pola M7-A1)" mengacu pada pola yang tidak pernah ada** — M7-A1 hanya `router.push('/masuk')` polos dan halaman login tidak membaca parameter apa pun (terverifikasi, bukan dugaan). Jadi dukungan `?return=` dibuat di sini, validasinya di `safeReturnPath` (`packages/shared/src/utils/returnUrl.ts`, 6 unit test) yang menolak URL absolut, `//host` & `/\host` protocol-relative, path relatif, dan karakter kontrol — tanpa penyaring itu halaman login kita jadi batu loncatan phishing. `ProductCard`/`BuyBox` sengaja tidak ikut diubah (di luar lingkup item ini). **`isFollowing` sengaja TIDAK ditambahkan ke `GET /shops/:slug`** meski tertulis di rencana: halaman toko dirender di server sementara token buyer hidup di `localStorage` (zustand persist), jadi request SSR tidak pernah membawa `Authorization` — nilainya akan selalu `false` sambil menyamar sebagai kebenaran. Status follow diambil client-side dari `/users/me/following/ids` (juga dipakai halaman toko favorit untuk menghapus kartu tanpa reload). **Jumlah follower dilacak sebagai selisih aksi, bukan dikoreksi dari status follow**: percobaan pertama mengunci `base = angkaSSR - (following ? 1 : 0)` saat store selesai memuat, dan itu meleset satu begitu urutan datanya berbeda (flag "sudah dimuat" bersifat global, masih menyala dari sesi guest sebelumnya, jadi basisnya terkunci sebelum id yang benar datang). Sekarang `ShopFollow` cuma menambah/mengurangi 1 setelah aksi user berhasil — `initialFollowerCount` dari SSR sudah benar apa adanya. **Di luar rencana**: follow toko sendiri ditolak 400 (kalau lolos, angkanya menipu dan broadcast M13-B2 mengirim notifikasi balik ke penjualnya), dan toko yang sudah soft-delete ditolak 404 + disaring dari daftar favorit supaya tidak ada toko hantu. Model `ShopFollower` **tanpa kolom `id`** (rencana menulis "id uuid composite" — kontradiktif): PK gabungan sudah unik dan sekaligus penjaga anti-duplikat klik ganda. **Belum terverifikasi di lingkungan lokal**: mesin dev tidak punya Postgres/Docker, jadi migration belum pernah diterapkan dan e2e belum pernah dijalankan — yang lolos lokal: `tsc` seluruh workspace, 189 unit test, dan `playwright test --list`; sisanya bergantung workflow `e2e.yml`. TC-TKPDD-155–157 perlu didaftarkan di TestForge.
 - **Scope**: Buyer follow toko dari halaman toko, lihat daftar di `/akun/toko-favorit`, unfollow. Halaman toko tampilkan follower count. Prasyarat M13-B2 Broadcast.
 - **Konteks kode (audit 2026-07-29)**:
   - `GET /shops/:slug` di [shop.routes.ts:24](apps/api/src/modules/shop/shop.routes.ts#L24) — `isFollowing` butuh auth opsional; middleware **`optionalAuth` sudah ada** ([apps/api/src/middleware/optionalAuth.ts](apps/api/src/middleware/optionalAuth.ts)).
@@ -715,9 +718,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **API**: `POST`/`DELETE /api/v1/shops/:slug/follow` · `GET /api/v1/users/me/following?page=&limit=` (registrasi pattern `users/me/*` di [app.ts:94-96](apps/api/src/app.ts#L94-L96)) · `GET /shops/:slug` + `followerCount` & `isFollowing`.
 - **UI**: tombol Follow/Following + count di header toko ([toko/[slug]/page.tsx](apps/web/src/app/(buyer)/toko/[slug]/page.tsx) — header section sekitar baris 33-63); halaman baru `/akun/toko-favorit` (grid toko, tombol unfollow inline).
 - **Acceptance**:
-  - [ ] Logged-out klik Follow → redirect `/masuk` dengan return URL (pola M7-A1)
-  - [ ] Toggle optimistic, count update tanpa reload; double-click tidak double-insert (upsert/skipDuplicates)
-  - [ ] Unfollow dari `/akun/toko-favorit` langsung remove dari grid
+  - [x] Logged-out klik Follow → redirect `/masuk` dengan return URL — _polanya belum ada di M7-A1, jadi dibuat di sini (lihat deliver notes); e2e TC-157_
+  - [x] Toggle optimistic, count update tanpa reload; double-click tidak double-insert (upsert/skipDuplicates) — e2e TC-155 menembak POST dua kali dan memastikan `followerCount` tetap +1
+  - [x] Unfollow dari `/akun/toko-favorit` langsung remove dari grid — grid disaring lewat store, sama seperti `/wishlist`
 - **Effort**: S
 
 ---
@@ -769,7 +772,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M13-B2. Broadcast Promo ke Follower
-- **Status**: ⚪ BLOCKED (butuh M13-A1) · **Owner**: _belum di-klaim_
+- **Status**: 🔵 TODO (blokirnya lepas — M13-A1 selesai) · **Owner**: _belum di-klaim_
 - **Scope**: Seller kirim pengumuman ke semua follower via notifikasi in-app. Rate-limited 1×/24 jam per toko.
 - **Konteks kode (audit 2026-07-29)**:
   - **Koreksi rencana lama**: enum `NotificationType` ([schema.prisma:52-58](packages/database/prisma/schema.prisma#L52)) belum punya `SHOP_BROADCAST` → item ini **butuh migration** (enum aditif + model `ShopBroadcast`).

@@ -29,6 +29,7 @@ import {
   adminComplaintRouter,
 } from './modules/complaint/complaint.routes';
 import { discussionRouter } from './modules/discussion/discussion.routes';
+import { followingRouter } from './modules/follow/follow.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { notificationRouter } from './modules/notification/notification.routes';
 import { orderRouter } from './modules/order/order.routes';
@@ -98,6 +99,7 @@ export function createApp(): Application {
   app.use('/api/v1/users/me/addresses', addressRouter);
   app.use('/api/v1/users/me/wishlist', wishlistRouter);
   app.use('/api/v1/users/me/recent-products', recentlyViewedRouter);
+  app.use('/api/v1/users/me/following', followingRouter);
 
   // Seller panel
   app.use('/api/v1/users/me', sellerShopRouter);  // /upgrade-to-seller
