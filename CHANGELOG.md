@@ -24,6 +24,17 @@ Versioning follows [SemVer](https://semver.org/).
 - `shopAddress` pesanan lama (termasuk data seed) hanya berisi `{city, province}` tanpa `name`, jadi nama penjual selalu punya cadangan dari relasi `order.shop`.
 - **Temuan yang belum dikerjakan:** halaman buyer lain masih memakai pola guard lama dan karenanya tidak bisa dibuka lewat URL langsung oleh user yang sudah login — `/wishlist`, `/akun`, `/akun/alamat`, `/akun/toko-favorit`, `/komplain`, `/notifikasi`, `/chat`, `/pesanan`. Perbaikannya seragam dan sepele, tapi menyentuh 8+ halaman di luar lingkup item ini.
 
+## [Unreleased] — Perbaikan: Alamat Seed Tidak Bisa Dipakai Checkout
+
+### Fixed
+- **Alamat default buyer dari seed sekarang bisa dipakai checkout.** Id-nya harfiah `"seed-addr-budi"`, sedangkan `checkoutSchema.addressId` mewajibkan `z.string().uuid()` — jadi checkout dengan alamat itu selalu ditolak `400 "Invalid uuid"`. Karena `isDefault` diurutkan paling atas di `GET /users/me/addresses`, justru alamat itulah yang pertama dipilih UI maupun test. Seed kini idempoten lewat **kunci alami** (`userId` + `label`) dan membiarkan `@default(uuid())` yang mengisi id.
+
+### Notes
+- **Ini bukan temuan baru — jebakannya sudah didokumentasikan** di `cart-checkout.spec.ts` sejak lama ("id seed bukan UUID sehingga ditolak checkoutSchema") dan di-workaround dengan membuat alamat sendiri, tapi sumbernya tidak pernah diperbaiki. Yang membuatnya muncul lagi: e2e invoice (M13-A2) memilih alamat pertama dan langsung gagal di CI.
+- **Baris alamat lama sengaja tidak dihapus.** `Order.addressId` pesanan seed lama menunjuk ke sana; menghapusnya akan menabrak FK. Di DB yang sudah ada, barisnya diturunkan dari status default dan label-nya diberi akhiran "(lama)" supaya tidak lagi terpilih pertama. Di DB baru barisnya memang tidak pernah ada.
+- Pemakai `db:seed` di DB lama akan melihat **dua** alamat buyer setelah ini: yang lama (tidak default, "Rumah (lama)") dan yang baru ber-uuid. Itu disengaja — lebih aman daripada memindahkan FK pesanan.
+- `cart-checkout.spec.ts` tetap membuat alamatnya sendiri: alasannya sekarang isolasi, bukan keterpaksaan. Komentarnya diperbarui supaya tidak menyesatkan.
+
 ## [Unreleased] — Perbaikan: Guard Halaman Menunggu Hidrasi Sesi
 
 ### Fixed
