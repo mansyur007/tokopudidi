@@ -61,8 +61,10 @@ test(tc('065', 'Checkout multi-toko berhasil membuat pesanan'), async ({ request
     },
   });
 
-  // Alamat dibuat sendiri, tidak memakai alamat seed: id seed ('seed-addr-budi')
-  // bukan UUID sehingga ditolak checkoutSchema (`addressId: z.string().uuid()`).
+  // Alamat dibuat sendiri supaya test ini tidak bergantung isi seed.
+  // (Dulu ini wajib: id alamat seed harfiah 'seed-addr-budi' dan ditolak
+  // `checkoutSchema.addressId: z.string().uuid()`. Seed-nya sudah diperbaiki,
+  // tapi membuat alamat sendiri tetap lebih terisolasi.)
   const addrRes = await request.post(`${V1}/users/me/addresses`, {
     headers: auth(token),
     data: {

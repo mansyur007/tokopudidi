@@ -395,24 +395,53 @@ async function main() {
     },
   });
 
-  const buyerAddress = await prisma.address.upsert({
-    where: { id: 'seed-addr-budi' },
-    update: {},
-    create: {
-      id: 'seed-addr-budi',
-      userId: buyer.id,
-      label: 'Rumah',
-      recipientName: 'Budi Pembeli',
-      recipientPhone: '+6281200000201',
-      province: 'DKI Jakarta',
-      city: 'Jakarta Selatan',
-      district: 'Kebayoran Baru',
-      subdistrict: 'Gandaria Utara',
-      postalCode: '12140',
-      fullAddress: 'Jl. Mawar No. 10',
-      isDefault: true,
-    },
-  });
+  // Alamat buyer. Idempotensinya lewat kunci alami (userId + label), BUKAN id
+  // tetap seperti sebelumnya.
+  //
+  // Kenapa diubah: id lamanya harfiah `"seed-addr-budi"`, sedangkan
+  // `checkoutSchema.addressId` mewajibkan `z.string().uuid()`. Artinya alamat
+  // default bawaan seed SELALU ditolak checkout dengan 400 "Invalid uuid" —
+  // dan karena `isDefault` diurutkan paling atas di `GET /users/me/addresses`,
+  // justru alamat itulah yang pertama dipilih UI maupun test.
+  const LABEL_ALAMAT_SEED = 'Rumah';
+  const ID_ALAMAT_LAMA = 'seed-addr-budi';
+
+  const alamatLama = await prisma.address.findUnique({ where: { id: ID_ALAMAT_LAMA } });
+
+  const buyerAddress =
+    (await prisma.address.findFirst({
+      where: { userId: buyer.id, label: LABEL_ALAMAT_SEED, id: { not: ID_ALAMAT_LAMA } },
+    })) ??
+    (await prisma.address.create({
+      data: {
+        // Tanpa `id` eksplisit — biarkan @default(uuid()) yang mengisi.
+        userId: buyer.id,
+        label: LABEL_ALAMAT_SEED,
+        recipientName: 'Budi Pembeli',
+        recipientPhone: '+6281200000201',
+        province: 'DKI Jakarta',
+        city: 'Jakarta Selatan',
+        district: 'Kebayoran Baru',
+        subdistrict: 'Gandaria Utara',
+        postalCode: '12140',
+        fullAddress: 'Jl. Mawar No. 10',
+        isDefault: true,
+      },
+    }));
+
+  // DB lama: barisnya sengaja TIDAK dihapus — pesanan seed lama menunjuk
+  // ke sana lewat `Order.addressId`. Cukup diturunkan dari status default
+  // supaya tidak lagi jadi alamat yang terpilih pertama.
+  if (alamatLama) {
+    await prisma.address.update({
+      where: { id: ID_ALAMAT_LAMA },
+      data: { isDefault: false, label: `${LABEL_ALAMAT_SEED} (lama)` },
+    });
+    await prisma.address.update({
+      where: { id: buyerAddress.id },
+      data: { isDefault: true },
+    });
+  }
 
   const demoShop = await prisma.shop.findUnique({ where: { slug: 'warung-bu-siti' } });
   const demoProducts = demoShop
