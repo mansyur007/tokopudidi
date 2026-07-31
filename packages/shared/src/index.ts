@@ -17,5 +17,6 @@ export * from './types/api';
 export * from './utils/format';
 export * from './utils/image';
 export * from './utils/price';
+export * from './utils/returnUrl';
 export * from './utils/seo';
 export * from './utils/variant';
