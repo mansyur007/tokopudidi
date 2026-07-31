@@ -40,7 +40,7 @@ export function BottomNav() {
     <nav
       aria-label="Navigasi utama"
       className={clsx(
-        'md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-line',
+        'md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-line print:hidden',
         // Ruang aman untuk gesture bar iOS.
         'pb-[env(safe-area-inset-bottom)]',
       )}

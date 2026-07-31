@@ -5,7 +5,9 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
-> **Progress (2026-07-30)** — **M12 tuntas** (A11 Bottom Nav, D3 SEO & Meta, D4 Image Optimization, C3 Audit Log). **M13-A1 Follow Toko** selesai — blokir **M13-B2 Broadcast** ikut lepas. Sisa M13 yang bebas di-klaim: **A2 Invoice**, **B1 Harga Grosir**, **B2 Broadcast**.
+> **Progress (2026-07-31)** — **M13-A2 Invoice Pesanan** selesai. Sisa M13 yang bebas di-klaim: **B1 Harga Grosir**, **B2 Broadcast**.
+>
+> **Progress (2026-07-30)** — **M12 tuntas** (A11 Bottom Nav, D3 SEO & Meta, D4 Image Optimization, C3 Audit Log). **M13-A1 Follow Toko** selesai — blokir **M13-B2 Broadcast** ikut lepas.
 >
 > **Progress (2026-07-29)** — **M11-B1 Etalase Toko** & **M11-B4 Statistik Produk** selesai. **M11-A8 Variant Multi-Axis** tahap 1–3 selesai (migration `m11_a8_variant_options` + backfill `npm run db:backfill-variants`); **tahap 4 (drop kolom `ProductVariant.name`) sengaja ditunda** sampai backfill terverifikasi di produksi. Setelah itu M11 tuntas dan **M12** bebas di-klaim.
 >
@@ -726,7 +728,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M13-A2. Invoice Pesanan (Buyer)
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-31): benar, **tidak ada API baru** — semua isi invoice sudah tersedia di `GET /orders/:id`. Aturan "pesanan ini punya invoice" diekstrak jadi `canViewInvoice`/`invoiceNumber` di `packages/shared/src/utils/invoice.ts` (6 unit test) supaya tombol di detail pesanan dan guard halaman invoice tidak mungkin berbeda daftarnya; salah satu test-nya menyapu seluruh 9 nilai `OrderStatus` sehingga status baru tidak bisa masuk diam-diam tanpa keputusan. **`print:hidden` ternyata belum cukup dipasang di halaman invoice saja**: layout buyer selalu merender Header/Footer/BottomNav/ChatFab, jadi keempatnya (plus `main.pb-20`) ikut diberi kelas print — tanpa itu invoice tercetak bersama nav dan tombol chat. Sengaja **tanpa auto-`window.print()`** (beda dengan label pengiriman seller): invoice juga dipakai untuk dilihat/diarsipkan, bukan hanya dicetak. **Guard hidrasi ikut dipasang di halaman invoice DAN `/pesanan/[id]`** — keduanya memakai `useAuthHydrated` (PR #43). Ini bukan hiasan: invoice justru halaman yang dibuka lewat URL langsung/bookmark, dan dengan pola lama (`if (!user) router.push('/masuk')` tanpa menunggu hidrasi) pemiliknya selalu dibuang ke halaman login. **Temuan yang tidak dikerjakan**: halaman buyer lain masih memakai pola lama itu — `/wishlist`, `/akun`, `/akun/alamat`, `/akun/toko-favorit`, `/komplain`, `/notifikasi`, `/chat`, `/pesanan` — semuanya tidak bisa dibuka lewat URL langsung oleh user yang sudah login. Perbaikannya seragam dan sepele, tapi menyentuh 8+ halaman di luar lingkup item ini. `shopAddress` pesanan lama (termasuk data seed) hanya berisi `{city, province}` tanpa `name`, jadi nama penjual selalu punya cadangan dari relasi `order.shop`. E2E `invoice.spec.ts` (TC-TKPDD-159–160) memeriksa cetaknya lewat `emulateMedia({media:'print'})`, bukan menebak nama kelas CSS. **Belum terverifikasi lokal** (mesin dev tanpa Postgres/Docker) — lolos di sini: `tsc` seluruh workspace, lint, 194 unit test, `playwright test --list`.
 - **Scope**: Halaman invoice printable per pesanan (print-to-PDF browser, bukan PDF generator).
 - **Konteks kode (audit 2026-07-29)**:
   - **Pola print sudah ada**: `apps/web/src/app/seller/pesanan/[id]/print/page.tsx` — tiru layout + media-query print-nya.
@@ -736,9 +739,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Baru: `apps/web/src/app/(buyer)/pesanan/[id]/invoice/page.tsx` — nomor invoice = `INV/{orderNumber}`, rincian item, ongkir, diskon (kalau ada), total, metode bayar, alamat snapshot
   - [pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx) — tombol "Lihat Invoice", tampil hanya untuk status `PAID | PROCESSING | SHIPPED | DELIVERED | COMPLETED` (bukan PENDING_PAYMENT/CANCELLED/EXPIRED/REFUNDED)
 - **Acceptance**:
-  - [ ] Hanya buyer pemilik yang bisa akses (guard existing)
-  - [ ] Status di bawah PAID / dibatalkan → tombol tidak muncul & akses langsung di-redirect
-  - [ ] `window.print()` → 1 halaman A4 rapi, tombol/nav tersembunyi via `print:hidden`
+  - [x] Hanya buyer pemilik yang bisa akses (guard existing) — halaman tidak menambah guard kedua, cukup andalkan penolakan API
+  - [x] Status di bawah PAID / dibatalkan → tombol tidak muncul & akses langsung ditolak — e2e TC-160 (dokumennya tidak dirender; halamannya menampilkan "Invoice belum tersedia" + tautan kembali, bukan redirect diam-diam)
+  - [x] `window.print()` → 1 halaman A4 rapi (`@page size: A4`), tombol/nav tersembunyi via `print:hidden` — e2e TC-159 memverifikasinya di media `print`
 - **Effort**: S
 
 ---

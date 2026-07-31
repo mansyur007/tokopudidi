@@ -42,7 +42,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
 
 export function Footer() {
   return (
-    <footer className="hidden md:block bg-white border-t border-line mt-8">
+    <footer className="hidden md:block bg-white border-t border-line mt-8 print:hidden">
       <div className="wrap py-10 grid gap-10" style={{ gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1.6fr' }}>
         {COLUMNS.map((col) => (
           <div key={col.title}>

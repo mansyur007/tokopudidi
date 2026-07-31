@@ -3,6 +3,27 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M13-A2: Invoice Pesanan (Buyer)
+
+### Added
+- **Invoice printable per pesanan** (`M13-A2`) — halaman `/pesanan/[id]/invoice`, dicetak lewat browser (print-to-PDF), bukan generator PDF.
+  - Nomor invoice `INV/{orderNumber}`, rincian item, ongkir, diskon, total, metode bayar, dan alamat — semuanya dari **snapshot** yang tersimpan di order, jadi dokumennya tetap memperlihatkan keadaan saat transaksi walau produk atau alamatnya berubah kemudian.
+  - Tombol "🧾 Lihat Invoice" di detail pesanan, muncul hanya untuk status `PAID | PROCESSING | SHIPPED | DELIVERED | COMPLETED`.
+  - `canViewInvoice` + `invoiceNumber` di `packages/shared/src/utils/invoice.ts` (6 unit test) + e2e `invoice.spec.ts` (TC-TKPDD-159–160).
+  - **Tidak ada API baru** — `GET /api/v1/orders/:id` sudah memuat seluruh isinya dan sudah menjaga kepemilikan buyer.
+
+### Fixed
+- **`/pesanan/[id]` tidak lagi membuang pemiliknya ke `/masuk` saat dibuka lewat URL langsung.** Halaman ini masih memakai pola lama (`if (!user) router.push('/masuk')` tanpa menunggu rehydrate), yaitu bug yang sama dengan shell admin/seller. Sekarang memakai `useAuthHydrated`.
+- **Kerangka aplikasi tidak lagi ikut tercetak.** Header, Footer, BottomNav, dan ChatFab dapat `print:hidden` (plus `print:pb-0` di `main`) — tanpa itu invoice keluar bersama nav dan tombol chat, karena keempatnya dirender layout buyer di setiap halaman.
+
+### Notes
+- **Aturan status invoice sengaja hidup di satu tempat.** Kalau tombol dan guard halaman menyimpan daftar status masing-masing, cepat atau lambat tombolnya tampil untuk pesanan yang halamannya menolak. Salah satu unit test menyapu seluruh 9 nilai `OrderStatus` dan membandingkannya dengan `INVOICE_STATUSES`, jadi status baru tidak bisa lolos tanpa keputusan eksplisit.
+- **`REFUNDED` tidak dapat invoice** (sesuai rencana): mencetak dokumen yang menyatakan pembayaran atas pesanan yang uangnya sudah dikembalikan justru menyesatkan.
+- **Tanpa auto-`window.print()`**, berbeda dengan label pengiriman seller yang memang khusus cetak. Invoice juga dipakai untuk dilihat dan diarsipkan.
+- Verifikasi cetaknya di e2e memakai `emulateMedia({ media: 'print' })` — memeriksa elemen yang benar-benar hilang saat media print, bukan menebak nama kelas CSS.
+- `shopAddress` pesanan lama (termasuk data seed) hanya berisi `{city, province}` tanpa `name`, jadi nama penjual selalu punya cadangan dari relasi `order.shop`.
+- **Temuan yang belum dikerjakan:** halaman buyer lain masih memakai pola guard lama dan karenanya tidak bisa dibuka lewat URL langsung oleh user yang sudah login — `/wishlist`, `/akun`, `/akun/alamat`, `/akun/toko-favorit`, `/komplain`, `/notifikasi`, `/chat`, `/pesanan`. Perbaikannya seragam dan sepele, tapi menyentuh 8+ halaman di luar lingkup item ini.
+
 ## [Unreleased] — Perbaikan: Guard Halaman Menunggu Hidrasi Sesi
 
 ### Fixed
