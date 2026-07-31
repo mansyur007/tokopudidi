@@ -27,6 +27,44 @@ async function injectBuyerSession(page: Page, request: APIRequestContext) {
   );
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Alamat buyer yang benar-benar bisa dipakai checkout.
+ *
+ * **Jebakan**: alamat bawaan seed ber-id `seed-addr-budi` (id tetap supaya
+ * upsert seed idempoten), sedangkan `checkoutSchema.addressId` mewajibkan
+ * `z.string().uuid()` — jadi alamat itu selalu ditolak 400 "Invalid uuid".
+ * Karena `isDefault` diurutkan paling atas, "ambil alamat pertama" justru
+ * selalu mendapat yang tidak bisa dipakai. Itu bug data seed, bukan bug test;
+ * dicatat sebagai temuan terpisah.
+ */
+async function checkoutableAddressId(request: APIRequestContext, token: string): Promise<string> {
+  const res = await request.get(`${V1}/users/me/addresses`, { headers: auth(token) });
+  expect(res.status()).toBe(200);
+  const daftar = (await res.json()).data as { id: string }[];
+
+  const pakai = daftar.find((a) => UUID.test(a.id));
+  if (pakai) return pakai.id;
+
+  const baru = await request.post(`${V1}/users/me/addresses`, {
+    headers: auth(token),
+    data: {
+      label: 'Rumah Uji Invoice',
+      recipientName: 'Pembeli E2E',
+      recipientPhone: '081200000201',
+      province: 'DKI Jakarta',
+      city: 'Jakarta Selatan',
+      district: 'Kebayoran Baru',
+      subdistrict: 'Gandaria Utara',
+      postalCode: '12140',
+      fullAddress: 'Jl. Uji Invoice No. 1',
+    },
+  });
+  expect(baru.status(), await baru.text()).toBe(201);
+  return (await baru.json()).data.id as string;
+}
+
 /** Pesanan buyer yang statusnya sudah dibayar — invoice-nya wajib ada. */
 async function pickPaidOrder(request: APIRequestContext) {
   const res = await request.get(`${V1}/orders?status=ALL&page=1`, { headers: auth(tokenFor('buyer')) });
@@ -100,14 +138,12 @@ test(tc('160', 'Invoice ditolak untuk pesanan yang belum dibayar, termasuk lewat
 
     const cart = await request.get(`${V1}/cart`, { headers: auth(token) });
     const grouped = (await cart.json()).data.grouped as { shop: { id: string }; items: { id: string }[] }[];
-    const alamat = await request.get(`${V1}/users/me/addresses`, { headers: auth(token) });
-    const daftarAlamat = (await alamat.json()).data as { id: string }[];
-    expect(daftarAlamat.length, 'seed butuh minimal 1 alamat buyer').toBeGreaterThan(0);
+    const addressId = await checkoutableAddressId(request, token);
 
     const checkout = await request.post(`${V1}/orders/checkout`, {
       headers: auth(token),
       data: {
-        addressId: daftarAlamat[0].id,
+        addressId,
         // TRANSFER_MANUAL sengaja: hanya COD yang langsung berstatus PAID.
         paymentMethod: 'TRANSFER_MANUAL',
         shops: grouped.map((g) => ({
