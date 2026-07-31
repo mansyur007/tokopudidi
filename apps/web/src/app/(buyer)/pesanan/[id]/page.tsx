@@ -4,8 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { SmartImage } from '@/components/media/SmartImage';
-import { formatRupiah, formatTanggal, formatTanggalWaktu, isComplaintWindowOpen } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import {
+  formatRupiah,
+  formatTanggal,
+  formatTanggalWaktu,
+  isComplaintWindowOpen,
+  canViewInvoice,
+} from '@tokopudidi/shared';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import {
   getOrder,
   cancelOrder,
@@ -22,6 +28,7 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -30,8 +37,12 @@ export default function OrderDetailPage() {
   const [complaintOpen, setComplaintOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) { router.push('/masuk'); return; }
-  }, [user, router]);
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pemilik pesanan yang
+    // membuka /pesanan/[id] lewat URL langsung (mis. dari tautan invoice)
+    // selalu dibuang ke /masuk. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
+    if (!user) { router.replace('/masuk'); return; }
+  }, [hydrated, user, router]);
 
   const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -95,6 +106,7 @@ export default function OrderDetailPage() {
     }
   }
 
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat pesanan...</div>;
   if (!user) return null;
   if (loading) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat pesanan...</div>;
   if (!order) return <div className="px-4 py-8 text-center">Pesanan tidak ditemukan.</div>;
@@ -326,6 +338,13 @@ export default function OrderDetailPage() {
           <button onClick={() => setComplaintOpen(true)} disabled={busy} className="btn-outline text-red-600">
             📦 Komplain Barang
           </button>
+        )}
+        {/* Invoice baru ada setelah pesanan dibayar (M13-A2) — aturannya di
+            `canViewInvoice`, dipakai juga oleh guard halaman invoice-nya. */}
+        {canViewInvoice(order.status) && (
+          <Link href={`/pesanan/${order.id}/invoice`} className="btn-outline" data-testid="lihat-invoice">
+            🧾 Lihat Invoice
+          </Link>
         )}
         <Link href={`/chat?shop=${order.shop.slug}`} className="btn-outline">
           💬 Chat Penjual

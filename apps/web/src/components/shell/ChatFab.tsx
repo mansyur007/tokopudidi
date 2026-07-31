@@ -31,7 +31,7 @@ export function ChatFab() {
       href="/chat"
       aria-label="Buka chat"
       className={clsx(
-        'chat-fab no-underline',
+        'chat-fab no-underline print:hidden',
         // Mobile: duduk di atas bottom nav (tinggi 56px + safe area) supaya
         // tidak saling menutupi. Desktop: posisi asli dari kelas .chat-fab.
         'bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-6',

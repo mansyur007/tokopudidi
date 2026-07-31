@@ -43,7 +43,9 @@ export function Header() {
   }, [user, refreshCart, refreshWishlist]);
 
   return (
-    <header className="sticky top-0 z-40 bg-white" style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
+    // `print:hidden` di sini & di Footer/BottomNav/ChatFab: kerangka aplikasi
+    // tidak ikut tercetak, supaya halaman invoice (M13-A2) keluar bersih.
+    <header className="sticky top-0 z-40 bg-white print:hidden" style={{ boxShadow: '0 1px 0 rgba(0,0,0,0.06)' }}>
       {/* Top utility strip — desktop only */}
       <div className="hidden md:block border-b border-line">
         <div className="wrap flex items-center justify-between h-[30px] text-[11.5px] text-ink-muted">
