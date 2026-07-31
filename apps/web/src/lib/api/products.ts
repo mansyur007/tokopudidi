@@ -38,6 +38,10 @@ export interface ProductDetail extends Omit<ProductCard, 'originalPrice' | 'disc
     optionValues: string[];
     optionValueIds: string[];
   }[];
+  // Harga grosir (M13-B1), terurut menaik menurut minQty. Dikirim mentah —
+  // harga per qty dihitung FE lewat `getUnitPrice`, helper yang sama dengan
+  // yang dipakai server saat menghitung keranjang & checkout.
+  wholesaleTiers: { minQty: number; price: number }[];
   category: { id: string; name: string; slug: string };
   shop: ProductCard['shop'] & {
     logoUrl: string | null;

@@ -9,7 +9,13 @@ import { useWishlistStore } from '@/store/wishlist';
 import { trackView } from '@/lib/api/products';
 import type { ProductDetail } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
-import { formatRupiah, getEffectivePrice, getSaleRemainingMs, findVariant } from '@tokopudidi/shared';
+import {
+  formatRupiah,
+  getSaleRemainingMs,
+  getUnitPrice,
+  getNextWholesaleTier,
+  findVariant,
+} from '@tokopudidi/shared';
 import { VariantPicker, LegacyVariantPicker } from './VariantPicker';
 import { Icon } from '@/components/shell/Icon';
 import { clsx } from 'clsx';
@@ -88,8 +94,11 @@ export function BuyBox({ product }: Props) {
   // nanti pembeli bisa menekan "Beli" tanpa memilih varian.
   const perluPilihVarian = multiAxis && !selectedVariant;
   const stockLeft = selectedVariant?.stock ?? (multiAxis ? 0 : product.stock);
-  // Harga efektif termasuk sale periodik (M9-B3) + variant modifier.
-  const effectivePrice = getEffectivePrice(product) + (selectedVariant?.priceModifier ?? 0);
+  // Harga satuan: sale periodik (M9-B3) + grosir per-qty (M13-B1), lalu
+  // variant modifier. Rumus yang sama persis dipakai server di cart & checkout.
+  const effectivePrice = getUnitPrice(product, qty) + (selectedVariant?.priceModifier ?? 0);
+  // Ambang berikutnya yang benar-benar lebih murah — untuk ajakan "tambah lagi".
+  const tierBerikut = getNextWholesaleTier(product, qty);
 
   function clamp(n: number) {
     if (n < product.minOrderQty) return product.minOrderQty;
@@ -197,10 +206,58 @@ export function BuyBox({ product }: Props) {
       )}
 
       {/* Subtotal */}
+      {/* Harga grosir (M13-B1) — tabel tingkat + harga satuan yang berlaku. */}
+      {product.wholesaleTiers?.length > 0 && (
+        <div className="mb-3.5 border border-line rounded-[9px] overflow-hidden" data-testid="tabel-grosir">
+          <div className="px-3 py-1.5 bg-primary-50 text-[12px] font-bold text-primary-700">
+            Harga Grosir
+          </div>
+          <table className="w-full text-[12px]">
+            <tbody>
+              {[
+                { minQty: product.minOrderQty, price: getUnitPrice(product, product.minOrderQty) },
+                ...product.wholesaleTiers,
+              ].map((t) => {
+                // Baris yang sedang berlaku = tier tertinggi yang ambangnya
+                // sudah dilewati qty saat ini.
+                const berlaku =
+                  qty >= t.minQty &&
+                  !product.wholesaleTiers.some((x) => x.minQty > t.minQty && qty >= x.minQty);
+                return (
+                  <tr
+                    key={t.minQty}
+                    className={clsx('border-t border-line', berlaku && 'bg-primary-50/60 font-bold text-ink')}
+                  >
+                    <td className="px-3 py-1.5">
+                      {t.minQty <= product.minOrderQty ? `${t.minQty} pcs` : `≥ ${t.minQty} pcs`}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">{formatRupiah(t.price)}/pcs</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tierBerikut && (
+        <p className="text-[11.5px] text-primary-700 mb-3 -mt-1.5">
+          Tambah {tierBerikut.minQty - qty} lagi → {formatRupiah(tierBerikut.price)}/pcs
+        </p>
+      )}
+
       <SaleCountdown product={product} />
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="text-[13px] text-ink-muted">Harga satuan</span>
+        <span className="text-[13px] text-ink" data-testid="harga-satuan">
+          {formatRupiah(effectivePrice)}
+        </span>
+      </div>
       <div className="flex justify-between items-baseline mb-3.5">
         <span className="text-[13px] text-ink-muted">Subtotal</span>
-        <span className="font-extrabold text-[19px] text-ink">{formatRupiah(effectivePrice * qty)}</span>
+        <span className="font-extrabold text-[19px] text-ink" data-testid="subtotal-buybox">
+          {formatRupiah(effectivePrice * qty)}
+        </span>
       </div>
 
       {/* CTAs */}

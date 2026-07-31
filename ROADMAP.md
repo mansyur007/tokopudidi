@@ -5,7 +5,7 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
-> **Progress (2026-07-31)** — **M13-A2 Invoice Pesanan** selesai. Sisa M13 yang bebas di-klaim: **B1 Harga Grosir**, **B2 Broadcast**.
+> **Progress (2026-07-31)** — **M13-A2 Invoice Pesanan** & **M13-B1 Harga Grosir** selesai. Sisa M13 yang bebas di-klaim: **B2 Broadcast** (blokirnya lepas sejak M13-A1).
 >
 > **Progress (2026-07-30)** — **M12 tuntas** (A11 Bottom Nav, D3 SEO & Meta, D4 Image Optimization, C3 Audit Log). **M13-A1 Follow Toko** selesai — blokir **M13-B2 Broadcast** ikut lepas.
 >
@@ -747,7 +747,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M13-B1. Harga Grosir (Tiered Pricing)
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-07-31): `getUnitPrice(p, qty, now)` masuk `price.ts` sesuai rencana, kontraknya **`min`** — tier hanya menang kalau memang lebih murah dari harga efektif saat itu. Tanpa itu produk yang sedang diskon (M9-B3) justru jadi lebih mahal ketika dibeli banyak, kebalikan dari arti kata "grosir"; ada test properti yang menjaga harga satuan **tidak pernah naik** saat qty bertambah. `getWholesaleTierPrice` sengaja **tidak mengandalkan urutan array**: validasi memang mewajibkan tier terurut, tapi helper ini juga membaca data langsung dari DB yang urutannya tidak dijamin, dan salah pilih tier berarti salah menagih. **Dua bug yang dicegat saat implementasi**: (1) `productUpdateSchema` bersifat partial, jadi route update men-`spread` sisa payload ke `product.update({data: rest})` — `wholesaleTiers` wajib ikut di-destructure keluar atau Prisma menolaknya saat runtime; (2) `OrderItem.price` dan `subtotal` sebelumnya menulis rumus harga **dua kali**, sekarang dihitung sekali lalu dipakai bersama — kalau keduanya sempat berbeda, total order tidak akan sama dengan jumlah itemnya (ada e2e yang membandingkan keduanya). **Guard tambahan di route update** (di luar zod): menurunkan harga normal saja tanpa menyertakan tier akan membuat tier lama diam-diam lebih mahal dari harga biasa — zod tidak bisa melihatnya karena payload-nya parsial, jadi route memeriksa tier existing terhadap harga hasil update dan menolak 400. `minQty` minimal **2**: tier ber-minQty 1 bukan grosir, itu mengganti harga normal lewat pintu belakang dan menciptakan dua sumber kebenaran. Update bersifat **replace-all**, array kosong = matikan grosir (tanpa endpoint terpisah). Seed diberi tier pada "Gula Pasir Gulaku 1kg" supaya jalurnya benar-benar terpakai di dev & e2e. **Temuan di luar item ini**: `apps/web/next.config.js` memasang `typescript: { ignoreBuildErrors: true }` **dan** `eslint: { ignoreDuringBuilds: true }` — artinya `npm run build` tidak pernah memeriksa tipe FE, dan klaim "tsc seluruh workspace lolos" di PR-PR sebelumnya tidak berlaku untuk `apps/web`. Di sini tipenya diperiksa terpisah lewat `npx tsc --noEmit -p apps/web/tsconfig.json` (bersih); menjadikannya gate CI adalah pekerjaan tersendiri (bersinggungan dengan `OPS-9` di TESTING.md). **Belum terverifikasi lokal** (mesin dev tanpa Postgres/Docker): migration & e2e bergantung CI. Lolos lokal: tsc api+web+shared+database, lint, **219 unit test** (25 baru), `playwright test --list`.
 - **Scope**: Seller set harga bertingkat per kuantitas (max 5 tier). BuyBox render tabel tier + harga mengikuti qty; cart/checkout ikut.
 - **Konteks kode (audit 2026-07-29)** — titik integrasi harga (semuanya terverifikasi):
   - Kontrak prioritas terdokumentasi di [packages/shared/src/utils/price.ts:1-3](packages/shared/src/utils/price.ts#L1-L3): Flash Sale > Sale Price > **Grosir** > normal.
@@ -766,10 +767,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - [ProductForm.tsx](apps/web/src/components/seller/ProductForm.tsx) — section "Harga Grosir" (pola section "Diskon Periodik" di :234)
   - Keranjang — harga satuan item ikut tier saat qty diedit (cart.service sudah hitung server-side, FE refresh)
 - **Acceptance**:
-  - [ ] Validasi monoton bekerja di FE dan API
-  - [ ] Qty naik melewati tier → harga satuan & subtotal berubah di BuyBox, cart, checkout (konsisten server-side)
-  - [ ] `OrderItem.price` menyimpan harga tier saat checkout
-  - [ ] Produk sedang sale: harga = `min(salePrice, tierPrice)` — tercakup unit test helper
+  - [x] Validasi monoton bekerja di FE dan API — aturannya satu daftar (`WHOLESALE_RULES`) yang dipakai create & update, jadi pesannya identik; e2e TC-163 menembak 4 bentuk payload tak masuk akal
+  - [x] Qty naik melewati tier → harga satuan & subtotal berubah di BuyBox, cart, checkout (konsisten server-side) — e2e TC-161 (server) & TC-164 (BuyBox)
+  - [x] `OrderItem.price` menyimpan harga tier saat checkout — e2e TC-162, sekalian memastikan `order.subtotal` = jumlah subtotal item
+  - [x] Produk sedang sale: harga = `min(salePrice, tierPrice)` — tercakup unit test helper
 - **Effort**: M
 
 ---

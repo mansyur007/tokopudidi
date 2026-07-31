@@ -64,6 +64,7 @@ sellerProductRouter.get('/:id', async (req, res, next) => {
           },
         },
         options: { orderBy: { order: 'asc' }, include: { values: { orderBy: { order: 'asc' } } } },
+        wholesaleTiers: { orderBy: { minQty: 'asc' } },
         category: true,
       },
     });
@@ -132,6 +133,15 @@ sellerProductRouter.post('/', validateBody(productCreateSchema), async (req, res
       if (req.body.options?.length && req.body.variants?.length) {
         await writeProductVariants(tx, p.id, req.body.options, req.body.variants);
       }
+      if (req.body.wholesaleTiers?.length) {
+        await tx.productWholesaleTier.createMany({
+          data: req.body.wholesaleTiers.map((t: { minQty: number; price: number }) => ({
+            productId: p.id,
+            minQty: t.minQty,
+            price: t.price,
+          })),
+        });
+      }
       return p;
     });
     return created(res, product, 'Produk berhasil ditambahkan');
@@ -147,7 +157,10 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
     });
     if (!existing) throw new NotFoundError('Produk tidak ditemukan');
 
-    const { imageUrls, variants, options, ...rest } = req.body;
+    // `wholesaleTiers` WAJIB ikut dikeluarkan dari `rest`: sisanya diteruskan
+    // apa adanya ke `product.update({ data: rest })`, dan relasi yang nyasar
+    // ke sana akan ditolak Prisma saat runtime.
+    const { imageUrls, variants, options, wholesaleTiers, ...rest } = req.body;
 
     // Konsistensi diskon periodik (M9-B3) — gabungan payload + data existing.
     const nextPrice = rest.price ?? existing.price;
@@ -162,6 +175,23 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
       // Hapus diskon → bersihkan periodenya juga.
       rest.saleStartAt = null;
       rest.saleEndAt = null;
+    }
+
+    // Konsistensi harga grosir (M13-B1) terhadap harga normal HASIL update.
+    // Zod hanya bisa memeriksa payload; turunkan harga normal saja tanpa
+    // menyertakan tier dan tier lama diam-diam jadi lebih mahal dari harga
+    // biasa — pembeli terlindungi oleh kontrak `min` di getUnitPrice, tapi
+    // datanya sudah telanjur tidak masuk akal. Jadi ditolak di sini.
+    const tierBerlaku: { minQty: number; price: number }[] =
+      wholesaleTiers ??
+      (rest.price !== undefined
+        ? await prisma.productWholesaleTier.findMany({
+            where: { productId: existing.id },
+            select: { minQty: true, price: true },
+          })
+        : []);
+    if (tierBerlaku.some((t) => t.price >= nextPrice)) {
+      throw new BadRequestError('Harga grosir harus lebih murah dari harga normal');
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -182,12 +212,29 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
       if (variants || options) {
         await writeProductVariants(tx, existing.id, options ?? [], variants ?? []);
       }
+
+      // Tier grosir: replace-all kalau dikirim. Array kosong = hapus semua
+      // tier, jadi seller bisa mematikan harga grosir tanpa endpoint terpisah.
+      if (wholesaleTiers) {
+        await tx.productWholesaleTier.deleteMany({ where: { productId: existing.id } });
+        if (wholesaleTiers.length > 0) {
+          await tx.productWholesaleTier.createMany({
+            data: wholesaleTiers.map((t: { minQty: number; price: number }) => ({
+              productId: existing.id,
+              minQty: t.minQty,
+              price: t.price,
+            })),
+          });
+        }
+      }
+
       return tx.product.findUnique({
         where: { id: existing.id },
         include: {
           images: true,
           variants: { where: { isActive: true } },
           options: { orderBy: { order: 'asc' }, include: { values: { orderBy: { order: 'asc' } } } },
+          wholesaleTiers: { orderBy: { minQty: 'asc' } },
         },
       });
     });

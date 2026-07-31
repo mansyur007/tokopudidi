@@ -49,6 +49,63 @@ const variantInput = z.object({
   isActive: z.boolean().optional(),
 });
 
+// ===== Harga grosir (M13-B1) =====
+export const MAX_WHOLESALE_TIERS = 5;
+
+const wholesaleTierInput = z.object({
+  // Minimal 2: tier dengan minQty 1 bukan "grosir", itu cuma mengganti harga
+  // normal lewat pintu belakang dan membuat dua sumber kebenaran untuk harga
+  // satuan produk.
+  minQty: z.number().int().min(2, 'Minimal pembelian grosir mulai dari 2'),
+  price: z.number().int().min(100, 'Harga grosir minimal Rp 100'),
+});
+
+/** Bentuk longgar yang dibaca aturan grosir — create & update sama-sama cocok. */
+interface WholesaleShape {
+  price?: number;
+  wholesaleTiers?: { minQty: number; price: number }[];
+}
+
+/**
+ * Aturan harga grosir. Sama seperti `VARIANT_RULES`: ditulis sebagai data
+ * supaya create (price wajib) dan update (price opsional) menolak payload yang
+ * sama dengan pesan yang sama persis.
+ */
+export const WHOLESALE_RULES: {
+  check: (v: WholesaleShape) => boolean;
+  message: string;
+  path: string[];
+}[] = [
+  {
+    // Ambang naik ketat. Kalau dibiarkan sama/menurun, "tier mana yang berlaku"
+    // jadi bergantung urutan array — bukan aturan yang bisa dijelaskan ke seller.
+    check: (v) => {
+      const t = v.wholesaleTiers ?? [];
+      return t.every((tier, i) => i === 0 || tier.minQty > t[i - 1].minQty);
+    },
+    message: 'Minimal pembelian tiap tingkat harus makin besar',
+    path: ['wholesaleTiers'],
+  },
+  {
+    // Harga turun ketat: beli lebih banyak tapi harga satuannya sama atau naik
+    // bukan harga grosir, dan pembeli akan menganggapnya salah hitung.
+    check: (v) => {
+      const t = v.wholesaleTiers ?? [];
+      return t.every((tier, i) => i === 0 || tier.price < t[i - 1].price);
+    },
+    message: 'Harga tiap tingkat harus makin murah',
+    path: ['wholesaleTiers'],
+  },
+  {
+    // Hanya diperiksa kalau harga normalnya ikut dikirim (update parsial bisa
+    // tidak menyertakannya — route yang menambal, sama seperti salePrice).
+    check: (v) =>
+      v.price == null || (v.wholesaleTiers ?? []).every((tier) => tier.price < v.price!),
+    message: 'Harga grosir harus lebih murah dari harga normal',
+    path: ['wholesaleTiers'],
+  },
+];
+
 const productBaseSchema = z.object({
   name: z.string().trim().min(3, 'Nama produk minimal 3 karakter').max(120),
   description: z.string().trim().min(10, 'Deskripsi minimal 10 karakter').max(5000),
@@ -69,6 +126,10 @@ const productBaseSchema = z.object({
   imageUrls: z.array(z.string().min(5)).min(1, 'Minimal 1 foto produk').max(5, 'Maksimal 5 foto'),
   options: z.array(optionInput).max(MAX_VARIANT_OPTIONS, `Maksimal ${MAX_VARIANT_OPTIONS} opsi varian`).optional(),
   variants: z.array(variantInput).max(MAX_VARIANT_COMBINATIONS).optional(),
+  wholesaleTiers: z
+    .array(wholesaleTierInput)
+    .max(MAX_WHOLESALE_TIERS, `Maksimal ${MAX_WHOLESALE_TIERS} tingkat harga grosir`)
+    .optional(),
 });
 
 /** Bentuk longgar yang dibaca aturan di bawah — create & update sama-sama cocok. */
@@ -154,7 +215,20 @@ function withVariantRules<S extends z.ZodTypeAny>(
   ) as z.ZodType<z.output<S>, z.ZodTypeDef, z.input<S>>;
 }
 
-export const productCreateSchema = withVariantRules(productBaseSchema)
+/** Sama seperti `withVariantRules`, untuk aturan harga grosir (M13-B1). */
+function withWholesaleRules<S extends z.ZodTypeAny>(
+  schema: S,
+): z.ZodType<z.output<S>, z.ZodTypeDef, z.input<S>> {
+  return WHOLESALE_RULES.reduce(
+    (acc, rule) => acc.refine((v) => rule.check(v as WholesaleShape), {
+      message: rule.message,
+      path: rule.path,
+    }),
+    schema as z.ZodTypeAny,
+  ) as z.ZodType<z.output<S>, z.ZodTypeDef, z.input<S>>;
+}
+
+export const productCreateSchema = withWholesaleRules(withVariantRules(productBaseSchema))
   .refine((v) => v.salePrice == null || v.salePrice < v.price, {
     message: 'Harga diskon harus lebih murah dari harga normal',
     path: ['salePrice'],
@@ -172,7 +246,7 @@ export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 // Partial dari base (tanpa refinement create) — konsistensi salePrice vs price
 // divalidasi di route update karena price bisa tidak ikut dikirim. Aturan
 // varian tetap berlaku: kalau `options`/`variants` dikirim, harus konsisten.
-export const productUpdateSchema = withVariantRules(productBaseSchema.partial());
+export const productUpdateSchema = withWholesaleRules(withVariantRules(productBaseSchema.partial()));
 
 export const shipOrderSchema = z.object({
   trackingNumber: z.string().trim().min(3, 'Nomor resi minimal 3 karakter').max(60),
