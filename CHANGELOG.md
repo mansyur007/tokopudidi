@@ -3,6 +3,18 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — Perbaikan: Deploy Menembus Batas Waktu di Lapisan Chromium
+
+### Fixed
+- **Deploy tidak lagi mengunduh ulang ~98 MB paket apt setiap commit.** Lapisan `RUN npx playwright install --with-deps chromium` di stage `api` berada **di bawah semua `COPY` kode aplikasi**, sehingga perubahan kode sekecil apa pun membatalkan cache-nya dan memaksa pemasangan ulang 110 paket apt + Chromium. Sekarang lapisan itu ditaruh setelah `COPY node_modules` tapi **sebelum** kode — `npx playwright` butuh node_modules, tidak butuh kode kita.
+- **`command_timeout` deploy dinaikkan 25m → 45m.** Bahkan setelah perbaikan urutan lapisan, rebuild tetap wajib saat dependency atau schema Prisma berubah, dan di VPS ini unduhan apt-nya sendirian bisa memakan ~20 menit.
+
+### Notes
+- **Kejadiannya** (deploy 2026-07-31, merge PR #46): job mulai 14:11:57 dan mati tepat 25 menit kemudian di `Run Command Timeout`. Build JS-nya sendiri hanya ~4,5 menit; sisanya — **19,5 menit** — habis di satu langkah `apt-get` yang baru sampai paket ke-103 dari 110. Kecepatan unduhnya memang buruk: `libllvm15` (23 MB) sendirian butuh 4 menit 19 detik (~90 KB/s).
+- **Produksi tidak ikut turun.** Kegagalannya terjadi di tahap `build`, sebelum `up -d` maupun `prisma migrate deploy`, jadi container lama tetap melayani — `toko.emha.space` diverifikasi masih 200 di `/api/health` dan homepage. Konsekuensinya migration `ProductWholesaleTier` (M13-B1) **belum diterapkan di produksi**; itu baru jalan pada deploy berikutnya yang berhasil.
+- Deploy berikutnya **tetap** akan membangun ulang lapisan Chromium sekali, karena M13-B1 mengubah `schema.prisma` dan Prisma client digenerate ke dalam `node_modules`. Sesudah itu barulah deploy yang hanya menyentuh kode ikut ter-cache.
+- **Belum dikerjakan:** image `api` membawa Chromium (~330 MB) semata-mata untuk scraper admin (`/admin/scrape`). Memisahkannya jadi service/image sendiri akan membuat image api ramping dan menghapus jalur apt ini dari deploy sepenuhnya — perubahan arsitektur tersendiri, di luar perbaikan ini.
+
 ## [Unreleased] — M13-B1: Harga Grosir (Tiered Pricing)
 
 ### Added
