@@ -45,16 +45,26 @@ ENV NODE_ENV=production
 # Browser Playwright dipasang ke path tetap agar mudah di-cache & ditemukan runtime.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY --from=build /app/node_modules ./node_modules
+# Install Chromium + dependency sistem untuk fitur scraper (/admin/scrape).
+# --with-deps memasang lib apt yang dibutuhkan headless Chromium di bookworm-slim.
+#
+# URUTANNYA PENTING — lapisan ini sengaja ditaruh SETELAH node_modules tapi
+# SEBELUM kode aplikasi. `npx playwright` butuh node_modules, tapi tidak butuh
+# kode kita sama sekali. Sebelumnya lapisan ini berada di bawah semua COPY kode,
+# sehingga SETIAP commit membatalkan cache-nya dan memaksa unduh ulang ~98 MB
+# paket apt + Chromium. Di VPS ini kecepatan apt bisa turun sampai ~90 KB/s
+# (libllvm15 23 MB pernah makan 4+ menit sendirian), dan deploy 2026-07-31
+# akhirnya menembus `command_timeout` 25 menit dengan 19,5 menit habis di sini.
+# Dengan urutan sekarang, cache-nya hanya batal saat dependency atau schema
+# Prisma berubah (client-nya digenerate ke dalam node_modules).
+RUN npx playwright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/package-lock.json ./package-lock.json
 COPY --from=build /app/tsconfig.base.json ./tsconfig.base.json
 COPY --from=build /app/packages/shared ./packages/shared
 COPY --from=build /app/packages/database ./packages/database
 COPY --from=build /app/apps/api ./apps/api
-# Install Chromium + dependency sistem untuk fitur scraper (/admin/scrape).
-# --with-deps memasang lib apt yang dibutuhkan headless Chromium di bookworm-slim.
-RUN npx playwright install --with-deps chromium \
-    && rm -rf /var/lib/apt/lists/*
 EXPOSE 4000
 WORKDIR /app/apps/api
 # tsx (esbuild) tersedia di node_modules (devDep api). Transpile-only, tanpa type-check.
