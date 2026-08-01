@@ -395,3 +395,37 @@ export interface ProductStats {
 
 export const getProductStats = (token: string, id: string, range: '7d' | '30d') =>
   apiFetch<ProductStats>(`/api/v1/seller/products/${id}/stats?range=${range}`, { token });
+
+// ===== Broadcast promo ke follower (M13-B2) =====
+export interface SellerBroadcastRow {
+  id: string;
+  title: string;
+  body: string;
+  recipientCount: number;
+  sentAt: string;
+  product: { slug: string; name: string } | null;
+}
+
+export interface SellerBroadcastStatus {
+  followerCount: number;
+  lastSentAt: string | null;
+  cooldownRemainingMs: number;
+  canSend: boolean;
+}
+
+export const listSellerBroadcasts = (token: string, page = 1, limit = 20) =>
+  apiFetch<{
+    items: SellerBroadcastRow[];
+    total: number;
+    page: number;
+    limit: number;
+    status: SellerBroadcastStatus;
+  }>(`/api/v1/seller/broadcast?page=${page}&limit=${limit}`, { token });
+
+export const createSellerBroadcast = (
+  token: string,
+  body: { title: string; body: string; productId?: string | null },
+) =>
+  apiFetch<SellerBroadcastRow>('/api/v1/seller/broadcast', {
+    method: 'POST', token, body: JSON.stringify(body),
+  });

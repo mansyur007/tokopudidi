@@ -55,6 +55,10 @@ enum NotificationType {
   PROMO
   SYSTEM
   NEW_QUESTION
+  // M13-B2. Sengaja terpisah dari PROMO: broadcast toko dikirim massal ke
+  // follower, jadi harus bisa dibedakan (dan nanti dibisukan) tanpa ikut
+  // membungkam notifikasi promo yang dipicu aksi user sendiri.
+  SHOP_BROADCAST
 }
 
 enum BannerPlacement {
@@ -95,27 +99,27 @@ model User {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  addresses     Address[]
-  shop          Shop?
-  cart          Cart?
-  orders        Order[]         @relation("BuyerOrders")
-  reviews       Review[]
-  notifications Notification[]
-  refreshTokens RefreshToken[]
-  otpCodes      OtpCode[]
-  chatMessages  ChatMessage[]
-  buyerRooms    ChatRoom[]      @relation("BuyerRoom")
-  refundRequests RefundRequest[]
-  paymentVerifs PaymentProof[]  @relation("VerifiedBy")
-  wishlists     Wishlist[]
-  productViews  ProductView[]
-  searchHistory SearchHistory[]
-  discussions   Discussion[]
+  addresses          Address[]
+  shop               Shop?
+  cart               Cart?
+  orders             Order[]             @relation("BuyerOrders")
+  reviews            Review[]
+  notifications      Notification[]
+  refreshTokens      RefreshToken[]
+  otpCodes           OtpCode[]
+  chatMessages       ChatMessage[]
+  buyerRooms         ChatRoom[]          @relation("BuyerRoom")
+  refundRequests     RefundRequest[]
+  paymentVerifs      PaymentProof[]      @relation("VerifiedBy")
+  wishlists          Wishlist[]
+  productViews       ProductView[]
+  searchHistory      SearchHistory[]
+  discussions        Discussion[]
   discussionHelpfuls DiscussionHelpful[]
-  reports       Report[]
-  complaints    Complaint[]
-  adminLogs     AdminLog[]
-  followedShops ShopFollower[]
+  reports            Report[]
+  complaints         Complaint[]
+  adminLogs          AdminLog[]
+  followedShops      ShopFollower[]
 
   @@index([phone])
   @@index([referralCode])
@@ -124,13 +128,13 @@ model User {
 // Jejak audit aksi tulis admin (M12-C3). Append-only: tidak ada route
 // update/delete, dan tidak ada relasi yang bisa menghapusnya secara kaskade.
 model AdminLog {
-  id      String @id @default(uuid())
-  adminId String
+  id         String   @id @default(uuid())
+  adminId    String
   // Sengaja TANPA onDelete: Cascade — default Prisma di Postgres adalah
   // ON DELETE RESTRICT, dan itulah yang benar untuk jejak audit: log tidak
   // boleh ikut hilang bersama pelakunya. Aman karena app ini soft-delete user
   // lewat `deletedAt`, tidak pernah hard delete.
-  admin   User   @relation(fields: [adminId], references: [id])
+  admin      User     @relation(fields: [adminId], references: [id])
   // Konstanta dari ADMIN_ACTIONS di @tokopudidi/shared, mis. "TAKEDOWN_PRODUCT".
   // Disimpan sebagai String, bukan enum, supaya menambah aksi baru tidak butuh
   // migration — daftar sahnya dijaga zod di sisi tulis.
@@ -139,9 +143,9 @@ model AdminLog {
   targetId   String?
   // Body request yang sudah dilewatkan redactAdminPayload — data-URI dibuang
   // dan string panjang dipotong. Tanpa itu satu banner base64 2MB masuk ke sini.
-  payload Json?
-  note    String?
-  createdAt DateTime @default(now())
+  payload    Json?
+  note       String?
+  createdAt  DateTime @default(now())
 
   @@index([adminId, createdAt])
   @@index([action, createdAt])
@@ -149,27 +153,27 @@ model AdminLog {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
 
 model OtpCode {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   phone     String
   code      String
-  purpose   String   // "REGISTER" | "LOGIN" | "RESET_PASSWORD"
+  purpose   String // "REGISTER" | "LOGIN" | "RESET_PASSWORD"
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([phone, purpose])
 }
@@ -201,46 +205,47 @@ model Address {
 // ============= SHOP =============
 
 model Shop {
-  id            String   @id @default(uuid())
-  ownerId       String   @unique
-  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  slug          String   @unique
-  name          String
-  description   String?
-  logoUrl       String?
-  bannerUrl     String?
-  city          String
-  province      String?
-  isOpen        Boolean  @default(true)
-  closedReason  String?
-  joinedAt      DateTime @default(now())
-  ratingAvg     Float    @default(0)
-  ratingCount   Int      @default(0)
-  totalSold     Int      @default(0)
-  ktpVerified   Boolean  @default(false)
+  id              String    @id @default(uuid())
+  ownerId         String    @unique
+  owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug            String    @unique
+  name            String
+  description     String?
+  logoUrl         String?
+  bannerUrl       String?
+  city            String
+  province        String?
+  isOpen          Boolean   @default(true)
+  closedReason    String?
+  joinedAt        DateTime  @default(now())
+  ratingAvg       Float     @default(0)
+  ratingCount     Int       @default(0)
+  totalSold       Int       @default(0)
+  ktpVerified     Boolean   @default(false)
   // Di-set admin (M10-A10) — dipakai filter "Official Store" di pencarian.
   // Badge & tampilannya menyusul di M14-B1.
-  isOfficialStore Boolean @default(false)
-  ktpUrl        String?  // hanya admin akses via signed URL
-  bankName      String?
-  bankAccountNo String?
+  isOfficialStore Boolean   @default(false)
+  ktpUrl          String? // hanya admin akses via signed URL
+  bankName        String?
+  bankAccountNo   String?
   bankAccountName String?
-  balance       Int      @default(0) // dalam rupiah
-  pendingBalance Int     @default(0)
-  autoReplyText String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
+  balance         Int       @default(0) // dalam rupiah
+  pendingBalance  Int       @default(0)
+  autoReplyText   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
-  products  Product[]
-  orders    Order[]
-  reviews   Review[]
-  chatRooms ChatRoom[]
-  withdrawals Withdrawal[]
+  products      Product[]
+  orders        Order[]
+  reviews       Review[]
+  chatRooms     ChatRoom[]
+  withdrawals   Withdrawal[]
   chatTemplates ChatTemplate[]
-  promoCodes PromoCode[]
-  showcases ShopShowcase[]
-  followers ShopFollower[]
+  promoCodes    PromoCode[]
+  showcases     ShopShowcase[]
+  followers     ShopFollower[]
+  broadcasts    ShopBroadcast[]
 
   @@index([slug])
   @@index([city])
@@ -249,17 +254,17 @@ model Shop {
 // ============= CATEGORY =============
 
 model Category {
-  id       String  @id @default(uuid())
-  parentId String?
-  parent   Category? @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
-  name     String
-  slug     String  @unique
-  iconUrl  String?
-  order    Int     @default(0)
-  isActive Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String     @id @default(uuid())
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  name      String
+  slug      String     @unique
+  iconUrl   String?
+  order     Int        @default(0)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   products Product[]
 
@@ -270,48 +275,49 @@ model Category {
 // ============= PRODUCT =============
 
 model Product {
-  id           String   @id @default(uuid())
-  shopId       String
-  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  categoryId   String
-  category     Category @relation(fields: [categoryId], references: [id])
-  name         String
-  slug         String   @unique
-  description  String   @db.Text
-  price        Int
+  id                   String           @id @default(uuid())
+  shopId               String
+  shop                 Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  categoryId           String
+  category             Category         @relation(fields: [categoryId], references: [id])
+  name                 String
+  slug                 String           @unique
+  description          String           @db.Text
+  price                Int
   // Sale price periodik (M9-B3) — aktif kalau salePrice terisi & now di dalam periode.
-  salePrice    Int?
-  saleStartAt  DateTime?
-  saleEndAt    DateTime?
-  stock        Int
-  minOrderQty  Int      @default(1)
-  weight       Int      // gram
-  condition    ProductCondition @default(NEW)
+  salePrice            Int?
+  saleStartAt          DateTime?
+  saleEndAt            DateTime?
+  stock                Int
+  minOrderQty          Int              @default(1)
+  weight               Int // gram
+  condition            ProductCondition @default(NEW)
   // Opsi pengiriman per produk (M10-A10) — di-set seller, jadi filter di pencarian
   // sekaligus ditegakkan saat checkout.
   // COD default true supaya produk lama tidak mendadak kehilangan opsi bayar di tempat.
-  codAvailable Boolean  @default(true)
-  freeShippingEligible Boolean @default(false)
-  isActive     Boolean  @default(true)
-  soldCount    Int      @default(0)
-  viewCount    Int      @default(0)
-  ratingAvg    Float    @default(0)
-  ratingCount  Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  deletedAt    DateTime?
+  codAvailable         Boolean          @default(true)
+  freeShippingEligible Boolean          @default(false)
+  isActive             Boolean          @default(true)
+  soldCount            Int              @default(0)
+  viewCount            Int              @default(0)
+  ratingAvg            Float            @default(0)
+  ratingCount          Int              @default(0)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  deletedAt            DateTime?
 
-  images     ProductImage[]
-  variants   ProductVariant[]
-  options    ProductOption[]
-  cartItems  CartItem[]
-  reviews    Review[]
-  orderItems OrderItem[]
-  wishlistedBy Wishlist[]
-  views      ProductView[]
-  discussions Discussion[]
-  showcaseItems ShopShowcaseProduct[]
+  images         ProductImage[]
+  variants       ProductVariant[]
+  options        ProductOption[]
+  cartItems      CartItem[]
+  reviews        Review[]
+  orderItems     OrderItem[]
+  wishlistedBy   Wishlist[]
+  views          ProductView[]
+  discussions    Discussion[]
+  showcaseItems  ShopShowcaseProduct[]
   wholesaleTiers ProductWholesaleTier[]
+  broadcasts     ShopBroadcast[]
   // searchVector dikelola via raw SQL trigger di migration
 
   @@index([shopId])
@@ -420,15 +426,15 @@ model Cart {
 }
 
 model CartItem {
-  id        String   @id @default(uuid())
+  id        String          @id @default(uuid())
   cartId    String
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantId String?
   variant   ProductVariant? @relation(fields: [variantId], references: [id])
   quantity  Int
-  addedAt   DateTime @default(now())
+  addedAt   DateTime        @default(now())
 
   @@index([cartId])
 }
@@ -436,25 +442,25 @@ model CartItem {
 // ============= ORDER =============
 
 model Order {
-  id             String   @id @default(uuid())
-  orderNumber    String   @unique
+  id             String         @id @default(uuid())
+  orderNumber    String         @unique
   buyerId        String
-  buyer          User     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  buyer          User           @relation("BuyerOrders", fields: [buyerId], references: [id])
   shopId         String
-  shop           Shop     @relation(fields: [shopId], references: [id])
+  shop           Shop           @relation(fields: [shopId], references: [id])
   addressId      String?
-  address        Address? @relation(fields: [addressId], references: [id])
-  status         OrderStatus @default(PENDING_PAYMENT)
+  address        Address?       @relation(fields: [addressId], references: [id])
+  status         OrderStatus    @default(PENDING_PAYMENT)
   subtotal       Int
   shippingCost   Int
-  discountAmount Int      @default(0)
+  discountAmount Int            @default(0)
   total          Int
   paymentMethod  PaymentMethod
   shippingMethod ShippingMethod
   trackingNumber String?
   courierName    String?
-  buyerAddress   Json     // snapshot
-  shopAddress    Json     // snapshot
+  buyerAddress   Json // snapshot
+  shopAddress    Json // snapshot
   notes          String?
   promoCode      String?
   paidAt         DateTime?
@@ -464,8 +470,8 @@ model Order {
   completedAt    DateTime?
   cancelledAt    DateTime?
   cancelReason   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   items         OrderItem[]
   paymentProof  PaymentProof?
@@ -492,7 +498,7 @@ model OrderItem {
   quantity     Int
   subtotal     Int
 
-  review Review?
+  review    Review?
   complaint Complaint?
 
   @@index([orderId])
@@ -517,24 +523,24 @@ model PaymentProof {
 // ============= REVIEW =============
 
 model Review {
-  id             String    @id @default(uuid())
-  orderItemId    String    @unique
-  orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  buyerId        String
-  buyer          User      @relation(fields: [buyerId], references: [id])
-  productId      String
-  product        Product   @relation(fields: [productId], references: [id])
-  shopId         String
-  shop           Shop      @relation(fields: [shopId], references: [id])
-  rating         Int       // 1-5
-  comment        String?
-  imageUrls      String[]
-  sellerReply    String?
+  id              String    @id @default(uuid())
+  orderItemId     String    @unique
+  orderItem       OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  buyerId         String
+  buyer           User      @relation(fields: [buyerId], references: [id])
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id])
+  shopId          String
+  shop            Shop      @relation(fields: [shopId], references: [id])
+  rating          Int // 1-5
+  comment         String?
+  imageUrls       String[]
+  sellerReply     String?
   sellerRepliedAt DateTime?
-  isHidden       Boolean   @default(false)
-  isReported     Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  isHidden        Boolean   @default(false)
+  isReported      Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([productId])
   @@index([shopId])
@@ -560,16 +566,16 @@ model ChatRoom {
 }
 
 model ChatMessage {
-  id        String   @id @default(uuid())
-  roomId    String
-  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  senderId  String
-  sender    User     @relation(fields: [senderId], references: [id])
-  content   String
-  imageUrl  String?
-  readAt    DateTime?
-  isReported Boolean @default(false)
-  sentAt    DateTime @default(now())
+  id         String    @id @default(uuid())
+  roomId     String
+  room       ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User      @relation(fields: [senderId], references: [id])
+  content    String
+  imageUrl   String?
+  readAt     DateTime?
+  isReported Boolean   @default(false)
+  sentAt     DateTime  @default(now())
 
   @@index([roomId])
 }
@@ -593,37 +599,37 @@ model Notification {
 // ============= BANNER =============
 
 model Banner {
-  id          String          @id @default(uuid())
-  imageUrl    String
-  linkUrl     String?
-  order       Int             @default(0)
-  isActive    Boolean         @default(true)
-  validFrom   DateTime?
-  validUntil  DateTime?
-  placement   BannerPlacement @default(HOME_TOP)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id         String          @id @default(uuid())
+  imageUrl   String
+  linkUrl    String?
+  order      Int             @default(0)
+  isActive   Boolean         @default(true)
+  validFrom  DateTime?
+  validUntil DateTime?
+  placement  BannerPlacement @default(HOME_TOP)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 }
 
 // ============= PROMO =============
 
 model PromoCode {
-  id           String       @id @default(uuid())
-  code         String       @unique
+  id            String       @id @default(uuid())
+  code          String       @unique
   // null = voucher platform (berlaku semua toko); terisi = voucher khusus toko (M9-B2).
-  shopId       String?
-  shop         Shop?        @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  discountType DiscountType
+  shopId        String?
+  shop          Shop?        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  discountType  DiscountType
   discountValue Int
-  minPurchase  Int          @default(0)
-  maxDiscount  Int?
-  usageLimit   Int?
-  usedCount    Int          @default(0)
-  validFrom    DateTime
-  validUntil   DateTime
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  minPurchase   Int          @default(0)
+  maxDiscount   Int?
+  usageLimit    Int?
+  usedCount     Int          @default(0)
+  validFrom     DateTime
+  validUntil    DateTime
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@index([code])
   @@index([shopId, isActive])
@@ -672,22 +678,22 @@ enum ComplaintStatus {
 // Berbeda dari RefundRequest (per order, langsung ke admin): komplain lewat
 // seller dulu, dan bisa berujung penggantian barang, bukan hanya uang kembali.
 model Complaint {
-  id             String    @id @default(uuid())
+  id             String              @id @default(uuid())
   orderId        String
-  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order          Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   // Satu item hanya bisa dikomplain sekali — kelanjutannya lewat escalate.
-  orderItemId    String    @unique
-  orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  orderItemId    String              @unique
+  orderItem      OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   buyerId        String
-  buyer          User      @relation(fields: [buyerId], references: [id])
+  buyer          User                @relation(fields: [buyerId], references: [id])
   type           ComplaintType
   description    String
   evidenceUrls   String[]
   resolutionType ComplaintResolution
-  status         ComplaintStatus @default(OPEN)
+  status         ComplaintStatus     @default(OPEN)
   sellerResponse String?
   adminDecision  String?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime            @default(now())
   respondedAt    DateTime?
   escalatedAt    DateTime?
   resolvedAt     DateTime?
@@ -743,14 +749,14 @@ model SearchHistory {
 // ============= WITHDRAWAL (seller payout) =============
 
 model Withdrawal {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   shopId        String
-  shop          Shop     @relation(fields: [shopId], references: [id])
+  shop          Shop      @relation(fields: [shopId], references: [id])
   amount        Int
-  status        String   @default("PENDING") // PENDING | PROCESSED | REJECTED
+  status        String    @default("PENDING") // PENDING | PROCESSED | REJECTED
   bankName      String
   bankAccountNo String
-  requestedAt   DateTime @default(now())
+  requestedAt   DateTime  @default(now())
   processedAt   DateTime?
   note          String?
 
@@ -760,21 +766,21 @@ model Withdrawal {
 // ============= DISCUSSION (Tanya Jawab Publik di halaman produk) =============
 
 model Discussion {
-  id            String    @id @default(uuid())
+  id            String       @id @default(uuid())
   productId     String
-  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
   parentId      String?
   parent        Discussion?  @relation("DiscussionReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies       Discussion[] @relation("DiscussionReplies")
-  message       String    @db.Text
-  isSellerReply Boolean   @default(false)
-  helpfulCount  Int       @default(0)
-  createdAt     DateTime  @default(now())
+  message       String       @db.Text
+  isSellerReply Boolean      @default(false)
+  helpfulCount  Int          @default(0)
+  createdAt     DateTime     @default(now())
   deletedAt     DateTime?
 
-  helpfuls      DiscussionHelpful[]
+  helpfuls DiscussionHelpful[]
 
   @@index([productId, parentId, createdAt])
 }
@@ -888,4 +894,29 @@ model ShopFollower {
   @@id([shopId, userId])
   // Daftar "Toko Favorit" milik user, terbaru dulu.
   @@index([userId, createdAt])
+}
+
+// ============= BROADCAST PROMO (M13-B2) =============
+
+// Riwayat pengumuman toko ke follower. Tabel ini bukan sekadar arsip: baris
+// terakhirnya adalah penegak rate limit 1x/24 jam (dicek lewat `sentAt`), jadi
+// baris tetap ditulis sekali per pengiriman — jangan pernah dihapus rutin.
+model ShopBroadcast {
+  id             String   @id @default(uuid())
+  shopId         String
+  shop           Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  title          String
+  body           String
+  // Produk yang disorot (opsional). SetNull, bukan Cascade: produk dihapus
+  // tidak boleh menghapus riwayat — kalau riwayatnya hilang, jendela 24 jam
+  // ikut hilang dan seller bisa broadcast lagi seketika.
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  // Jangkauan saat dikirim. Disimpan, bukan dihitung ulang dari jumlah follower
+  // sekarang — follower bisa bertambah/berkurang setelah broadcast terkirim.
+  recipientCount Int      @default(0)
+  sentAt         DateTime @default(now())
+
+  // Riwayat per toko (terbaru dulu) sekaligus jalur cek rate limit.
+  @@index([shopId, sentAt])
 }
