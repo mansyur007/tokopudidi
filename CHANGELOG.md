@@ -3,6 +3,32 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M13-B2: Broadcast Promo ke Follower
+
+### Added
+- **Broadcast promo ke follower** (`M13-B2`) — seller mengirim satu pengumuman ke seluruh follower tokonya sebagai notifikasi in-app, dibatasi 1× per 24 jam.
+  - Enum `NotificationType.SHOP_BROADCAST` + model `ShopBroadcast` (migration `20260801100000_m13_b2_shop_broadcast`, aditif murni).
+  - `POST /api/v1/seller/broadcast` — menolak sebelum menulis apa pun kalau: jeda 24 jam belum lewat (429 + sisa waktu), toko belum punya follower (400), atau `productId` bukan milik toko sendiri (400).
+  - `GET /api/v1/seller/broadcast` — riwayat + `recipientCount`, digabung dengan `status` (jumlah follower & sisa jeda) supaya halaman seller cukup satu request untuk memutuskan tombol kirim aktif atau tidak.
+  - Halaman `/seller/broadcast` (form judul/isi/pilih produk + riwayat) dan menu "📣 Broadcast" di `SellerShell`.
+  - `broadcastCooldownRemainingMs` / `canBroadcastNow` / `formatCooldownRemaining` di `packages/shared/src/utils/broadcast.ts` + `broadcastCreateSchema` — 13 unit test.
+  - E2E `broadcast.spec.ts` (TC-TKPDD-165–166).
+
+### Fixed
+- **Notifikasi diskusi (`NEW_QUESTION`, M8-A3) tidak lagi tampil sebagai "🔔 Sistem".** Union tipe di `apps/web/src/lib/api/notifications.ts` tertinggal saat M8-A3 sehingga tipe itu jatuh ke fallback `TYPE_LABEL.SYSTEM`. Diperbaiki sekalian karena daftar yang sama harus ditambah untuk `SHOP_BROADCAST`.
+
+### Notes
+- **Fan-out berjalan setelah respons terkirim** (`res.on('finish')`), bukan di jalur request: 1000 follower berarti round-trip penulisan notifikasi yang sama sekali tidak memengaruhi jawaban untuk seller. Ditulis `createMany` per 500 baris. Konsekuensinya notifikasi tiba beberapa saat setelah 201 — e2e menunggunya dengan `expect.poll`, bukan membaca sekali lalu menyimpulkan gagal.
+- **Jeda 24 jam ditegakkan dengan advisory lock per toko, bukan "baca lalu tulis".** Dua klik beruntun sama-sama membaca "belum ada broadcast" sebelum salah satunya sempat menulis, lalu keduanya lolos dan follower menerima notifikasi dobel. `INSERT ... WHERE NOT EXISTS` **juga tidak** menutup celah ini: pada isolasi READ COMMITTED (default Postgres) subquery-nya tidak melihat baris transaksi lain yang belum commit. `pg_advisory_xact_lock(hashtext(shopId))` di dalam transaksi adalah yang benar-benar menyerialkan keduanya, dan hanya menahan pengirim ke toko yang sama.
+- **Rate limiter existing (`middleware/rateLimit.ts`) tidak dipakai** — limiter itu per-IP, sedangkan batas ini milik toko: satu seller berpindah jaringan akan lolos, dan dua seller di satu kantor akan saling menghabiskan jatah.
+- **Toko tanpa follower = 400, bukan sukses kosong.** Kalau dibiarkan "berhasil", jatah 24 jamnya tetap terpakai untuk kiriman yang tidak sampai ke siapa pun.
+- **Produk yang disorot wajib aktif, bukan sekadar milik toko sendiri.** Broadcast tidak bisa ditarik kembali; menautkan ribuan follower ke halaman produk yang sedang dinonaktifkan berarti mengirim tautan mati sekali untuk selamanya. Picker di halaman seller pun hanya memuat produk `ACTIVE`.
+- **`SHOP_BROADCAST` dibuat terpisah dari `PROMO`** supaya kiriman massal toko bisa dibedakan (dan nanti dibisukan) tanpa ikut membungkam notifikasi promo yang dipicu aksi user sendiri.
+- **`ShopBroadcast.productId` memakai `ON DELETE SET NULL`, bukan cascade.** Baris riwayat itulah yang menahan jendela 24 jam berikutnya — kalau ikut terhapus bersama produknya, seller bisa broadcast lagi seketika.
+- **User yang sudah di-soft-delete disaring dari daftar penerima.** Notifikasinya tidak akan pernah dibaca, tapi ikut terhitung di `recipientCount` sehingga angka jangkauan di riwayat mengklaim lebih banyak daripada kenyataannya.
+- **Kegagalan fan-out tidak membatalkan baris riwayat** (sudah di luar jalur respons, hanya dicatat ke pino). Pilihan yang disengaja: lebih baik satu kiriman gagal daripada jedanya ikut hilang dan follower dibanjiri percobaan ulang.
+- **E2E-nya menuntut DB yang segar** untuk jalur suksesnya, karena jeda 24 jam tidak bisa direset lewat API — dan memang tidak boleh bisa, endpoint reset akan jadi lubang untuk menghindari batasnya di produksi. Pesan gagalnya menyebut `npm run db:seed`. Urutan test di berkas itu juga sengaja: semua pemeriksaan penolakan dijalankan sebelum broadcast yang berhasil, karena setelahnya jeda 24 jam menutup semua jalur lain dengan 429 sebelum sempat sampai ke pemeriksaan yang mau diuji.
+- **Belum terverifikasi di lingkungan lokal** — mesin dev tidak punya Postgres/Docker, jadi migration belum pernah diterapkan dan e2e belum pernah dijalankan; keduanya bergantung workflow `e2e.yml`. Yang lolos lokal: `tsc` api + web + shared + database, lint, **232 unit test** (13 baru), dan `playwright test --list`.
 ## [Unreleased] — Perbaikan: Deploy Menembus Batas Waktu di Lapisan Chromium
 
 ### Fixed

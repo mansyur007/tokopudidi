@@ -2,7 +2,10 @@ import { apiFetch } from './client';
 
 export interface NotificationItem {
   id: string;
-  type: 'ORDER_UPDATE' | 'NEW_MESSAGE' | 'PROMO' | 'SYSTEM';
+  // Cerminkan enum `NotificationType` di schema. `NEW_QUESTION` (M8-A3) selama
+  // ini tertinggal di sini sehingga notifikasi diskusi jatuh ke label "Sistem";
+  // ditambahkan sekalian bersama SHOP_BROADCAST (M13-B2) supaya daftarnya utuh.
+  type: 'ORDER_UPDATE' | 'NEW_MESSAGE' | 'PROMO' | 'SYSTEM' | 'NEW_QUESTION' | 'SHOP_BROADCAST';
   title: string;
   body: string;
   linkUrl: string | null;

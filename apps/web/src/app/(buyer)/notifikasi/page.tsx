@@ -18,6 +18,8 @@ const TYPE_LABEL: Record<NotificationItem['type'], { emoji: string; tag: string 
   NEW_MESSAGE:  { emoji: '💬', tag: 'Chat' },
   PROMO:        { emoji: '🎉', tag: 'Promo' },
   SYSTEM:       { emoji: '🔔', tag: 'Sistem' },
+  NEW_QUESTION: { emoji: '❓', tag: 'Diskusi' },
+  SHOP_BROADCAST: { emoji: '📣', tag: 'Toko' },
 };
 
 export default function NotificationsPage() {

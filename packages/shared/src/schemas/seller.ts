@@ -337,3 +337,28 @@ export const showcaseMoveSchema = z.object({
   direction: z.enum(['up', 'down']),
 });
 export type ShowcaseMoveInput = z.infer<typeof showcaseMoveSchema>;
+
+// ===== Broadcast promo ke follower (M13-B2) =====
+// Isi broadcast masuk ke kolom `Notification.body` follower dan tidak bisa
+// ditarik kembali setelah terkirim, jadi batas panjangnya dibuat lebih ketat
+// daripada deskripsi biasa: 500 karakter sudah lebih dari cukup untuk sebuah
+// pengumuman, dan menahan kiriman yang tidak terbaca di daftar notifikasi.
+export const BROADCAST_TITLE_MAX = 60;
+export const BROADCAST_BODY_MAX = 500;
+
+export const broadcastCreateSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(3, 'Judul minimal 3 karakter')
+    .max(BROADCAST_TITLE_MAX, `Judul maksimal ${BROADCAST_TITLE_MAX} karakter`),
+  body: z
+    .string()
+    .trim()
+    .min(10, 'Isi pengumuman minimal 10 karakter')
+    .max(BROADCAST_BODY_MAX, `Isi pengumuman maksimal ${BROADCAST_BODY_MAX} karakter`),
+  // Produk yang disorot — opsional. Kepemilikannya (produk ini milik toko yang
+  // mengirim) tidak bisa dicek di sini, jadi ditegakkan di route.
+  productId: z.string().uuid('Produk tidak valid').nullable().optional(),
+});
+export type BroadcastCreateInput = z.infer<typeof broadcastCreateSchema>;

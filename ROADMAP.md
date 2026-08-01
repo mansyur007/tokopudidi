@@ -1,9 +1,11 @@
 # 🗺️ Tokopudidi — Roadmap M7–M15
 
-> **Status dokumen**: Draft 3 · Terakhir di-update: **2026-07-30**
+> **Status dokumen**: Draft 3 · Terakhir di-update: **2026-08-01**
 > **Sumber kebenaran** untuk milestone setelah M6. Setiap item adalah unit pekerjaan yang bisa di-klaim per orang/tim.
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
+>
+> **Progress (2026-08-01)** — **M13 tuntas**: B2 Broadcast Promo selesai (A1 Follow Toko, A2 Invoice, B1 Harga Grosir sudah lebih dulu). Milestone berikutnya yang bebas di-klaim: **M14** (A1 Login Google, A2 Email Transaksional, B1 Badge Reputasi, B2 Bulk Edit).
 >
 > **Progress (2026-07-31)** — **M13-A2 Invoice Pesanan** & **M13-B1 Harga Grosir** selesai. Sisa M13 yang bebas di-klaim: **B2 Broadcast** (blokirnya lepas sejak M13-A1).
 >
@@ -776,7 +778,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M13-B2. Broadcast Promo ke Follower
-- **Status**: 🔵 TODO (blokirnya lepas — M13-A1 selesai) · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-08-01): rencana menulis "cek `ShopBroadcast.sentAt` terakhir di DB" — benar, tapi **cara mengeceknya tidak boleh 'baca lalu tulis'**: dua klik beruntun sama-sama membaca "belum ada broadcast" sebelum salah satunya sempat menulis, lalu keduanya lolos dan follower menerima notifikasi dobel. Percobaan pertama memakai `INSERT ... SELECT ... WHERE NOT EXISTS` dengan anggapan itu atomik — **keliru**: pada isolasi READ COMMITTED (default Postgres) subquery-nya tidak melihat baris transaksi lain yang belum commit, jadi celahnya persis sama. Yang dipakai sekarang `pg_advisory_xact_lock(hashtext(shopId))` di dalam transaksi — menyerialkan pengirim ke toko yang sama saja, toko lain tidak ikut antre, dan kuncinya lepas sendiri saat rollback sehingga lemparan 429 tidak bisa meninggalkan toko terkunci. Pembacaan sisa waktu sebelum kunci tetap ada tapi cuma jalan pintas untuk pesan; yang mengikat adalah pembacaan **di dalam** kunci. Konstanta 24 jam + `broadcastCooldownRemainingMs`/`formatCooldownRemaining` ditaruh di `packages/shared/src/utils/broadcast.ts` (13 unit test) karena API dan halaman seller harus sepakat — kalau angkanya ditulis dua kali, tombolnya menyala lebih dulu daripada API mau menerima dan seller mengetik pengumuman lengkap untuk kemudian ditolak. Halaman seller menghitung ulang sisa jeda tiap 30 detik dari `lastSentAt`, bukan menghitung mundur angka yang dibekukan saat load (halaman yang dibiarkan terbuka semalaman akan bohong). Fan-out dipasang di `res.on('finish')` — respons benar-benar terkirim dulu. **Di luar rencana**: `productId` di riwayat memakai `ON DELETE SET NULL`, bukan cascade — baris riwayat itulah yang menahan jendela 24 jam berikutnya, kalau ikut terhapus bersama produknya seller bisa broadcast lagi seketika; dan user yang sudah soft-delete disaring dari penerima supaya `recipientCount` tidak mengklaim jangkauan yang tidak pernah ada. **Bug lama yang ikut diperbaiki**: union `NotificationItem['type']` di FE tertinggal sejak M8-A3, sehingga notifikasi diskusi (`NEW_QUESTION`) tampil sebagai "🔔 Sistem" — daftarnya harus disentuh untuk `SHOP_BROADCAST`, jadi sekalian dilengkapi. **Utang yang disadari**: jalur sukses e2e menuntut DB segar karena jeda 24 jam tidak bisa direset lewat API — dan memang tidak boleh bisa, endpoint reset akan jadi lubang untuk menghindari batasnya di produksi; pesan gagalnya menyebut `npm run db:seed`. **Belum terverifikasi lokal** (mesin dev tanpa Postgres/Docker): migration & e2e bergantung CI. Lolos lokal: `tsc` api+web+shared+database, lint, 232 unit test, `playwright test --list`. TC-TKPDD-165–166 perlu didaftarkan di TestForge.
 - **Scope**: Seller kirim pengumuman ke semua follower via notifikasi in-app. Rate-limited 1×/24 jam per toko.
 - **Konteks kode (audit 2026-07-29)**:
   - **Koreksi rencana lama**: enum `NotificationType` ([schema.prisma:52-58](packages/database/prisma/schema.prisma#L52)) belum punya `SHOP_BROADCAST` → item ini **butuh migration** (enum aditif + model `ShopBroadcast`).
@@ -788,10 +791,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - `GET /api/v1/seller/broadcast` — riwayat + recipientCount
 - **UI**: halaman sendiri `apps/web/src/app/seller/broadcast/page.tsx` (form title/body/product-picker + riwayat) + menu di `SellerShell.tsx`.
 - **Acceptance**:
-  - [ ] Broadcast ke-2 dalam 24 jam → 429 dengan pesan sisa waktu
-  - [ ] Follower dapat notif tipe `SHOP_BROADCAST`, klik → toko/produk terkait
-  - [ ] Fan-out 1000 follower tidak menahan respons (batch async)
-  - [ ] Toko tanpa follower → 400 dengan pesan jelas
+  - [x] Broadcast ke-2 dalam 24 jam → 429 dengan pesan sisa waktu — e2e TC-166 memeriksa status **dan** bentuk pesannya (`/\d+ (jam|menit)/`), bukan cuma kodenya
+  - [x] Follower dapat notif tipe `SHOP_BROADCAST`, klik → toko/produk terkait — e2e TC-166 menunggu notifikasinya benar-benar tertulis (fan-out async) lalu memeriksa `linkUrl`
+  - [x] Fan-out 1000 follower tidak menahan respons (batch async) — `res.on('finish')` + `createMany` per 500
+  - [x] Toko tanpa follower → 400 dengan pesan jelas — e2e TC-165, sekaligus memastikan penolakan tidak menulis baris riwayat (jatah 24 jamnya utuh)
 - **Effort**: M
 
 ---
