@@ -1,8 +1,11 @@
 import { prisma } from '@tokopudidi/database';
+import { getShopBadge, type ShopBadge } from '@tokopudidi/shared';
 import { NotFoundError, BadRequestError } from '../../lib/errors';
 
 // Bentuk kartu toko — sama persis dengan `ShopCard` yang dipakai /shops/featured
-// supaya grid di /akun/toko-favorit bisa memakai komponen yang sama.
+// supaya grid di /akun/toko-favorit bisa memakai komponen yang sama. Karena itu
+// `badge` (M14-B1) wajib ikut di sini juga: kalau ketinggalan, toko yang sama
+// tampil ber-badge di homepage tapi polos di daftar favorit.
 export interface ShopCard {
   id: string;
   slug: string;
@@ -12,6 +15,7 @@ export interface ShopCard {
   ratingAvg: number;
   ratingCount: number;
   totalSold: number;
+  badge: ShopBadge | null;
 }
 
 export interface FollowingResult {
@@ -24,7 +28,16 @@ export interface FollowingResult {
 const SHOP_CARD_SELECT = {
   id: true, slug: true, name: true, logoUrl: true, city: true,
   ratingAvg: true, ratingCount: true, totalSold: true,
+  // Bahan badge — dibuang lagi di `toShopCard`, hanya hasilnya yang dikirim.
+  ktpVerified: true, isOfficialStore: true,
 } as const;
+
+function toShopCard(
+  s: { ktpVerified: boolean; isOfficialStore: boolean } & Omit<ShopCard, 'badge'>,
+): ShopCard {
+  const { ktpVerified, isOfficialStore, ...rest } = s;
+  return { ...rest, badge: getShopBadge({ ktpVerified, isOfficialStore, ...rest }) };
+}
 
 /**
  * Cari toko hidup berdasarkan slug. Follow ke toko yang sudah dihapus tidak
@@ -91,5 +104,5 @@ export async function listFollowedShops(
     }),
   ]);
 
-  return { items: rows.map((r) => r.shop), total, page, limit };
+  return { items: rows.map((r) => toShopCard(r.shop)), total, page, limit };
 }

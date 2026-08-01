@@ -3,6 +3,29 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M14-B1: Badge Reputasi Toko
+
+### Added
+- **Badge reputasi toko** (`M14-B1`) — `OFFICIAL` > `STAR_PLUS` > `STAR` > tanpa badge, **diturunkan saat dibaca** dari kolom yang sudah ada. Tanpa migration, tanpa kolom baru, tanpa cron.
+  - `getShopBadge` + `getShopBadgeMeta` di `packages/shared/src/utils/badge.ts` — 14 unit test.
+  - Badge dikirim **sudah jadi** oleh API di kartu produk, detail produk, detail toko, toko unggulan, dan daftar toko favorit.
+  - Komponen `ShopBadgeMark` dipakai di kelima tempat itu — satu ikon, satu tooltip, tidak berbeda antar halaman.
+  - E2E `badge.spec.ts` (TC-TKPDD-167–169).
+
+### Fixed
+- **Label "Official Store" di halaman produk tidak lagi bersumber `ktpVerified`** (utang `M10-A10`). `ktpVerified` hanya berarti KTP penjualnya sudah dicek admin; "Official Store" adalah status kurasi yang punya kolomnya sendiri (`isOfficialStore`). Menyamakan keduanya membuat **setiap** toko terverifikasi tampil sebagai official store di mata pembeli.
+- **Tanda centang ✅ di header toko** berasal dari kekeliruan yang sama dan ikut diganti badge sebenarnya.
+
+### Notes
+- **`ktpVerified` dan `isOfficialStore` dihapus dari respons buyer** (`/shops/:slug`, `/shops/featured`, `/products/:slug`). Ini bukan penghematan payload melainkan penutup jalan: selama bahan mentahnya masih terkirim, kekeliruan "hitung ulang aturan di FE" gampang terulang. E2E TC-167 menembak ketiga endpoint untuk memastikan keduanya benar-benar hilang.
+- **Enam query yang membangun kartu produk dipusatkan ke `CARD_SHOP_SELECT`.** Listing, related, for-you, wishlist, baru-dilihat, dan produk di halaman toko masing-masing punya `shop: { select: … }` literal sendiri. Kalau field badge ditambahkan satu per satu, cepat atau lambat ada yang tertinggal dan toko yang sama tampil ber-badge di beranda tapi polos di wishlist. Sekarang `CardRow` membuat kelalaian itu jadi error tsc, bukan bug diam.
+- **`ShopCard` daftar toko favorit ikut dapat `badge`** — kontraknya memang "sama persis dengan `/shops/featured`", jadi kalau ketinggalan, toko yang sama tampil beda di dua halaman.
+- **`ktpVerified` disyaratkan untuk badge performa, tapi tidak untuk `OFFICIAL`.** Official adalah keputusan kurasi admin dan tidak boleh dicabut mesin hanya karena rating sedang turun; sebaliknya badge performa tidak boleh bisa dikarang toko yang identitasnya belum pernah diperiksa lewat segelintir transaksi berating bagus.
+- **Ambang badge inklusif** (`>=`), dan unit test-nya memakai konstanta ambang itu langsung — menggeser ambang tidak bisa diam-diam mengubah arti test.
+- **Jebakan yang dicegat saat menulis e2e:** percobaan pertama memanggil `/shops/:slug/products`, route yang tidak ada. Karena dibungkus `if (status === 200)`, test-nya akan "lolos" tanpa memeriksa apa pun. Diganti ke `/products?shopId=` dengan assertion tanpa syarat.
+- Nilai `ratingAvg`/`totalSold` di seed acak, jadi e2e **tidak pernah menuntut badge tertentu** dari data seed. Yang diperiksa adalah perubahannya saat flag official di-toggle admin lalu dikembalikan — sekaligus bukti badge memang diturunkan saat dibaca, bukan disimpan.
+- **Belum terverifikasi di lingkungan lokal** — mesin dev belum punya Postgres/Docker (Docker sedang dipasang), jadi e2e bergantung workflow `e2e.yml`. Yang lolos lokal: `tsc` api + web + shared + database, lint, **246 unit test** (14 baru), dan `playwright test --list`.
+
 ## [Unreleased] — M13-B2: Broadcast Promo ke Follower
 
 ### Added

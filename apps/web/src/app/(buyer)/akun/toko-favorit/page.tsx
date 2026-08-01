@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SmartImage } from '@/components/media/SmartImage';
+import { ShopBadgeMark } from '@/components/shop/ShopBadgeMark';
 import { useAuthStore } from '@/store/auth';
 import { useFollowStore } from '@/store/follow';
 import { getFollowedShops, type FollowingResult } from '@/lib/api/follow';
@@ -78,7 +79,10 @@ export default function TokoFavoritPage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{s.name}</p>
+                  <p className="text-sm font-medium truncate flex items-center gap-1">
+                    <span className="truncate">{s.name}</span>
+                    <ShopBadgeMark badge={s.badge} />
+                  </p>
                   <p className="text-xs text-gray-500 truncate">📍 {s.city}</p>
                   <p className="text-xs text-gray-600 mt-0.5">
                     ⭐ {s.ratingAvg.toFixed(1)} ({s.ratingCount}) • {s.totalSold} terjual

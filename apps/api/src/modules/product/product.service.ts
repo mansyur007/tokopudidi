@@ -1,7 +1,22 @@
 import { prisma, Prisma } from '@tokopudidi/database';
-import { getEffectivePrice, getDiscountPct } from '@tokopudidi/shared';
-import type { ProductListQuery } from '@tokopudidi/shared';
+import { getEffectivePrice, getDiscountPct, getShopBadge } from '@tokopudidi/shared';
+import type { ProductListQuery, ShopBadge } from '@tokopudidi/shared';
 import { withVariantValues } from './variant.read';
+
+/**
+ * Field toko yang perlu diambil untuk sebuah kartu produk (M14-B1).
+ *
+ * Dipakai bersama oleh SEMUA query yang bermuara ke `toProductCard` — listing,
+ * related, for-you, wishlist, baru-dilihat, dan produk di halaman toko. Satu
+ * konstanta, bukan enam salinan literal: kalau kriteria badge nanti butuh field
+ * baru, satu tempat yang berubah dan `CardRow` memaksa sisanya ikut (kalau ada
+ * yang tertinggal, tsc yang menagih — bukan kartu yang diam-diam kehilangan
+ * badge di satu halaman saja).
+ */
+export const CARD_SHOP_SELECT = {
+  id: true, name: true, slug: true, city: true,
+  isOfficialStore: true, ktpVerified: true, ratingAvg: true, totalSold: true,
+} as const;
 
 // Output ringkas untuk listing card. Hindari send semua relasi supaya payload kecil.
 export interface ProductCard {
@@ -16,7 +31,10 @@ export interface ProductCard {
   ratingAvg: number;
   ratingCount: number;
   soldCount: number;
-  shop: { id: string; name: string; slug: string; city: string };
+  // Badge dikirim sebagai HASIL, bukan bahan mentahnya: `ratingAvg`/`totalSold`
+  // milik toko tidak dipakai untuk apa pun lagi di kartu, jadi mengirimnya cuma
+  // memperbesar payload dan menggoda FE menghitung ulang aturan yang sama.
+  shop: { id: string; name: string; slug: string; city: string; badge: ShopBadge | null };
 }
 
 export type CardRow = {
@@ -24,7 +42,10 @@ export type CardRow = {
   price: number; salePrice: number | null; saleStartAt: Date | null; saleEndAt: Date | null;
   ratingAvg: number; ratingCount: number; soldCount: number;
   images: { url: string }[];
-  shop: { id: string; name: string; slug: string; city: string };
+  shop: {
+    id: string; name: string; slug: string; city: string;
+    isOfficialStore: boolean; ktpVerified: boolean; ratingAvg: number; totalSold: number;
+  };
 };
 
 export function toProductCard(p: CardRow): ProductCard {
@@ -42,7 +63,13 @@ export function toProductCard(p: CardRow): ProductCard {
     ratingAvg: p.ratingAvg,
     ratingCount: p.ratingCount,
     soldCount: p.soldCount,
-    shop: p.shop,
+    shop: {
+      id: p.shop.id,
+      name: p.shop.name,
+      slug: p.shop.slug,
+      city: p.shop.city,
+      badge: getShopBadge(p.shop),
+    },
   };
 }
 
@@ -112,7 +139,7 @@ export async function listProducts(query: ProductListQuery): Promise<{
       take: query.limit,
       include: {
         images: { orderBy: { order: 'asc' }, take: 1 },
-        shop:   { select: { id: true, name: true, slug: true, city: true } },
+        shop:   { select: CARD_SHOP_SELECT },
       },
     }),
   ]);
@@ -159,12 +186,22 @@ export async function getProductBySlug(slug: string) {
         select: {
           id: true, name: true, slug: true, logoUrl: true, city: true,
           ratingAvg: true, ratingCount: true, totalSold: true, isOpen: true,
-          ktpVerified: true,
+          ktpVerified: true, isOfficialStore: true,
         },
       },
     },
   });
-  return product ? withVariantValues(product) : product;
+  if (!product) return product;
+
+  // `ktpVerified` & `isOfficialStore` sengaja TIDAK ikut keluar ke pembeli:
+  // keduanya bahan mentah badge, dan sebelum M14-B1 justru `ktpVerified` inilah
+  // yang salah dipakai FE untuk melabeli "Official Store". Menghapusnya dari
+  // payload memastikan kekeliruan itu tidak bisa terulang diam-diam.
+  const { ktpVerified, isOfficialStore, ...shop } = product.shop;
+  return withVariantValues({
+    ...product,
+    shop: { ...shop, badge: getShopBadge({ ktpVerified, isOfficialStore, ...shop }) },
+  });
 }
 
 export async function getRelatedProducts(productId: string, limit = 6): Promise<ProductCard[]> {
@@ -189,7 +226,7 @@ export async function getRelatedProducts(productId: string, limit = 6): Promise<
     take: limit,
     include: {
       images: { orderBy: { order: 'asc' }, take: 1 },
-      shop: { select: { id: true, name: true, slug: true, city: true } },
+      shop: { select: CARD_SHOP_SELECT },
     },
   });
 
@@ -252,7 +289,7 @@ export async function getForYouProducts(userId: string | undefined, limit = 30):
     take: limit,
     include: {
       images: { orderBy: { order: 'asc' }, take: 1 },
-      shop: { select: { id: true, name: true, slug: true, city: true } },
+      shop: { select: CARD_SHOP_SELECT },
     },
   });
 

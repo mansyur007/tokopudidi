@@ -2,6 +2,7 @@ import { SmartImage } from '@/components/media/SmartImage';
 import { formatTanggal } from '@tokopudidi/shared';
 import { ReportButton } from '@/components/report/ReportButton';
 import { ShopFollow } from './ShopFollow';
+import { ShopBadgeMark } from './ShopBadgeMark';
 import type { ShopDetail } from '@/lib/api/shops';
 
 /**
@@ -27,7 +28,10 @@ export function ShopHeader({ shop }: { shop: ShopDetail }) {
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold flex items-center gap-1">
               {shop.name}
-              {shop.ktpVerified && <span title="Terverifikasi" aria-label="Terverifikasi">✅</span>}
+              {/* M14-B1: dulu ✅ dari `ktpVerified` — tanda cek itu terbaca
+                  pembeli sebagai "toko resmi", padahal artinya cuma KTP
+                  penjualnya sudah dicek. Sekarang badge sebenarnya. */}
+              <ShopBadgeMark badge={shop.badge} showLabel />
             </h1>
             <p className="text-xs text-gray-500">📍 {shop.city}{shop.province ? `, ${shop.province}` : ''}</p>
             <p className="text-xs text-gray-500">Bergabung sejak {formatTanggal(shop.joinedAt)}</p>

@@ -15,6 +15,7 @@ import { BuyBox } from '@/components/product/BuyBox';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ReportButton } from '@/components/report/ReportButton';
+import { ShopBadgeMark } from '@/components/shop/ShopBadgeMark';
 import { Icon } from '@/components/shell/Icon';
 
 interface Props { params: { slug: string } }
@@ -122,10 +123,12 @@ export default async function ProductDetailPage({ params }: Props) {
 
           {/* Kolom 2 — Info */}
           <div className="flex flex-col gap-3.5 min-w-0">
-            {product.shop.ktpVerified && (
-              <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                <Icon name="shield" size={14} /> Official Store
-              </div>
+            {/* M14-B1: label ini dulu dirender dari `ktpVerified`, yang cuma
+                berarti "KTP penjualnya sudah dicek admin" — bukan Official
+                Store. Sekarang dari badge yang dihitung API, dan tulisannya
+                mengikuti badge yang benar-benar dipegang toko. */}
+            {product.shop.badge && (
+              <ShopBadgeMark badge={product.shop.badge} showLabel />
             )}
             <h1 className="text-[21px] font-bold leading-snug m-0 text-ink">{product.name}</h1>
 
@@ -178,11 +181,7 @@ export default async function ProductDetailPage({ params }: Props) {
               <div className="flex-1 min-w-0">
                 <Link href={`/toko/${product.shop.slug}`} className="flex items-center gap-1.5 font-bold text-sm text-ink no-underline">
                   <span className="truncate">{product.shop.name}</span>
-                  {product.shop.ktpVerified && (
-                    <span className="w-4 h-4 rounded-full bg-primary text-white grid place-items-center shrink-0">
-                      <Icon name="check" size={10} stroke={3} />
-                    </span>
-                  )}
+                  <ShopBadgeMark badge={product.shop.badge} />
                 </Link>
                 <div className="text-[11.5px] text-ink-muted mt-0.5 inline-flex items-center gap-1">
                   <span className="inline-flex items-center gap-0.5 text-star">
