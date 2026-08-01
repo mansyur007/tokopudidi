@@ -27,7 +27,12 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 25m
+          # 25m pernah tidak cukup (deploy 2026-07-31): saat lapisan Chromium
+          # harus dibangun ulang, unduhan apt di VPS ini bisa sendirian memakan
+          # ~20 menit. Urutan lapisan di Dockerfile sudah diperbaiki supaya itu
+          # jarang terjadi, tapi rebuild tetap wajib saat dependency atau schema
+          # Prisma berubah — jadi batasnya diberi kelonggaran, bukan dipepetkan.
+          command_timeout: 45m
           script: |
             set -e
             cd /opt/tokopudidi
