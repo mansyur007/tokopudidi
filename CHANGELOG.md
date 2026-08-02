@@ -3,6 +3,32 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M15-C1: Flash Sale (Event Terjadwal)
+
+### Added
+- **Flash sale terjadwal** (`M15-C1`) — event dikurasi admin, berisi slot produk dengan harga khusus + **kuota**. Beda dari diskon periodik (M9-B3): terpusat, dan jumlah unit yang dijual dengan harga itu dibatasi.
+  - Model `FlashSale` + `FlashSaleItem`, dan kolom snapshot `OrderItem.flashSaleItemId` (migration `m15_c1_flash_sale`, aditif murni).
+  - `GET /api/v1/flash-sales/active` — event berjalan + kartu produk + sisa kuota. `null` kalau tidak ada, bukan 404.
+  - Admin CRUD `/api/v1/admin/flash-sales` (event) dan `/:id/items` (slot), dengan enam aksi baru di jejak audit (M12-C3).
+  - Section "⚡ Flash Sale" di beranda + halaman `/flash-sale` — hitungan mundur & bar sisa kuota per produk; panel `/admin/flash-sale`.
+  - `resolveUnitPrice` di `packages/shared` — melengkapi kontrak harga lintas-milestone. 24 unit test baru; e2e `flash-sale.spec.ts` (TC-TKPDD-174–178).
+
+### Notes
+- **"Prioritas" itu aturan pemenang saat seri, bukan izin menaikkan harga.** ROADMAP menulis flash > sale > grosir, dan dibaca harfiah itu berarti harga flash Rp 60.000 mengalahkan tier grosir Rp 45.000 — pembeli yang memborong justru ditagih lebih mahal, persis kebalikan dari yang dijanjikan kata "grosir" dan kebalikan dari kontrak `min` yang sudah ditulis M13-B1. Yang ditegakkan sekarang: yang dibayar selalu kandidat termurah, dan urutan prioritas hanya menentukan siapa yang dilaporkan ketika angkanya sama persis.
+- **`resolveUnitPrice` mengembalikan `source`, dan itu bukan hiasan.** Checkout memotong kuota flash **hanya** kalau harga flash yang benar-benar menang. Kalau tier grosir lebih murah, pembeli membayar harga tier dan slot flash-nya tidak ikut terbakar — kuota yang sudah diiklankan ke pembeli lain tidak boleh habis oleh transaksi yang tidak memakainya.
+- **Harga checkout kini dihitung DI DALAM transaksi.** Ini perubahan struktur pada `checkout()`, bukan tambahan: sejak ada kuota, harga sebuah item baru pasti setelah slotnya benar-benar dipesan, dan slot bisa keburu diambil orang lain. Menghitung subtotal di luar transaksi berarti `Order.total` bisa tidak sama dengan jumlah itemnya tepat pada kasus balapan — kasus yang paling sulit ditelusuri belakangan. Validasi promo ikut masuk ke transaksi karena diskonnya berbasis subtotal itu.
+- **Pemesanan kuota memakai SQL mentah, bukan `updateMany`.** Syaratnya membandingkan dua kolom (`soldCount + qty <= quota`) dan Prisma tidak bisa menyusun itu. Alternatif yang disarankan rencana lama — baca `quota` dulu lalu `soldCount: { lte: quota - qty }` — menyisakan celah: kalau admin menurunkan kuota di antara baca dan tulis, penjagaannya memakai angka basi.
+- **Kuota habis tidak menggagalkan checkout.** Item itu jatuh ke harga normal dan belanjanya lanjut. Menggagalkan seluruh pesanan karena satu slot promo habis adalah menghukum pembeli atas keterlambatan sepersekian detik.
+- **Pelepasan kuota menumpang di `restoreStock`**, titik yang sama dengan pengembalian stok — jadi cancel, kedaluwarsa QRIS (M10-A5), dan refund (M10-A7) ikut benar tanpa masing-masing harus mengingatnya, begitu juga jalur pembatalan keempat nanti.
+- **Snapshot `OrderItem.flashSaleItemId` tidak bisa diganti tebakan dari harga.** Harga flash bisa diubah admin setelah pesanan dibuat, jadi mencocokkan `OrderItem.price` dengan `FlashSaleItem.salePrice` akan salah melepas kuota.
+- **Slot & event yang sudah dipakai baris pesanan tidak bisa dihapus** (422, admin diarahkan menjeda). `soldCount` yang sudah kembali ke 0 **tidak** berarti tidak ada yang menunjuk ke sana: baris pesanan yang batal tetap ada, dan menghapus slotnya membuat pembatalan berikutnya kehilangan sasaran. Karena itu yang diperiksa adalah keberadaan `OrderItem`, bukan `soldCount`.
+- **Pemeriksaan tumpang tindih menyertakan event yang dijeda**, dan ikut jalan saat **periode event diubah** — bukan hanya saat slot ditambahkan. Tanpa yang kedua, aturan "satu harga flash per produk per jam" ditegakkan di pintu masuk slot lalu bocor lewat pintu edit event.
+- **Harga flash dipasang ke kartu lewat `applyFlashPrices`, satu pasca-proses atas `ProductCard[]`** — bukan lookup yang disisipkan ke enam `include` yang berbeda. Alasannya sama dengan `CARD_SHOP_SELECT` di M14-B1, dengan taruhan lebih besar: badge yang beda antar halaman itu membingungkan, harga yang beda antar halaman itu tidak bisa dipercaya. Keranjang & halaman detail ikut memakainya supaya angka yang dibaca sebelum menekan Bayar sama dengan yang ditagih.
+- **Hitungan mundur mendapat bagian "N hari".** Bentuk `HH:MM:SS` polos merender event tujuh hari sebagai "165:30:47" — benar secara aritmetika, tidak terbaca siapa pun. Kekeliruan itu lolos sampai e2e TC-177 menampilkannya; formatnya kini `formatSisaWaktu` di shared, dipakai bersama section beranda dan BuyBox, dengan unit test yang mengunci kedua bentuknya.
+- **TC-155 (viewer jejak audit) ikut diperbarui**: jumlah opsi filter aksi naik 22 → 28. Angka literal itu memang dipasang penulisnya sebagai tripwire agar penambahan aksi admin tidak lewat tanpa disadari, dan kali ini ia bekerja persis seperti itu.
+- **Test balapan kuota (TC-178) sempat tidak bergigi.** Versi pertamanya memakai `Promise.all` atas satu `APIRequestContext`; permintaannya terserialisasi, jadi checkout kedua sudah membaca kuota nol dan yang teruji cuma jalur sekuensial — test-nya tetap hijau walau syarat `soldCount + qty <= quota` dibuang dari kodenya. Ketahuan karena penjaganya sengaja dilumpuhkan untuk memeriksa apakah test-nya benar-benar menangkap. Sekarang dua lapis: satu bagian deterministik (beli 2 saat kuota tinggal 1 → jatuh ke harga normal, `soldCount` tidak tersentuh) yang tidak bergantung waktu sama sekali, dan konteks HTTP terpisah untuk bagian yang benar-benar bersamaan.
+- **Terverifikasi lokal (2026-08-02).** `docker compose up -d` → `prisma migrate reset` → `prisma migrate deploy` → `db:seed` → **65/65 e2e lolos**, termasuk TC-174–178. Lolos juga: `tsc` api + web + shared + database, lint, dan **288 unit test** (24 baru). Section beranda, halaman `/flash-sale`, detail produk, dan panel `/admin/flash-sale` diperiksa langsung di browser. TC-TKPDD-174–178 perlu didaftarkan di TestForge.
+
 ## [Unreleased] — M14-B2: Bulk Edit Stok & Harga
 
 ### Added

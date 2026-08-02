@@ -4,7 +4,7 @@ import { getShopBadge } from '@tokopudidi/shared';
 import { ok } from '../../lib/response';
 import { NotFoundError } from '../../lib/errors';
 import { requireAuth } from '../../middleware/auth';
-import { toProductCard, CARD_SHOP_SELECT } from '../product/product.service';
+import { toProductCard, applyFlashPrices, CARD_SHOP_SELECT } from '../product/product.service';
 import { followShop, unfollowShop } from '../follow/follow.service';
 
 export const shopRouter = Router();
@@ -144,10 +144,11 @@ shopRouter.get('/:slug/showcase/:showcaseSlug', async (req, res, next) => {
       }),
     ]);
 
-    // Lewat toProductCard yang sama dengan listing lain — harga sale (M9-B3) ikut.
+    // Lewat toProductCard yang sama dengan listing lain — harga sale (M9-B3)
+    // dan flash sale (M15-C1) ikut.
     return ok(res, {
       showcase,
-      items: rows.map((r) => toProductCard(r.product)),
+      items: await applyFlashPrices(rows.map((r) => toProductCard(r.product))),
       total,
       page,
       limit,

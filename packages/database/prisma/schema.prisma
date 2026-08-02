@@ -318,6 +318,7 @@ model Product {
   showcaseItems  ShopShowcaseProduct[]
   wholesaleTiers ProductWholesaleTier[]
   broadcasts     ShopBroadcast[]
+  flashSaleItems FlashSaleItem[]
   // searchVector dikelola via raw SQL trigger di migration
 
   @@index([shopId])
@@ -497,11 +498,20 @@ model OrderItem {
   price        Int
   quantity     Int
   subtotal     Int
+  // Snapshot slot flash sale yang dipakai baris ini (M15-C1) — terisi HANYA
+  // kalau harga flash yang benar-benar menang. Tanpa kolom ini, pelepasan kuota
+  // saat pesanan batal harus menebak-nebak item mana yang dulu memakai flash
+  // (harga snapshot saja tidak cukup: harga flash bisa berubah setelahnya).
+  flashSaleItemId String?
+  flashSaleItem   FlashSaleItem? @relation(fields: [flashSaleItemId], references: [id], onDelete: SetNull)
 
   review    Review?
   complaint Complaint?
 
   @@index([orderId])
+  // Dipakai admin untuk memastikan sebuah slot belum pernah terpakai sebelum
+  // boleh dihapus.
+  @@index([flashSaleItemId])
 }
 
 model PaymentProof {
@@ -794,6 +804,52 @@ model DiscussionHelpful {
 
   @@id([discussionId, userId])
   @@index([userId])
+}
+
+// ============= FLASH SALE (event terjadwal, M15-C1) =============
+
+// Beda dari diskon periodik produk (M9-B3): event ini dikurasi admin, terpusat,
+// dan ber-kuota — jumlah unit yang dijual dengan harga flash dibatasi, bukan
+// hanya rentang waktunya.
+model FlashSale {
+  id        String   @id @default(uuid())
+  name      String
+  startAt   DateTime
+  endAt     DateTime
+  // Jeda tanpa menghapus: event yang dijeda tetap "memesan" produknya terhadap
+  // pemeriksaan tumpang tindih, supaya mengaktifkannya lagi tidak pernah
+  // menghasilkan dua harga flash untuk produk yang sama di jam yang sama.
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items FlashSaleItem[]
+
+  // Melayani satu-satunya query panas di sisi pembeli: event yang sedang
+  // berjalan sekarang.
+  @@index([isActive, startAt, endAt])
+}
+
+model FlashSaleItem {
+  id          String    @id @default(uuid())
+  flashSaleId String
+  flashSale   FlashSale @relation(fields: [flashSaleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Harga satuan selama event. Divalidasi < Product.price saat disimpan.
+  salePrice   Int
+  // Jumlah unit yang boleh terjual dengan harga flash.
+  quota       Int
+  // Dinaikkan atomik di dalam transaksi checkout, diturunkan lagi lewat
+  // `restoreStock` saat pesanannya batal/kedaluwarsa/direfund.
+  soldCount   Int       @default(0)
+
+  orderItems OrderItem[]
+
+  // Satu produk cukup sekali per event; dua baris untuk produk yang sama
+  // membuat harga & kuotanya ambigu.
+  @@unique([flashSaleId, productId])
+  @@index([productId])
 }
 
 // ============= REPORT / PELAPORAN (M8-C2) =============

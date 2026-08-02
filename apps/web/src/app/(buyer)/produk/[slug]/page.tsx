@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { getProduct, getRelated, listProducts } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
 import {
-  formatRupiah, getEffectivePrice, getDiscountPct,
+  formatRupiah, resolveUnitPrice,
   metaDescription, firstPublicImage, buildProductJsonLd,
 } from '@tokopudidi/shared';
 import { SITE_URL, absoluteUrl } from '@/lib/siteUrl';
@@ -70,6 +70,18 @@ export default async function ProductDetailPage({ params }: Props) {
       .catch(() => []),
     getRelated(product.id).then((items) => items.slice(0, 6)).catch(() => []),
   ]);
+
+  // Harga besar di kepala halaman. Lewat `resolveUnitPrice` yang sama dengan
+  // BuyBox & server, bukan `getEffectivePrice` yang cuma tahu diskon periodik:
+  // sejak M15-C1 harga flash bisa menang, dan dua angka berbeda di layar yang
+  // sama adalah cara tercepat membuat pembeli tidak percaya keduanya.
+  // Qty 1 karena ini harga kepala, bukan harga per kuantitas — tier grosir
+  // punya tabelnya sendiri di BuyBox.
+  const hargaUtama = resolveUnitPrice(product, 1).price;
+  const diskonPct =
+    hargaUtama < product.price
+      ? Math.round(((product.price - hargaUtama) / product.price) * 100)
+      : null;
 
   const jsonLd = buildProductJsonLd(
     {
@@ -147,12 +159,12 @@ export default async function ProductDetailPage({ params }: Props) {
             <div>
               <div className="flex items-baseline gap-2 flex-wrap">
                 <div className="text-[28px] font-extrabold tracking-tight text-ink leading-none">
-                  {formatRupiah(getEffectivePrice(product))}
+                  {formatRupiah(hargaUtama)}
                 </div>
-                {getDiscountPct(product) != null && (
+                {diskonPct != null && (
                   <>
                     <span className="text-xs font-bold text-red-600 bg-red-50 rounded px-1.5 py-0.5">
-                      -{getDiscountPct(product)}%
+                      -{diskonPct}%
                     </span>
                     <span className="text-sm text-ink-muted line-through">
                       {formatRupiah(product.price)}

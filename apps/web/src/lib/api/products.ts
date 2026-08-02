@@ -46,6 +46,13 @@ export interface ProductDetail extends Omit<ProductCard, 'originalPrice' | 'disc
   // harga per qty dihitung FE lewat `getUnitPrice`, helper yang sama dengan
   // yang dipakai server saat menghitung keranjang & checkout.
   wholesaleTiers: { minQty: number; price: number }[];
+  // Flash sale (M15-C1) — dikirim mentah dengan alasan yang sama seperti tier
+  // grosir: `getUnitPrice` di FE harus memakai bahan yang sama persis dengan
+  // server. `null` = produk ini tidak sedang ikut event berjalan (atau kuotanya
+  // sudah habis, yang bagi pembeli sama artinya: harga normal).
+  flashPrice: number | null;
+  flashEndAt: string | null;
+  flashRemaining: number | null;
   category: { id: string; name: string; slug: string };
   shop: ProductCard['shop'] & {
     logoUrl: string | null;
