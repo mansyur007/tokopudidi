@@ -31,10 +31,35 @@ async function broadcastStatus(request: Req, token: string) {
   };
 }
 
+// Cara mengosongkan jeda di DB lokal. `npm run db:seed` TIDAK cukup: seed-nya
+// murni upsert dan tidak pernah menghapus baris, jadi riwayat broadcast (yang
+// justru menahan jendela 24 jam) tetap tinggal. Di CI hal ini tak pernah
+// terasa karena tiap run memakai container Postgres yang baru.
+const CARA_RESET =
+  'kosongkan riwayatnya dulu: docker compose exec postgres psql -U tokopudidi -d tokopudidi -c \'TRUNCATE "ShopBroadcast";\'';
+
+/**
+ * Kedua test di berkas ini menuntut jeda 24 jam yang belum terpakai.
+ *
+ * Bukan cuma jalur suksesnya: cek jeda berjalan lebih dulu daripada cek
+ * kepemilikan produk & follower, jadi begitu satu broadcast terkirim, SEMUA
+ * penolakan yang mestinya 400 ikut berubah jadi 429. Tanpa pemeriksaan di sini,
+ * run kedua gagal dengan diff "Expected 400, Received 429" yang menyesatkan —
+ * seolah guard-nya rusak, padahal jedanya yang sudah terpakai.
+ */
+async function butuhJedaKosong(request: Req, token: string) {
+  const { status } = await broadcastStatus(request, token);
+  expect(
+    status.cooldownRemainingMs,
+    `toko seed sudah broadcast dalam 24 jam terakhir — ${CARA_RESET}`,
+  ).toBe(0);
+}
+
 test(tc('165', 'Broadcast: ditolak tanpa hak akses, payload tak masuk akal, produk toko lain, & toko tanpa follower'), async ({ request }) => {
   const sellerToken = tokenFor('seller');
   const buyerToken = tokenFor('buyer');
   const shop = await sellerShop(request, sellerToken);
+  await butuhJedaKosong(request, sellerToken);
 
   // 1. Tanpa token -> 401. Broadcast menulis notifikasi massal; endpoint ini
   //    tidak boleh bisa disentuh anonim sama sekali.
@@ -99,13 +124,11 @@ test(tc('166', 'Broadcast: terkirim ke follower, notifikasi sampai, dan kiriman 
   const follow = await request.post(`${V1}/shops/${shop.slug}/follow`, { headers: auth(buyerToken) });
   expect(follow.status()).toBe(200);
 
-  const before = await broadcastStatus(request, sellerToken);
   // Jeda 24 jam tidak bisa direset lewat API (endpoint reset = lubang untuk
   // menghindari batasnya di produksi), jadi test ini menuntut DB yang segar.
-  expect(
-    before.status.cooldownRemainingMs,
-    'toko seed sudah broadcast dalam 24 jam terakhir — jalankan `npm run db:seed` di DB test',
-  ).toBe(0);
+  await butuhJedaKosong(request, sellerToken);
+
+  const before = await broadcastStatus(request, sellerToken);
   expect(before.status.followerCount).toBeGreaterThan(0);
 
   const judul = `Promo E2E ${Date.now()}`;
