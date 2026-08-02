@@ -26,6 +26,7 @@ export async function getCartForUser(userId: string) {
               salePrice: true, saleStartAt: true, saleEndAt: true,
               isActive: true, weight: true,
               codAvailable: true, freeShippingEligible: true,
+              isPreorder: true, preorderDays: true,
               // Harga grosir (M13-B1) — harga satuan keranjang ikut turun
               // begitu qty melewati ambang tier.
               wholesaleTiers: { select: { minQty: true, price: true } },
@@ -72,6 +73,8 @@ export async function getCartForUser(userId: string) {
         weight: it.product.weight,
         codAvailable: it.product.codAvailable,
         freeShippingEligible: it.product.freeShippingEligible,
+        isPreorder: it.product.isPreorder,
+        preorderDays: it.product.isPreorder ? it.product.preorderDays : null,
       },
       variant: it.variant
         ? { id: it.variant.id, name: it.variant.name, stock: it.variant.stock }

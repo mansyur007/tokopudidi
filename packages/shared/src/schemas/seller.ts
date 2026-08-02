@@ -122,6 +122,9 @@ const productBaseSchema = z.object({
   // Opsi pengiriman (M10-A10) — jadi filter di pencarian & ditegakkan saat checkout.
   codAvailable: z.boolean().default(true),
   freeShippingEligible: z.boolean().default(false),
+  // Pre-order (M15-B1) — murni informasi (lead time), tidak ada SLA otomatis.
+  isPreorder: z.boolean().default(false),
+  preorderDays: z.number().int().min(1).max(90).nullable().optional(),
   isActive: z.boolean().default(true),
   imageUrls: z.array(z.string().min(5)).min(1, 'Minimal 1 foto produk').max(5, 'Maksimal 5 foto'),
   options: z.array(optionInput).max(MAX_VARIANT_OPTIONS, `Maksimal ${MAX_VARIANT_OPTIONS} opsi varian`).optional(),
@@ -240,6 +243,10 @@ export const productCreateSchema = withWholesaleRules(withVariantRules(productBa
   .refine((v) => !v.saleStartAt || !v.saleEndAt || new Date(v.saleStartAt) < new Date(v.saleEndAt), {
     message: 'Tanggal berakhir harus setelah tanggal mulai',
     path: ['saleEndAt'],
+  })
+  .refine((v) => !v.isPreorder || (v.preorderDays != null && v.preorderDays >= 1 && v.preorderDays <= 90), {
+    message: 'Lama pre-order wajib diisi 1-90 hari',
+    path: ['preorderDays'],
   });
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 

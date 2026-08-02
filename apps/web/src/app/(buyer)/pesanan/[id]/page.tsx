@@ -115,6 +115,19 @@ export default function OrderDetailPage() {
   const bisaKomplain =
     ['DELIVERED', 'COMPLETED'].includes(order.status) && isComplaintWindowOpen(order.deliveredAt);
 
+  // Estimasi pre-order (M15-B1) — campur ready + pre-order pakai lead time
+  // TERLAMA di antara item-nya, bukan rata-rata: itulah tanggal paling lambat
+  // seller boleh selesai memproses sebelum janjinya dianggap molor. Snapshot
+  // per item (bukan `Product.preorderDays` yang mungkin sudah diubah seller),
+  // hari kalender sederhana (bukan hari kerja).
+  const maxPreorderDays = order.items.reduce(
+    (max, it) => (it.preorderDays != null ? Math.max(max, it.preorderDays) : max),
+    0,
+  );
+  const estimasiDiproses = order.paidAt && maxPreorderDays > 0
+    ? new Date(new Date(order.paidAt).getTime() + maxPreorderDays * 86400000)
+    : null;
+
   const addr = order.buyerAddress as null | {
     label: string; recipientName: string; recipientPhone: string;
     fullAddress: string; subdistrict: string; district: string;
@@ -164,6 +177,11 @@ export default function OrderDetailPage() {
             </li>
           )}
         </ol>
+        {order.status === 'PROCESSING' && estimasiDiproses && (
+          <p className="text-xs text-primary-700 bg-primary-50 rounded px-2.5 py-1.5 mt-2">
+            📦 Ada produk pre-order — estimasi diproses s.d. {formatTanggal(estimasiDiproses)}
+          </p>
+        )}
       </section>
 
       {/* Tracking dummy */}

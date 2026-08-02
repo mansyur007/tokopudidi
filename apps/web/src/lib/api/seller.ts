@@ -96,6 +96,8 @@ export interface SellerProductDetail extends SellerProductRow {
   salePrice: number | null;
   saleStartAt: string | null;
   saleEndAt: string | null;
+  isPreorder: boolean;
+  preorderDays: number | null;
   // Variant multi-axis (M11-A8). `optionValues` kosong untuk produk lama yang
   // belum di-backfill — form jatuh ke 1 nilai memakai `name`.
   options?: { id: string; name: string; order: number; values: { id: string; value: string; order: number }[] }[];

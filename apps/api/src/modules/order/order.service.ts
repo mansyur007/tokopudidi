@@ -290,6 +290,10 @@ export async function checkout(userId: string, input: CheckoutInput) {
                 price,
                 quantity: it.quantity,
                 subtotal: price * it.quantity,
+                // Snapshot (M15-B1) — lead time saat ini, bukan referensi hidup
+                // ke produk: seller mengubahnya nanti tidak boleh mengubah
+                // estimasi pada pesanan yang sudah dibuat.
+                preorderDays: it.product.isPreorder ? it.product.preorderDays : null,
                 flashSaleItemId,
               };
             }),

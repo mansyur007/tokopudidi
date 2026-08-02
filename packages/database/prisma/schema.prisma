@@ -297,6 +297,12 @@ model Product {
   // COD default true supaya produk lama tidak mendadak kehilangan opsi bayar di tempat.
   codAvailable         Boolean          @default(true)
   freeShippingEligible Boolean          @default(false)
+  // Pre-order (M15-B1) — murni informasi, tidak ada SLA/auto-cancel otomatis.
+  // preorderDays wajib terisi (1-90) kalau isPreorder true; ditegakkan di route,
+  // bukan di schema, supaya update parsial tetap bisa mengubah field lain tanpa
+  // mengulang keduanya.
+  isPreorder           Boolean          @default(false)
+  preorderDays         Int?
   isActive             Boolean          @default(true)
   soldCount            Int              @default(0)
   viewCount            Int              @default(0)
@@ -498,6 +504,10 @@ model OrderItem {
   price        Int
   quantity     Int
   subtotal     Int
+  // Snapshot lama pre-order (M15-B1), pola yang sama dengan productName/price:
+  // seller mengubah `Product.preorderDays` tidak boleh mengubah estimasi pada
+  // pesanan yang sudah dibuat. Null kalau produknya bukan pre-order saat dibeli.
+  preorderDays Int?
   // Snapshot slot flash sale yang dipakai baris ini (M15-C1) — terisi HANYA
   // kalau harga flash yang benar-benar menang. Tanpa kolom ini, pelepasan kuota
   // saat pesanan batal harus menebak-nebak item mana yang dulu memakai flash

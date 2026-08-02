@@ -18,6 +18,7 @@ import {
   findVariant,
 } from '@tokopudidi/shared';
 import { VariantPicker, LegacyVariantPicker } from './VariantPicker';
+import { PreorderBadge } from './PreorderBadge';
 import { Icon } from '@/components/shell/Icon';
 import { clsx } from 'clsx';
 
@@ -178,6 +179,10 @@ export function BuyBox({ product }: Props) {
   return (
     <div className="bg-white border border-line rounded-card p-4 md:sticky md:top-[160px]">
       <div className="font-extrabold text-[15px] mb-3 text-ink">Atur jumlah dan catatan</div>
+
+      {product.isPreorder && product.preorderDays != null && (
+        <PreorderBadge days={product.preorderDays} className="mb-3" />
+      )}
 
       {/* Varian — multi-axis (M11-A8) atau 1 sumbu untuk data lama */}
       {product.variants.length > 0 && (multiAxis ? (

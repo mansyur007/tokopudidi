@@ -14,6 +14,7 @@ import { checkoutOrder } from '@/lib/api/orders';
 import type { CartGroup } from '@/lib/api/cart';
 import { ApiClientError } from '@/lib/api/client';
 import { VoucherPicker } from '@/components/checkout/VoucherPicker';
+import { PreorderBadge } from '@/components/product/PreorderBadge';
 
 type ShippingMethod = 'REGULAR' | 'SAME_DAY' | 'PICKUP_SENDIRI';
 type PaymentMethod = 'COD' | 'TRANSFER_MANUAL' | 'QRIS_MOCK';
@@ -313,6 +314,9 @@ export default function CheckoutPage() {
                   <div className="flex-1 min-w-0">
                     <p className="line-clamp-1">{it.product.name}</p>
                     {it.variant && <p className="text-xs text-gray-500">Varian: {it.variant.name}</p>}
+                    {it.product.isPreorder && it.product.preorderDays != null && (
+                      <PreorderBadge days={it.product.preorderDays} className="mt-0.5" />
+                    )}
                     <p className="text-xs text-gray-500">{it.quantity} × {formatRupiah(it.price)}</p>
                   </div>
                   <p className="font-medium">{formatRupiah(it.subtotal)}</p>

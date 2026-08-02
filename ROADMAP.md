@@ -5,6 +5,8 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
+> **Progress (2026-08-02, malam)** — **M15-B1 Pre-Order** selesai: badge lead time murni informasi (tanpa SLA/auto-cancel) di card/BuyBox/keranjang/checkout via komponen bersama `PreorderBadge`, konsistensi `isPreorder`/`preorderDays` ditegakkan server-side (bukan cuma zod), dan snapshot `OrderItem.preorderDays` menjaga estimasi order lama tidak berubah saat seller mengedit lead time. Sisa M15 yang bebas di-klaim: **D1 PWA** (S), mandiri.
+>
 > **Progress (2026-08-02, sore)** — **M15-C1 Flash Sale** selesai: event terjadwal dikurasi admin, ber-kuota atomik, dengan kontrak harga lintas-milestone (flash > sale > grosir) yang akhirnya lengkap di `price.ts` — **dengan koreksi**: prioritas menentukan pemenang saat harga seri, bukan izin menaikkan harga. Sisa M15 yang bebas di-klaim: **B1 Pre-Order** (S–M) & **D1 PWA** (S), keduanya mandiri.
 >
 > **Progress (2026-08-02)** — **M14-B2 Bulk Edit** selesai. Sisa M14 tinggal **A1 Login Google** & **A2 Email Transaksional**, keduanya **⚪ BLOCKED menunggu kredensial eksternal** (`GOOGLE_CLIENT_ID`; kredensial SMTP) — tidak bisa diselesaikan tanpa itu. Yang bebas di-klaim berikutnya: **M15** (C1 Flash Sale, B1 Pre-Order, D1 PWA).
@@ -924,7 +926,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M15-B1. Pre-Order
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-08-02): Konsistensi `isPreorder`/`preorderDays` ditegakkan di ROUTE, bukan cuma zod — update parsial bisa mengirim `isPreorder` tanpa `preorderDays` (atau sebaliknya), jadi server menggabungkan payload dengan data existing sebelum memutuskan: `isPreorder` aktif tanpa lama hari 1-90 ditolak 400, dan mematikan toggle SELALU membersihkan `preorderDays` ke `null` walau field itu tidak ikut dikirim client — pola yang sama dengan penanganan `salePrice` di M9-B3. Badge `"📦 Pre-Order · N hari"` jadi komponen bersama (`PreorderBadge.tsx`) dipakai identik di `ProductCard`, `BuyBox`, keranjang, dan checkout — bukan empat salinan JSX, supaya tidak ada peluang teksnya berbeda antar halaman (pelajaran `CARD_SHOP_SELECT`/`applyFlashPrices` dari M14-B1/M15-C1). Field `isPreorder`/`preorderDays` mengalir lewat `include`/`select` Prisma yang sudah ada (tidak perlu menambah kolom baru ke query manapun kecuali `CardRow`/`ProductCard` di `product.service.ts` dan select eksplisit di `cart.service.ts`). Estimasi di order detail pakai `max(items.preorderDays)` — bukan rata-rata — karena itulah tanggal paling lambat seller boleh selesai memproses; dihitung dari snapshot `OrderItem.preorderDays`, bukan `Product.preorderDays` yang bisa sudah diubah seller. **Terverifikasi lokal (2026-08-02)**: `docker compose up -d` → `prisma migrate reset` → `prisma migrate deploy` → `db:seed` → **70/70 e2e lolos** (TC-TKPDD-179–183 baru). Lolos juga: `tsc` api+web+shared+database, lint, 288 unit test. Alur lengkap (toggle di form seller → badge di listing/detail/keranjang/checkout → snapshot bertahan setelah seller ubah lead time) diperiksa langsung di browser.
 - **Scope**: Produk ditandai pre-order dengan lead time X hari. Badge di card/BuyBox/cart/checkout; estimasi proses di order detail. Murni informasi — **tidak ada SLA otomatis** (tidak ada auto-cancel di kode, jangan tambah).
 - **Schema diff**: `Product.isPreorder Boolean @default(false)`, `Product.preorderDays Int?` (1–90), **+ snapshot `OrderItem.preorderDays Int?`** — supaya estimasi di order lama tidak berubah saat seller mengubah setting produk (pola snapshot yang sama dengan `productName`/`price`).
 - **Konteks kode (audit 2026-07-29)**: [ProductForm.tsx](apps/web/src/components/seller/ProductForm.tsx) sudah punya pola section toggle ("Diskon Periodik" :234, "Opsi Pengiriman" :329) — section "Pre-Order" mengikuti; zod refine di [packages/shared/src/schemas/product.ts](packages/shared/src/schemas/product.ts): `isPreorder: true` → `preorderDays` wajib 1–90; `false` → server null-kan.
@@ -932,10 +935,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Badge "Pre-Order · N hari" di [ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx), [BuyBox.tsx](apps/web/src/components/product/BuyBox.tsx), item keranjang, item checkout
   - Order detail buyer ([pesanan/[id]/page.tsx](apps/web/src/app/(buyer)/pesanan/[id]/page.tsx)) — catatan di stage PROCESSING: "estimasi diproses s.d. {paidAt + maxDays} " dengan `maxDays = max(items.preorderDays)` (hari kalender, sederhana)
 - **Acceptance**:
-  - [ ] Badge konsisten di card, detail, cart, checkout
-  - [ ] Checkout campur ready + pre-order → estimasi pakai lead time terlama
-  - [ ] Toggle off → `preorderDays` ter-clear di DB
-  - [ ] Seller ubah lead time setelah ada order → estimasi order lama tidak berubah (snapshot)
+  - [x] Badge konsisten di card, detail, cart, checkout — komponen bersama `PreorderBadge`, diperiksa di keempat tempat via browser
+  - [x] Checkout campur ready + pre-order → estimasi pakai lead time terlama — `max(items.preorderDays)` di order detail
+  - [x] Toggle off → `preorderDays` ter-clear di DB — ditegakkan di route, bukan cuma zod (e2e TC-180)
+  - [x] Seller ubah lead time setelah ada order → estimasi order lama tidak berubah (snapshot) — e2e TC-182
 - **Effort**: S–M
 
 ---

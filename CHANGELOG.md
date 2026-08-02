@@ -3,6 +3,23 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M15-B1: Pre-Order
+
+### Added
+- **Pre-order** (`M15-B1`) — produk ditandai pre-order dengan lead time (1-90 hari), murni informasi: **tidak ada SLA/auto-cancel otomatis**.
+  - Kolom `Product.isPreorder` + `Product.preorderDays`, dan snapshot `OrderItem.preorderDays` (migration `m15_b1_preorder`, aditif murni).
+  - Section "📦 Pre-Order" di [ProductForm](apps/web/src/components/seller/ProductForm.tsx) — pola toggle yang sama dengan "Diskon Periodik" (M9-B3).
+  - Badge `"📦 Pre-Order · N hari"` — komponen bersama [`PreorderBadge`](apps/web/src/components/product/PreorderBadge.tsx) dipakai identik di kartu produk, BuyBox, keranjang, dan checkout.
+  - Order detail buyer: catatan estimasi "diproses s.d. ..." di stage PROCESSING, pakai lead time **terlama** di antara item campuran ready + pre-order.
+  - E2E `preorder.spec.ts` (TC-TKPDD-179–183).
+
+### Notes
+- **Konsistensi ditegakkan di route, bukan cuma zod.** Update produk itu parsial — payload bisa mengirim `isPreorder` tanpa `preorderDays`, atau sebaliknya. Server menggabungkan payload dengan data existing sebelum memutuskan: `isPreorder` aktif tanpa lama hari 1-90 ditolak 400, dan mematikan toggle **selalu** membersihkan `preorderDays` ke `null` walau field itu tidak ikut dikirim — persis pola yang sudah dipakai `salePrice` (M9-B3).
+- **Satu komponen badge, bukan empat salinan JSX.** `ProductCard`, `BuyBox`, keranjang, dan checkout semua memanggil `PreorderBadge` yang sama — pelajaran `CARD_SHOP_SELECT` (M14-B1) dan `applyFlashPrices` (M15-C1): teks badge yang berbeda antar halaman itu membingungkan pembeli.
+- **Estimasi order pakai snapshot, bukan `Product.preorderDays` hidup.** `OrderItem.preorderDays` direkam saat checkout supaya seller yang mengubah lead time setelah ada pesanan tidak diam-diam mengubah janji yang sudah dibaca pembeli — pola snapshot yang sama dengan `productName`/`price`.
+- **Campuran ready + pre-order pakai lead time TERLAMA**, bukan rata-rata: itulah tanggal paling lambat seller boleh selesai memproses sebelum janjinya dianggap molor.
+- **Terverifikasi lokal (2026-08-02).** `docker compose up -d` → `prisma migrate reset` → `prisma migrate deploy` → `db:seed` → **70/70 e2e lolos**, termasuk TC-179–183. Lolos juga: `tsc` api + web + shared + database, lint, dan **288 unit test**. Alur lengkap (toggle di form seller → badge di listing/detail/keranjang/checkout → snapshot bertahan setelah seller ubah lead time) diperiksa langsung di browser. TC-TKPDD-179–183 perlu didaftarkan di TestForge.
+
 ## [Unreleased] — M15-C1: Flash Sale (Event Terjadwal)
 
 ### Added

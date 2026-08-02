@@ -17,6 +17,8 @@ export interface CartItem {
     weight: number;
     codAvailable: boolean;
     freeShippingEligible: boolean;
+    isPreorder: boolean;
+    preorderDays: number | null;
   };
   variant: { id: string; name: string; stock: number } | null;
   shop: { id: string; name: string; slug: string; isOpen: boolean };
