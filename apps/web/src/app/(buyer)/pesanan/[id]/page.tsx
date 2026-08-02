@@ -10,6 +10,7 @@ import {
   formatTanggalWaktu,
   isComplaintWindowOpen,
   canViewInvoice,
+  preorderEstimate,
 } from '@tokopudidi/shared';
 import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import {
@@ -115,18 +116,10 @@ export default function OrderDetailPage() {
   const bisaKomplain =
     ['DELIVERED', 'COMPLETED'].includes(order.status) && isComplaintWindowOpen(order.deliveredAt);
 
-  // Estimasi pre-order (M15-B1) — campur ready + pre-order pakai lead time
-  // TERLAMA di antara item-nya, bukan rata-rata: itulah tanggal paling lambat
-  // seller boleh selesai memproses sebelum janjinya dianggap molor. Snapshot
-  // per item (bukan `Product.preorderDays` yang mungkin sudah diubah seller),
-  // hari kalender sederhana (bukan hari kerja).
-  const maxPreorderDays = order.items.reduce(
-    (max, it) => (it.preorderDays != null ? Math.max(max, it.preorderDays) : max),
-    0,
-  );
-  const estimasiDiproses = order.paidAt && maxPreorderDays > 0
-    ? new Date(new Date(order.paidAt).getTime() + maxPreorderDays * 86400000)
-    : null;
+  // Estimasi pre-order (M15-B1) — aturannya (lead time TERLAMA, dihitung dari
+  // `paidAt`, snapshot per item) ada di shared supaya bisa diuji tanpa merender
+  // halaman ini. Lihat `preorderEstimate`.
+  const estimasiDiproses = preorderEstimate(order.items, order.paidAt);
 
   const addr = order.buyerAddress as null | {
     label: string; recipientName: string; recipientPhone: string;
