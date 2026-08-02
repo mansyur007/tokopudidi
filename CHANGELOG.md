@@ -3,6 +3,27 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M14-B2: Bulk Edit Stok & Harga
+
+### Added
+- **Edit massal stok & harga** (`M14-B2`) — mode edit inline di daftar produk seller, simpan sekali klik.
+  - `PATCH /api/v1/seller/products/bulk` — maks 50 baris, satu `$transaction`, respons `{ updated: n }`.
+  - Kepemilikan diperiksa **sebelum** apa pun ditulis: satu id milik toko lain membatalkan seluruh permintaan (403).
+  - Tombol "✏️ Edit Massal" di [seller/produk](apps/web/src/app/seller/produk/page.tsx) — harga/stok jadi input, checkbox aktif, bar aksi sticky di bawah dengan hitungan baris berubah.
+  - `bulkProductUpdateSchema` + `findBulkPriceConflicts` — 18 unit test.
+  - E2E `bulk-edit.spec.ts` (TC-TKPDD-170–173).
+- Kelas error `UnprocessableEntityError` (422) — memisahkan "payload cacat" (400) dari "isinya bertabrakan dengan data existing".
+
+### Notes
+- **Rencana di ROADMAP kurang satu guard.** Yang tertulis hanya guard `salePrice` (M9-B3), padahal jalur satuan menjaga **dua** hal terhadap penurunan harga: diskon periodik **dan** harga grosir (M13-B1). Tanpa guard kedua, bulk edit jadi pintu belakang untuk membuat harga "grosir" lebih mahal daripada harga biasa. Pembeli memang masih terlindungi kontrak `min` di `getUnitPrice`, tapi datanya sudah telanjur tidak masuk akal. Keduanya kini ditegakkan di sini.
+- **`PATCH /bulk` wajib dideklarasikan sebelum `PATCH /:id`.** Express mencocokkan route sesuai urutan pendaftaran; kalau dibalik, permintaannya ditelan `/:id` dengan `id = "bulk"` dan gagalnya muncul sebagai error validasi `productUpdateSchema` yang membingungkan, bukan 404 yang jelas. TC-173 mengunci urutan itu: kalau terbalik, payload tak sah akan menjawab 404, bukan 400.
+- **Baris tanpa perubahan ditolak zod.** Baris begitu ikut terhitung di `updated`, sehingga seller diberi tahu "12 produk diperbarui" padahal yang benar-benar berubah lebih sedikit. FE juga sudah menyaringnya lewat dirty-tracking — server jadi jaring kedua, bukan satu-satunya.
+- **Id produk kembar dalam satu payload ditolak.** Dua baris untuk produk yang sama membuat nilai akhirnya bergantung urutan array: mana yang menang jadi kebetulan, bukan keputusan.
+- **Baris yang tidak mengubah harga sengaja tidak diperiksa konfliknya.** Kalau sebuah produk sudah telanjur punya data harga tidak konsisten dari sebelumnya, memblokir penyesuaian stoknya tidak memperbaiki apa pun — hanya mengunci pekerjaan yang tak ada kaitannya dengan masalahnya.
+- **Angka batas di pesan konflik adalah tier tertinggi yang menabrak**, bukan tier pertama yang ditemukan di array — itulah batas yang benar-benar harus dilewati seller. Ada unit test yang membalik urutan array untuk memastikan angkanya tidak ikut berubah.
+- **Mode edit tidak ditutup saat 422.** `errors` dikirim per **id produk** sehingga barisnya bisa ditandai masing-masing; menutup mode edit akan membuang semua ketikan yang belum tersimpan.
+- **Terverifikasi lokal (2026-08-02).** Docker engine akhirnya hidup, jadi seluruh rantainya benar-benar dijalankan: `docker compose up -d` → `prisma migrate deploy` (semua migration, termasuk `m13_b2_shop_broadcast` yang sebelumnya hanya pernah jalan di CI) → `db:seed` → **60/60 e2e lolos**, termasuk TC-170–173. Lolos juga: `tsc` api + web + shared + database, lint, dan **264 unit test** (18 baru).
+
 ## [Unreleased] — M14-B1: Badge Reputasi Toko
 
 ### Added
@@ -24,7 +45,7 @@ Versioning follows [SemVer](https://semver.org/).
 - **Ambang badge inklusif** (`>=`), dan unit test-nya memakai konstanta ambang itu langsung — menggeser ambang tidak bisa diam-diam mengubah arti test.
 - **Jebakan yang dicegat saat menulis e2e:** percobaan pertama memanggil `/shops/:slug/products`, route yang tidak ada. Karena dibungkus `if (status === 200)`, test-nya akan "lolos" tanpa memeriksa apa pun. Diganti ke `/products?shopId=` dengan assertion tanpa syarat.
 - Nilai `ratingAvg`/`totalSold` di seed acak, jadi e2e **tidak pernah menuntut badge tertentu** dari data seed. Yang diperiksa adalah perubahannya saat flag official di-toggle admin lalu dikembalikan — sekaligus bukti badge memang diturunkan saat dibaca, bukan disimpan.
-- **Belum terverifikasi di lingkungan lokal** — mesin dev belum punya Postgres/Docker (Docker sedang dipasang), jadi e2e bergantung workflow `e2e.yml`. Yang lolos lokal: `tsc` api + web + shared + database, lint, **246 unit test** (14 baru), dan `playwright test --list`.
+- **Terverifikasi lokal (2026-08-02)** — TC-167–169 ikut lolos dalam run 60/60 e2e di DB segar. Lolos juga: `tsc` api + web + shared + database, lint, dan **246 unit test** (14 baru).
 
 ## [Unreleased] — M13-B2: Broadcast Promo ke Follower
 
@@ -50,7 +71,7 @@ Versioning follows [SemVer](https://semver.org/).
 - **`ShopBroadcast.productId` memakai `ON DELETE SET NULL`, bukan cascade.** Baris riwayat itulah yang menahan jendela 24 jam berikutnya — kalau ikut terhapus bersama produknya, seller bisa broadcast lagi seketika.
 - **User yang sudah di-soft-delete disaring dari daftar penerima.** Notifikasinya tidak akan pernah dibaca, tapi ikut terhitung di `recipientCount` sehingga angka jangkauan di riwayat mengklaim lebih banyak daripada kenyataannya.
 - **Kegagalan fan-out tidak membatalkan baris riwayat** (sudah di luar jalur respons, hanya dicatat ke pino). Pilihan yang disengaja: lebih baik satu kiriman gagal daripada jedanya ikut hilang dan follower dibanjiri percobaan ulang.
-- **E2E-nya menuntut DB yang segar** untuk jalur suksesnya, karena jeda 24 jam tidak bisa direset lewat API — dan memang tidak boleh bisa, endpoint reset akan jadi lubang untuk menghindari batasnya di produksi. Pesan gagalnya menyebut `npm run db:seed`. Urutan test di berkas itu juga sengaja: semua pemeriksaan penolakan dijalankan sebelum broadcast yang berhasil, karena setelahnya jeda 24 jam menutup semua jalur lain dengan 429 sebelum sempat sampai ke pemeriksaan yang mau diuji.
+- **E2E-nya menuntut DB yang segar — kedua test, bukan cuma jalur suksesnya.** Cek jeda berjalan lebih dulu daripada cek kepemilikan produk & follower, jadi begitu satu broadcast terkirim, semua penolakan yang mestinya 400 ikut berubah jadi 429. Ketahuan saat suite dijalankan dua kali berturut-turut di DB lokal: run kedua gagal dengan diff "Expected 400, Received 429" yang menyesatkan, seolah guard-nya rusak. Kedua test sekarang memeriksa prasyaratnya di awal lewat `butuhJedaKosong`, sehingga gagalnya menjelaskan penyebabnya alih-alih menuduh kode. **Dan saran resetnya pun sempat salah**: pesan pertama menyuruh `npm run db:seed`, padahal seed itu murni upsert dan tidak pernah menghapus baris — riwayat broadcast yang justru menahan jendela 24 jam tetap tinggal. Di CI kekeliruan ini tak pernah terasa karena tiap run memakai container Postgres baru. Pesannya kini menyebut `TRUNCATE "ShopBroadcast"`, dan langkah itu sudah diuji: setelah dijalankan, kedua test hijau lagi. Jedanya sendiri tidak bisa direset lewat API — dan memang tidak boleh bisa, endpoint reset akan jadi lubang untuk menghindari batasnya di produksi. Pesan gagalnya menyebut `npm run db:seed`. Urutan test di berkas itu juga sengaja: semua pemeriksaan penolakan dijalankan sebelum broadcast yang berhasil, karena setelahnya jeda 24 jam menutup semua jalur lain dengan 429 sebelum sempat sampai ke pemeriksaan yang mau diuji.
 - **Belum terverifikasi di lingkungan lokal** — mesin dev tidak punya Postgres/Docker, jadi migration belum pernah diterapkan dan e2e belum pernah dijalankan; keduanya bergantung workflow `e2e.yml`. Yang lolos lokal: `tsc` api + web + shared + database, lint, **232 unit test** (13 baru), dan `playwright test --list`.
 ## [Unreleased] — Perbaikan: Deploy Menembus Batas Waktu di Lapisan Chromium
 

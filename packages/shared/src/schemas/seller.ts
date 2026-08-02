@@ -248,6 +248,44 @@ export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 // varian tetap berlaku: kalau `options`/`variants` dikirim, harus konsisten.
 export const productUpdateSchema = withWholesaleRules(withVariantRules(productBaseSchema.partial()));
 
+// ===== Bulk edit stok & harga (M14-B2) =====
+// Batas 50 baris per request: satu transaksi yang menahan ratusan baris produk
+// memperpanjang lock tabel tanpa alasan, dan seller yang mengedit lebih dari
+// itu sekaligus lebih mungkin salah tempel daripada benar-benar bermaksud.
+export const MAX_BULK_PRODUCT_ITEMS = 50;
+
+const bulkProductItemSchema = z
+  .object({
+    id: z.string().uuid(),
+    // Ambangnya disamakan dengan form produk biasa — bulk edit tidak boleh jadi
+    // pintu belakang untuk menembus aturan yang berlaku di jalur satuan.
+    price: z.number().int().min(100, 'Harga minimal Rp 100').optional(),
+    stock: z.number().int().min(0, 'Stok tidak boleh negatif').optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => v.price !== undefined || v.stock !== undefined || v.isActive !== undefined, {
+    // Baris tanpa perubahan bukan sekadar mubazir: ia ikut terhitung di
+    // `updated`, sehingga seller diberi tahu "12 produk diperbarui" padahal
+    // yang benar-benar berubah lebih sedikit.
+    message: 'Setiap baris harus mengubah minimal satu kolom',
+  });
+
+export const bulkProductUpdateSchema = z
+  .object({
+    items: z
+      .array(bulkProductItemSchema)
+      .min(1, 'Tidak ada perubahan untuk disimpan')
+      .max(MAX_BULK_PRODUCT_ITEMS, `Maksimal ${MAX_BULK_PRODUCT_ITEMS} produk per simpan`),
+  })
+  .refine((v) => new Set(v.items.map((i) => i.id)).size === v.items.length, {
+    // Dua baris untuk produk yang sama membuat hasil akhirnya bergantung urutan
+    // array — nilai mana yang menang jadi kebetulan, bukan keputusan.
+    message: 'Ada produk yang sama dikirim lebih dari sekali',
+    path: ['items'],
+  });
+export type BulkProductUpdateInput = z.infer<typeof bulkProductUpdateSchema>;
+export type BulkProductItemInput = z.infer<typeof bulkProductItemSchema>;
+
 export const shipOrderSchema = z.object({
   trackingNumber: z.string().trim().min(3, 'Nomor resi minimal 3 karakter').max(60),
   courierName: z.string().trim().min(2, 'Pilih kurir dulu').max(40),

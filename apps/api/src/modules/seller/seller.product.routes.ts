@@ -1,11 +1,15 @@
 import { Router } from 'express';
 import { prisma } from '@tokopudidi/database';
-import { productCreateSchema, productUpdateSchema, slugify } from '@tokopudidi/shared';
+import {
+  productCreateSchema, productUpdateSchema, bulkProductUpdateSchema, slugify,
+  type BulkProductItemInput,
+} from '@tokopudidi/shared';
 import { ok, created } from '../../lib/response';
 import { requireAuth } from '../../middleware/auth';
 import { requireShopOwner } from './seller.middleware';
 import { validateBody } from '../../middleware/validate';
-import { NotFoundError, BadRequestError } from '../../lib/errors';
+import { NotFoundError, BadRequestError, ForbiddenError, UnprocessableEntityError } from '../../lib/errors';
+import { findBulkPriceConflicts, toBulkUpdateData } from './product.bulk';
 import { getProductStats } from './product.stats';
 import { writeProductVariants } from './variant.write';
 import { withVariantValues } from '../product/variant.read';
@@ -145,6 +149,54 @@ sellerProductRouter.post('/', validateBody(productCreateSchema), async (req, res
       return p;
     });
     return created(res, product, 'Produk berhasil ditambahkan');
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/v1/seller/products/bulk — edit massal stok & harga (M14-B2).
+//
+// WAJIB dideklarasikan SEBELUM `PATCH /:id` di bawah. Express mencocokkan
+// route sesuai urutan pendaftaran, jadi kalau dibalik, `/:id` akan menelan
+// permintaan ini dengan `id = "bulk"` — dan gagalnya bukan 404 yang jelas,
+// melainkan validasi productUpdateSchema yang membingungkan.
+sellerProductRouter.patch('/bulk', validateBody(bulkProductUpdateSchema), async (req, res, next) => {
+  try {
+    const shopId = req.shop!.id;
+    const items = req.body.items as BulkProductItemInput[];
+    const ids = items.map((i) => i.id);
+
+    // Kepemilikan diperiksa sebelum apa pun ditulis: satu id milik toko lain
+    // membatalkan seluruh permintaan. Menulis sebagian lalu menolak sisanya
+    // akan meninggalkan perubahan yang tidak pernah dikonfirmasi seller.
+    const existing = await prisma.product.findMany({
+      where: { id: { in: ids }, shopId, deletedAt: null },
+      select: {
+        id: true, name: true, price: true, salePrice: true,
+        wholesaleTiers: { select: { minQty: true, price: true } },
+      },
+    });
+    if (existing.length !== ids.length) {
+      throw new ForbiddenError('Ada produk yang bukan milik tokomu atau sudah dihapus');
+    }
+
+    // Tabrakan dengan diskon / harga grosir existing — 422 berisi daftar baris
+    // bermasalah, supaya FE bisa menandai barisnya, bukan cuma bilang "gagal".
+    const conflicts = findBulkPriceConflicts(items, existing);
+    if (conflicts.length > 0) {
+      throw new UnprocessableEntityError(
+        `${conflicts.length} produk tidak bisa disimpan — cek harganya`,
+        Object.fromEntries(conflicts.map((c) => [c.id, [c.reason]])),
+      );
+    }
+
+    // Satu transaksi: kalau ada satu yang gagal di tengah, tidak ada yang
+    // separuh tersimpan.
+    await prisma.$transaction(
+      items.map((item) =>
+        prisma.product.update({ where: { id: item.id }, data: toBulkUpdateData(item) }),
+      ),
+    );
+
+    return ok(res, { updated: items.length }, `${items.length} produk diperbarui`);
   } catch (err) { next(err); }
 });
 
