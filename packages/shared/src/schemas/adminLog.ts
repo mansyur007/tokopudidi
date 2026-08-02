@@ -35,6 +35,14 @@ export const ADMIN_ACTIONS = [
   'CREATE_CATEGORY',
   'UPDATE_CATEGORY',
   'DELETE_CATEGORY',
+  // Flash sale (M15-C1). Slot punya aksinya sendiri karena yang mengubah harga
+  // yang dibayar pembeli adalah slot, bukan event-nya.
+  'CREATE_FLASH_SALE',
+  'UPDATE_FLASH_SALE',
+  'DELETE_FLASH_SALE',
+  'CREATE_FLASH_SALE_ITEM',
+  'UPDATE_FLASH_SALE_ITEM',
+  'DELETE_FLASH_SALE_ITEM',
   // Alat admin. Tidak menulis data kita, tapi menjalankan headless browser ke
   // pihak ketiga atas nama platform — justru jenis aksi yang audit log ada
   // untuknya ("siapa yang menghajar Tokopedia jam 3 pagi").
@@ -64,6 +72,12 @@ export const ADMIN_ACTION_LABEL: Record<AdminAction, string> = {
   CREATE_CATEGORY: 'Buat kategori',
   UPDATE_CATEGORY: 'Ubah kategori',
   DELETE_CATEGORY: 'Hapus kategori',
+  CREATE_FLASH_SALE: 'Buat flash sale',
+  UPDATE_FLASH_SALE: 'Ubah flash sale',
+  DELETE_FLASH_SALE: 'Hapus flash sale',
+  CREATE_FLASH_SALE_ITEM: 'Tambah produk flash sale',
+  UPDATE_FLASH_SALE_ITEM: 'Ubah slot flash sale',
+  DELETE_FLASH_SALE_ITEM: 'Hapus slot flash sale',
   SCRAPE_TOKOPEDIA: 'Scrape Tokopedia',
 };
 
@@ -78,6 +92,7 @@ export const ADMIN_TARGET_TYPES = [
   'VOUCHER',
   'BANNER',
   'CATEGORY',
+  'FLASH_SALE',
 ] as const;
 export type AdminTargetType = (typeof ADMIN_TARGET_TYPES)[number];
 

@@ -233,10 +233,13 @@ test(tc('155', 'Viewer /admin/log terbuka lewat URL langsung: entri, filter aksi
   // dicatat sebagai temuan terpisah, bukan diperbaiki di PR ini.
   const aksi = page.locator('label:has(span:text-is("Aksi")) select');
 
-  // Dropdown aksi = 21 aksi di ADMIN_ACTIONS + opsi "Semua aksi".
+  // Dropdown aksi = 27 aksi di ADMIN_ACTIONS + opsi "Semua aksi".
   // Angkanya sengaja literal: kalau nanti ada aksi admin baru, test ini gagal
   // dan memaksa orangnya sadar bahwa daftar filter ikut berubah.
-  await expect(aksi.locator('option')).toHaveCount(22);
+  // Naik dari 22 di M15-C1 — enam aksi flash sale (event & slot, masing-masing
+  // create/update/delete) memang harus bisa ditelusuri terpisah, karena yang
+  // mengubah harga yang ditagih ke pembeli adalah slotnya, bukan event-nya.
+  await expect(aksi.locator('option')).toHaveCount(28);
 
   // Halaman benar-benar berisi entri hasil TC-149–154, bukan empty state.
   await expect(page.getByText(/\d+ entri/)).toBeVisible();

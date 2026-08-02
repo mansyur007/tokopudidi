@@ -12,6 +12,7 @@ import { adminBannerRouter } from './modules/admin/admin.banner.routes';
 import { adminCategoryRouter } from './modules/admin/admin.category.routes';
 import { adminLogRouter } from './modules/admin/admin.log.routes';
 import { adminDashboardRouter } from './modules/admin/admin.dashboard.routes';
+import { adminFlashSaleRouter } from './modules/admin/admin.flashSale.routes';
 import { adminProductRouter } from './modules/admin/admin.product.routes';
 import { adminRefundRouter } from './modules/admin/admin.refund.routes';
 import { adminReportRouter } from './modules/admin/admin.report.routes';
@@ -29,6 +30,7 @@ import {
   adminComplaintRouter,
 } from './modules/complaint/complaint.routes';
 import { discussionRouter } from './modules/discussion/discussion.routes';
+import { flashSaleRouter } from './modules/flashSale/flashSale.routes';
 import { followingRouter } from './modules/follow/follow.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { notificationRouter } from './modules/notification/notification.routes';
@@ -87,6 +89,7 @@ export function createApp(): Application {
   app.use('/api/v1/chats', chatRouter);
   app.use('/api/v1/complaints', complaintRouter);
   app.use('/api/v1/discussions', discussionRouter);
+  app.use('/api/v1/flash-sales', flashSaleRouter);
   app.use('/api/v1/notifications', notificationRouter);
   app.use('/api/v1/orders', orderRouter);
   app.use('/api/v1/products', productRouter);
@@ -125,6 +128,7 @@ export function createApp(): Application {
   app.use('/api/v1/admin/reports', adminReportRouter);
   app.use('/api/v1/admin/complaints', adminComplaintRouter);
   app.use('/api/v1/admin/voucher', adminVoucherRouter);
+  app.use('/api/v1/admin/flash-sales', adminFlashSaleRouter);
   app.use('/api/v1/admin/banners', adminBannerRouter);
   app.use('/api/v1/admin/categories', adminCategoryRouter);
   app.use('/api/v1/admin/logs', adminLogRouter);        // jejak audit (M12-C3) — GET saja

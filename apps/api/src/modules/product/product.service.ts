@@ -1,6 +1,7 @@
 import { prisma, Prisma } from '@tokopudidi/database';
 import { getEffectivePrice, getDiscountPct, getShopBadge } from '@tokopudidi/shared';
 import type { ProductListQuery, ShopBadge } from '@tokopudidi/shared';
+import { resolveFlashPrices } from '../flashSale/flashSale.service';
 import { withVariantValues } from './variant.read';
 
 /**
@@ -71,6 +72,52 @@ export function toProductCard(p: CardRow): ProductCard {
       badge: getShopBadge(p.shop),
     },
   };
+}
+
+/**
+ * Pasang harga flash sale (M15-C1) ke sebuah kartu produk.
+ *
+ * Harga coret yang ditampilkan adalah harga normal produk, bukan harga sale
+ * M9-B3 yang mungkin sedang jalan: "hemat sekian" harus diukur dari angka yang
+ * tertera di luar event. Kalau harga flash-nya ternyata tidak lebih murah,
+ * kartunya dikembalikan apa adanya — sama seperti `resolveUnitPrice`, promo
+ * tidak boleh menaikkan harga.
+ */
+export function withFlashPrice(card: ProductCard, salePrice: number): ProductCard {
+  const asli = card.originalPrice ?? card.price;
+  if (salePrice >= card.price) return card;
+  return {
+    ...card,
+    price: salePrice,
+    originalPrice: asli,
+    discountPct: Math.round(((asli - salePrice) / asli) * 100),
+  };
+}
+
+/**
+ * Tempelkan harga flash ke daftar kartu produk mana pun.
+ *
+ * Dibuat sebagai pasca-proses atas `ProductCard[]`, bukan parameter tambahan di
+ * `toProductCard`: enam query berbeda bermuara ke sana (lihat CARD_SHOP_SELECT),
+ * dan menyisipkan lookup ke masing-masing `include` adalah cara paling pasti
+ * untuk suatu hari melewatkan satu — persis kekeliruan yang dibayar M14-B1,
+ * ketika toko yang sama tampil ber-badge di beranda tapi polos di wishlist.
+ * Harga yang berbeda antar halaman jauh lebih buruk lagi.
+ *
+ * Biayanya satu query indexed per daftar, dan `resolveFlashPrices` berhenti
+ * lebih awal kalau daftarnya kosong.
+ */
+export async function applyFlashPrices(
+  cards: ProductCard[],
+  now: Date = new Date(),
+): Promise<ProductCard[]> {
+  if (cards.length === 0) return cards;
+  const hits = await resolveFlashPrices(cards.map((c) => c.id), now);
+  if (hits.size === 0) return cards;
+  return cards.map((c) => {
+    const hit = hits.get(c.id);
+    return hit ? withFlashPrice(c, hit.salePrice) : c;
+  });
 }
 
 function buildOrderBy(sort: ProductListQuery['sort']): Prisma.ProductOrderByWithRelationInput[] {
@@ -144,7 +191,7 @@ export async function listProducts(query: ProductListQuery): Promise<{
     }),
   ]);
 
-  const items: ProductCard[] = rows.map(toProductCard);
+  const items = await applyFlashPrices(rows.map(toProductCard));
 
   return { items, total, page: query.page, limit: query.limit };
 }
@@ -198,8 +245,19 @@ export async function getProductBySlug(slug: string) {
   // yang salah dipakai FE untuk melabeli "Official Store". Menghapusnya dari
   // payload memastikan kekeliruan itu tidak bisa terulang diam-diam.
   const { ktpVerified, isOfficialStore, ...shop } = product.shop;
+
+  // Halaman detail mengirim field harga MENTAH dan FE menghitung sendiri lewat
+  // `getUnitPrice` (harga per qty bergantung tier grosir). Karena itu harga
+  // flash harus ikut dikirim sebagai bahan, bukan sebagai hasil — kalau tidak,
+  // BuyBox akan menampilkan harga normal untuk produk yang di beranda barusan
+  // diiklankan murah.
+  const flash = (await resolveFlashPrices([product.id])).get(product.id) ?? null;
+
   return withVariantValues({
     ...product,
+    flashPrice: flash?.salePrice ?? null,
+    flashEndAt: flash?.endAt ?? null,
+    flashRemaining: flash?.remaining ?? null,
     shop: { ...shop, badge: getShopBadge({ ktpVerified, isOfficialStore, ...shop }) },
   });
 }
@@ -230,7 +288,7 @@ export async function getRelatedProducts(productId: string, limit = 6): Promise<
     },
   });
 
-  return rows.map(toProductCard);
+  return applyFlashPrices(rows.map(toProductCard));
 }
 
 export async function getForYouProducts(userId: string | undefined, limit = 30): Promise<ProductCard[]> {
@@ -293,7 +351,7 @@ export async function getForYouProducts(userId: string | undefined, limit = 30):
     },
   });
 
-  const items: ProductCard[] = rows.map(toProductCard);
+  const items: ProductCard[] = await applyFlashPrices(rows.map(toProductCard));
 
   // Kalau hasil personalized kurang dari limit, lengkapi dengan bestseller global (tanpa duplikat).
   if (items.length < limit) {

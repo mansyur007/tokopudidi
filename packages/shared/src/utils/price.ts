@@ -1,6 +1,12 @@
 // Helper harga efektif produk (M9-B3 sale price).
-// Prioritas harga (rencana lintas-milestone): Flash Sale (M15-C1) > Sale Price (M9-B3)
-// > Harga Grosir (M13-B1) > harga normal. Yang mengerjakan berikutnya extend helper ini.
+//
+// Prioritas harga (lengkap sejak M15-C1): Flash Sale (M15-C1) > Sale Price
+// (M9-B3) > Harga Grosir (M13-B1) > harga normal.
+//
+// Prioritas itu menentukan siapa yang MENANG SAAT SERI — bukan izin menaikkan
+// harga. Yang dibayar pembeli selalu kandidat termurah (lihat `resolveUnitPrice`).
+// Aturan itu dipertahankan dari M13-B1 dengan alasan yang sama: promo yang
+// membuat harga justru naik adalah kebalikan dari yang dijanjikan namanya.
 
 export interface SalePriceFields {
   price: number;
@@ -67,26 +73,69 @@ export function getWholesaleTierPrice(
   return terpilih ? terpilih.price : null;
 }
 
+// ===== Flash sale (M15-C1) =====
+
+/** Dari mana harga satuan yang berlaku itu berasal. */
+export type PriceSource = 'FLASH' | 'SALE' | 'WHOLESALE' | 'NORMAL';
+
+export interface FlashPriceFields extends WholesalePriceFields {
+  /**
+   * Harga slot flash sale yang SUDAH diresolusi pemanggil: event-nya berjalan
+   * dan kuotanya masih ada. Helper ini pure dan tidak bisa menanyakannya ke DB,
+   * jadi keputusan "flash ini masih berlaku" milik API (lihat
+   * `flashSale.service.ts`), sedangkan keputusan "harga mana yang menang" milik
+   * fungsi ini — supaya cuma ada satu tempat yang tahu urutannya.
+   */
+  flashPrice?: number | null;
+}
+
+/**
+ * Harga satuan final untuk kuantitas tertentu, beserta asalnya.
+ *
+ * Kontraknya `min`, bukan "yang prioritasnya tertinggi menang": setiap kandidat
+ * (flash, sale, tier grosir) hanya dipakai kalau memang paling murah. Prioritas
+ * baru berperan ketika dua kandidat menghasilkan angka yang sama persis —
+ * di situ yang lebih tinggi prioritasnya yang dilaporkan, karena itulah promo
+ * yang sedang diiklankan ke pembeli.
+ *
+ * `source` bukan hiasan: checkout memakainya untuk memutuskan kapan kuota flash
+ * benar-benar dipotong. Kalau tier grosir ternyata lebih murah dari harga flash,
+ * pembeli membayar harga tier dan slot flash-nya TIDAK ikut terbakar.
+ */
+export function resolveUnitPrice(
+  p: FlashPriceFields,
+  qty: number = 1,
+  now: Date = new Date(),
+): { price: number; source: PriceSource } {
+  const efektif = getEffectivePrice(p, now);
+  const tier = getWholesaleTierPrice(p.wholesaleTiers, qty);
+
+  // Urutan array = urutan prioritas saat harganya seri.
+  const kandidat: { price: number; source: PriceSource }[] = [];
+  if (p.flashPrice != null) kandidat.push({ price: p.flashPrice, source: 'FLASH' });
+  kandidat.push({ price: efektif, source: isSaleActive(p, now) ? 'SALE' : 'NORMAL' });
+  if (tier != null) kandidat.push({ price: tier, source: 'WHOLESALE' });
+
+  let menang = kandidat[0];
+  for (const k of kandidat) {
+    if (k.price < menang.price) menang = k;
+  }
+  return menang;
+}
+
 /**
  * Harga satuan final untuk kuantitas tertentu — **satu-satunya** fungsi yang
  * boleh dipakai menghitung harga per item di cart, checkout, dan BuyBox.
- *
- * Kontraknya `min`, bukan "tier menang": tier hanya dipakai kalau memang lebih
- * murah dari harga efektif saat itu. Tanpa itu, produk yang sedang diskon
- * (M9-B3) justru jadi lebih mahal saat dibeli banyak — persis kebalikan dari
- * yang dijanjikan kata "grosir".
  *
  * `priceModifier` varian ditambahkan SETELAH fungsi ini oleh pemanggil,
  * konsisten dengan pola yang sudah ada di cart & order service.
  */
 export function getUnitPrice(
-  p: WholesalePriceFields,
+  p: FlashPriceFields,
   qty: number = 1,
   now: Date = new Date(),
 ): number {
-  const efektif = getEffectivePrice(p, now);
-  const tier = getWholesaleTierPrice(p.wholesaleTiers, qty);
-  return tier == null ? efektif : Math.min(efektif, tier);
+  return resolveUnitPrice(p, qty, now).price;
 }
 
 /**

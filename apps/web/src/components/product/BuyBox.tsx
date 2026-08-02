@@ -11,6 +11,7 @@ import type { ProductDetail } from '@/lib/api/products';
 import { ApiClientError } from '@/lib/api/client';
 import {
   formatRupiah,
+  formatSisaWaktu,
   getSaleRemainingMs,
   getUnitPrice,
   getNextWholesaleTier,
@@ -40,6 +41,44 @@ function SaleCountdown({ product }: { product: ProductDetail }) {
     <p className="text-[12px] text-red-600 font-semibold mb-2">
       ⏰ Diskon berakhir dalam {pad(h)}:{pad(m)}:{pad(s)}
     </p>
+  );
+}
+
+/**
+ * Panel flash sale (M15-C1) — harga event + sisa kuota + hitungan mundur.
+ *
+ * Selalu tampil selama produknya ikut event berjalan, tanpa syarat "< 24 jam"
+ * seperti `SaleCountdown`: flash sale memang dijual sebagai tenggat, dan
+ * menyembunyikan hitungan mundurnya menghilangkan satu-satunya keterangan
+ * kenapa harganya berbeda dari biasanya.
+ */
+function FlashPanel({ product }: { product: ProductDetail }) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!product.flashEndAt) return;
+    const tick = () => setRemaining(new Date(product.flashEndAt!).getTime() - Date.now());
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [product.flashEndAt]);
+
+  if (product.flashPrice == null || remaining == null || remaining <= 0) return null;
+
+  return (
+    <div className="mb-3 rounded-[9px] bg-red-50 border border-red-200 px-3 py-2" data-testid="flash-panel">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12.5px] font-extrabold text-red-600">⚡ Flash Sale</span>
+        <span className="font-mono font-bold text-[12.5px] bg-ink text-white rounded px-1.5 py-0.5">
+          {formatSisaWaktu(remaining)}
+        </span>
+      </div>
+      {product.flashRemaining != null && (
+        <p className="text-[11.5px] text-red-700 mt-0.5">
+          Sisa {product.flashRemaining} pcs dengan harga ini
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -246,6 +285,7 @@ export function BuyBox({ product }: Props) {
         </p>
       )}
 
+      <FlashPanel product={product} />
       <SaleCountdown product={product} />
       <div className="flex justify-between items-baseline mb-1">
         <span className="text-[13px] text-ink-muted">Harga satuan</span>

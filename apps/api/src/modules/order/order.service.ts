@@ -1,9 +1,10 @@
 import { prisma, Prisma } from '@tokopudidi/database';
 import type { OrderStatus, PaymentMethod } from '@tokopudidi/database';
-import { getUnitPrice } from '@tokopudidi/shared';
+import { resolveUnitPrice } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
 import { quoteShipping, isCodAvailable } from '../shipping/shipping.service';
+import { resolveFlashPrices, reserveFlashQuota } from '../flashSale/flashSale.service';
 import { restoreStock } from './stock';
 import {
   QRIS_EXPIRY_MINUTES,
@@ -27,12 +28,13 @@ export interface PromoApplied {
 }
 
 async function validatePromo(
+  tx: Prisma.TransactionClient,
   code: string,
   totalSubtotal: number,
   shopSubtotals: Map<string, number>,
 ): Promise<PromoApplied | null> {
   if (!code) return null;
-  const promo = await prisma.promoCode.findUnique({
+  const promo = await tx.promoCode.findUnique({
     where: { code },
     include: { shop: { select: { name: true } } },
   });
@@ -113,14 +115,19 @@ export async function checkout(userId: string, input: CheckoutInput) {
   }
 
   // 3. Validasi & build order per toko.
+  //
+  // Subtotal SENGAJA belum dihitung di sini. Sejak M15-C1 harga satuan bisa
+  // berubah di detik terakhir — slot flash yang kuotanya keburu diambil orang
+  // lain membuat item itu jatuh ke harga normal — dan angka itu baru pasti
+  // setelah kuotanya benar-benar dipesan di dalam transaksi. Menghitung subtotal
+  // di luar transaksi berarti `Order.total` bisa tidak sama dengan jumlah
+  // item-nya persis pada kasus yang paling sulit ditelusuri.
   const cartItemMap = new Map(cart.items.map((it) => [it.id, it]));
-  let combinedSubtotal = 0;
   const shopOrders: Array<{
     shopId: string;
     items: typeof cart.items;
     shippingMethod: 'REGULAR' | 'SAME_DAY' | 'PICKUP_SENDIRI';
     notes?: string;
-    subtotal: number;
     weightGr: number;
     shippingCost: number;
   }> = [];
@@ -152,15 +159,8 @@ export async function checkout(userId: string, input: CheckoutInput) {
       }
     }
 
-    let subtotal = 0;
     let weightGr = 0;
     for (const it of items) {
-      // Harga satuan (sale M9-B3 + grosir M13-B1) — tersimpan di OrderItem.price
-      // (snapshot saat beli). Rumusnya WAJIB sama persis dengan yang dipakai
-      // saat membuat OrderItem di bawah; kalau berbeda, total order tidak akan
-      // sama dengan jumlah itemnya.
-      const price = getUnitPrice(it.product, it.quantity) + (it.variant?.priceModifier ?? 0);
-      subtotal += price * it.quantity;
       weightGr += it.product.weight * it.quantity;
     }
 
@@ -176,35 +176,81 @@ export async function checkout(userId: string, input: CheckoutInput) {
         : quoteShipping(address.province, shopGroup.shippingMethod, weightGr);
     }
 
-    combinedSubtotal += subtotal;
     shopOrders.push({
       shopId: shopGroup.shopId,
       items,
       shippingMethod: shopGroup.shippingMethod,
       notes: shopGroup.notes || undefined,
-      subtotal,
       weightGr,
       shippingCost,
     });
   }
 
-  // 4. Validasi promo. Voucher platform → combined subtotal (dipotong proporsional per order);
-  //    voucher toko (M9-B2) → hanya subtotal & order toko tsb.
-  const shopSubtotals = new Map(shopOrders.map((so) => [so.shopId, so.subtotal]));
-  const promoApplied = await validatePromo(input.promoCode ?? '', combinedSubtotal, shopSubtotals);
+  // 4. Calon harga flash sale (M15-C1) — dibaca di luar transaksi karena ini
+  //    baru pencarian kandidat; yang mengikat adalah pemesanan kuota di bawah.
+  const flashHits = await resolveFlashPrices(
+    Array.from(new Set(cart.items.map((it) => it.productId))),
+  );
 
-  // 5. Buat order dalam transaksi tunggal.
+  // 5. Harga, promo, dan pembuatan order — satu transaksi.
   const created = await prisma.$transaction(async (tx) => {
+    // 5a. Harga satuan final per item keranjang. Di sinilah kuota flash dipesan:
+    //     kalau kalah balapan, item itu jatuh ke harga normal dan checkout
+    //     TETAP jalan — kuota habis bukan alasan menggagalkan belanja orang.
+    const hargaPerItem = new Map<string, { price: number; flashSaleItemId: string | null }>();
+    for (const so of shopOrders) {
+      for (const it of so.items) {
+        const hit = flashHits.get(it.productId);
+        let hasil = resolveUnitPrice(
+          { ...it.product, flashPrice: hit?.salePrice ?? null },
+          it.quantity,
+        );
+        let flashSaleItemId: string | null = null;
+
+        if (hasil.source === 'FLASH' && hit) {
+          if (await reserveFlashQuota(tx, hit.flashSaleItemId, it.quantity)) {
+            flashSaleItemId = hit.flashSaleItemId;
+          } else {
+            // Kuota keburu diambil orang lain — hitung ulang tanpa flash.
+            hasil = resolveUnitPrice({ ...it.product, flashPrice: null }, it.quantity);
+          }
+        }
+
+        hargaPerItem.set(it.id, {
+          price: hasil.price + (it.variant?.priceModifier ?? 0),
+          flashSaleItemId,
+        });
+      }
+    }
+
+    const subtotalPerToko = new Map(
+      shopOrders.map((so) => [
+        so.shopId,
+        so.items.reduce((sum, it) => sum + hargaPerItem.get(it.id)!.price * it.quantity, 0),
+      ]),
+    );
+    const combinedSubtotal = Array.from(subtotalPerToko.values()).reduce((a, b) => a + b, 0);
+
+    // 5b. Validasi promo. Voucher platform → combined subtotal (dipotong proporsional
+    //     per order); voucher toko (M9-B2) → hanya subtotal & order toko tsb.
+    const promoApplied = await validatePromo(
+      tx,
+      input.promoCode ?? '',
+      combinedSubtotal,
+      subtotalPerToko,
+    );
+
     const orderRecords = [];
     for (const so of shopOrders) {
+      const subtotal = subtotalPerToko.get(so.shopId)!;
       // Voucher toko: diskon penuh ke order toko tsb; platform: proporsional per share subtotal.
       let discount = 0;
       if (promoApplied && promoApplied.shopId) {
         discount = promoApplied.shopId === so.shopId ? promoApplied.discountAmount : 0;
       } else if (promoApplied && combinedSubtotal > 0) {
-        discount = Math.floor((promoApplied.discountAmount * so.subtotal) / combinedSubtotal);
+        discount = Math.floor((promoApplied.discountAmount * subtotal) / combinedSubtotal);
       }
-      const total = so.subtotal + so.shippingCost - discount;
+      const total = subtotal + so.shippingCost - discount;
 
       const shop = await tx.shop.findUniqueOrThrow({ where: { id: so.shopId } });
 
@@ -215,7 +261,7 @@ export async function checkout(userId: string, input: CheckoutInput) {
           shopId: so.shopId,
           addressId: address?.id,
           status: input.paymentMethod === 'COD' ? 'PAID' : 'PENDING_PAYMENT',
-          subtotal: so.subtotal,
+          subtotal,
           shippingCost: so.shippingCost,
           discountAmount: discount,
           total,
@@ -230,19 +276,21 @@ export async function checkout(userId: string, input: CheckoutInput) {
           paidAt: input.paymentMethod === 'COD' ? new Date() : null,
           items: {
             create: so.items.map((it) => {
-              // Dihitung sekali lalu dipakai untuk `price` dan `subtotal` —
-              // sebelumnya rumusnya ditulis dua kali dan wajib selalu identik.
-              const hargaSatuan =
-                getUnitPrice(it.product, it.quantity) + (it.variant?.priceModifier ?? 0);
+              // Angka yang sama persis dengan yang dipakai menyusun `subtotal`
+              // di atas — dibaca dari satu peta, bukan dihitung ulang. Rumus
+              // yang ditulis dua kali adalah cara paling gampang membuat total
+              // order tidak sama dengan jumlah itemnya.
+              const { price, flashSaleItemId } = hargaPerItem.get(it.id)!;
               return {
                 productId: it.productId,
                 variantId: it.variantId,
                 productName: it.product.name,
                 productImage: it.product.images[0]?.url ?? null,
                 variantName: it.variant?.name,
-                price: hargaSatuan,
+                price,
                 quantity: it.quantity,
-                subtotal: hargaSatuan * it.quantity,
+                subtotal: price * it.quantity,
+                flashSaleItemId,
               };
             }),
           },

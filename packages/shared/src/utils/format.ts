@@ -34,6 +34,29 @@ export function timeAgo(input: Date | string): string {
   return formatTanggal(d);
 }
 
+/**
+ * Sisa waktu untuk hitungan mundur: "02:15:09", atau "6 hari 21:30:47" kalau
+ * lebih dari sehari.
+ *
+ * Bagian harinya bukan hiasan. Tanpa itu, event tujuh hari dirender
+ * "165:30:47" — angka yang secara teknis benar tapi tidak terbaca siapa pun,
+ * dan sempat lolos begitu saja sampai e2e menampilkannya. Detiknya tetap
+ * ditampilkan seberapa pun jauhnya tenggat supaya jelas hitungannya hidup.
+ *
+ * Ditulis "hari", bukan disingkat "h": di layar yang sama ada satuan jam, dan
+ * "6h" terbaca dua arti.
+ */
+export function formatSisaWaktu(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const hari = Math.floor(total / 86400);
+  const jam = Math.floor((total % 86400) / 3600);
+  const menit = Math.floor((total % 3600) / 60);
+  const detik = total % 60;
+  const waktu = `${pad(jam)}:${pad(menit)}:${pad(detik)}`;
+  return hari > 0 ? `${hari} hari ${waktu}` : waktu;
+}
+
 export function slugify(input: string): string {
   return input
     .toLowerCase()

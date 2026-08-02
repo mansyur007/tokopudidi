@@ -401,6 +401,44 @@ async function main() {
   }
   console.log(`✅ ${promoData.length} promo code (HEMAT10K, DISKON5, GRATISONGKIR)`);
 
+  // 6b. Flash sale berjalan (M15-C1).
+  //
+  // Ada di seed dengan alasan yang sama seperti harga grosir di atas: tanpa
+  // event yang benar-benar berjalan, section beranda & jalur harga flash tidak
+  // pernah terpakai di dev maupun e2e, dan bug-nya baru ketahuan di produksi.
+  // Periodenya relatif terhadap waktu seed (mulai 1 jam lalu, berakhir 7 hari
+  // lagi) supaya tetap "berjalan" berapa pun lamanya database ini dipakai.
+  // Dicari lewat `name`, bukan `slug`: slug produk seed diberi salt per toko
+  // (lihat `slugifyId`), jadi menebaknya di sini akan diam-diam tidak cocok.
+  // Keduanya sengaja produk tanpa diskon periodik & tanpa harga grosir supaya
+  // e2e bisa menguji jalur flash tanpa tercampur aturan harga lain.
+  const flashProducts = await prisma.product.findMany({
+    where: { name: { in: ['Beras Pandan Wangi 5kg', 'Teh Tubruk Tongji 100gr'] } },
+    select: { id: true, price: true },
+  });
+  if (flashProducts.length > 0) {
+    const namaEvent = 'Flash Sale Spesial Hari Ini';
+    const adaEvent = await prisma.flashSale.findFirst({ where: { name: namaEvent } });
+    if (!adaEvent) {
+      await prisma.flashSale.create({
+        data: {
+          name: namaEvent,
+          startAt: new Date(Date.now() - 60 * 60 * 1000),
+          endAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          items: {
+            create: flashProducts.map((p) => ({
+              productId: p.id,
+              // Kelipatan seribu ke bawah supaya angkanya enak dibaca di demo.
+              salePrice: Math.max(100, Math.floor((p.price * 0.7) / 1000) * 1000),
+              quota: 25,
+            })),
+          },
+        },
+      });
+    }
+    console.log(`✅ Flash sale berjalan (${flashProducts.length} produk, kuota 25)`);
+  }
+
   // 7. Demo buyer + 1 order COMPLETED + 1 pengajuan refund PENDING.
   //    Supaya panel admin (terutama arbitrase refund) ada datanya saat demo.
   const buyerPassword = await bcrypt.hash('buyer123', 12);

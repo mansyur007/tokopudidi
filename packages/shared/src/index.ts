@@ -7,6 +7,7 @@ export * from './schemas/chat';
 export * from './schemas/common';
 export * from './schemas/complaint';
 export * from './schemas/discussion';
+export * from './schemas/flashSale';
 export * from './schemas/order';
 export * from './schemas/product';
 export * from './schemas/report';

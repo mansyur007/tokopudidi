@@ -15,6 +15,7 @@ const NAV = [
   { href: '/admin/laporan',  label: 'Laporan',    emoji: '🚩' },
   { href: '/admin/komplain', label: 'Komplain',   emoji: '📦' },
   { href: '/admin/voucher',  label: 'Voucher',    emoji: '🎟️' },
+  { href: '/admin/flash-sale', label: 'Flash Sale', emoji: '⚡' },
   { href: '/admin/banner',   label: 'Banner',     emoji: '🖼️' },
   { href: '/admin/kategori', label: 'Kategori',   emoji: '🗂️' },
   { href: '/admin/log',      label: 'Jejak Audit', emoji: '📜' },

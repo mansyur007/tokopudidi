@@ -1,6 +1,7 @@
 import { prisma } from '@tokopudidi/database';
 import { getUnitPrice } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
+import { resolveFlashPrices } from '../flashSale/flashSale.service';
 
 // Cart dijamin ada (auto-create di register). Tapi defensive: upsert kalau belum ada.
 async function ensureCart(userId: string) {
@@ -39,11 +40,20 @@ export async function getCartForUser(userId: string) {
   });
   if (!cart) return { items: [], grouped: [] };
 
-  // Harga satuan (sale M9-B3 + grosir M13-B1) + variant modifier.
+  // Harga flash (M15-C1) ikut ditampilkan di keranjang, bukan hanya ditagih
+  // saat checkout: harga di keranjang adalah janji yang dibaca pembeli sebelum
+  // menekan Bayar, dan janji yang berbeda dari tagihannya — walau lebih murah —
+  // membuat pembeli mengira ada yang salah. Kuota belum dipesan di sini; yang
+  // mengikat tetap transaksi checkout.
+  const flashHits = await resolveFlashPrices(cart.items.map((it) => it.productId));
+
+  // Harga satuan (flash M15-C1 + sale M9-B3 + grosir M13-B1) + variant modifier.
   // `getUnitPrice` butuh qty karena tier grosir bergantung padanya — itu
   // sebabnya harga di keranjang bisa berubah saat qty diedit.
   const items = cart.items.map((it) => {
-    const effectivePrice = getUnitPrice(it.product, it.quantity) + (it.variant?.priceModifier ?? 0);
+    const flashPrice = flashHits.get(it.productId)?.salePrice ?? null;
+    const effectivePrice =
+      getUnitPrice({ ...it.product, flashPrice }, it.quantity) + (it.variant?.priceModifier ?? 0);
     return {
       id: it.id,
       productId: it.productId,
