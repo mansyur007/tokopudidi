@@ -40,6 +40,16 @@ export class ConflictError extends HttpError {
   }
 }
 
+// Bentuk payload-nya benar, isinya yang bertabrakan dengan data existing —
+// mis. harga baru yang membuat diskon/harga grosir lebih mahal dari harga
+// normal (M14-B2). Dibedakan dari 400 supaya client bisa menandai baris yang
+// bermasalah, bukan sekadar menampilkan satu pesan gagal.
+export class UnprocessableEntityError extends HttpError {
+  constructor(message = 'Datanya tidak bisa diproses', errors?: Record<string, string[]>) {
+    super(422, message, errors);
+  }
+}
+
 export class TooManyRequestsError extends HttpError {
   constructor(message = 'Sabar dulu ya, terlalu banyak percobaan') {
     super(429, message);

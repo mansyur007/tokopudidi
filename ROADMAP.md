@@ -5,6 +5,8 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
+> **Progress (2026-08-02)** — **M14-B2 Bulk Edit** selesai. Sisa M14 tinggal **A1 Login Google** & **A2 Email Transaksional**, keduanya **⚪ BLOCKED menunggu kredensial eksternal** (`GOOGLE_CLIENT_ID`; kredensial SMTP) — tidak bisa diselesaikan tanpa itu. Yang bebas di-klaim berikutnya: **M15** (C1 Flash Sale, B1 Pre-Order, D1 PWA).
+>
 > **Progress (2026-08-01)** — **M13 tuntas**: B2 Broadcast Promo selesai (A1 Follow Toko, A2 Invoice, B1 Harga Grosir sudah lebih dulu). Lanjut ke **M14**: **B1 Badge Reputasi** selesai — sekaligus membayar utang M10-A10, label "Official Store"/✅ tidak lagi bersumber `ktpVerified`. Sisa M14 yang bebas di-klaim: **B2 Bulk Edit** (mandiri), serta **A1 Login Google** & **A2 Email Transaksional** yang **butuh kredensial/layanan eksternal** dulu (`GOOGLE_CLIENT_ID`, kredensial SMTP) — dua item itu tidak bisa diselesaikan tanpa itu.
 >
 > **Progress (2026-07-31)** — **M13-A2 Invoice Pesanan** & **M13-B1 Harga Grosir** selesai. Sisa M13 yang bebas di-klaim: **B2 Broadcast** (blokirnya lepas sejak M13-A1).
@@ -800,7 +802,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M14-A1. Login dengan Google (OAuth)
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: ⚪ BLOCKED — butuh `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` dari Google Cloud Console (beserta redirect URI terdaftar) sebelum bisa dikerjakan & diverifikasi · **Owner**: _belum di-klaim_
 - **Scope**: Tombol "Masuk dengan Google" di `/masuk` & `/daftar`; akun baru via Google, linking ke akun existing.
 - **Konteks kode (audit 2026-07-29)** — kendala yang mengubah desain lama:
   - Identitas utama = **phone**: `User.phone` wajib & unique, login = phone+password ([auth.service.ts:75-89](apps/api/src/modules/auth/auth.service.ts#L75)), `User.email` opsional, `passwordHash` non-null.
@@ -825,7 +827,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M14-A2. Email Transaksional
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: ⚪ BLOCKED — butuh kredensial penyedia email (SMTP / API key) + domain pengirim terverifikasi sebelum bisa dikerjakan & diverifikasi · **Owner**: _belum di-klaim_
 - **Scope (re-scope 2026-07-29)**: email event transaksional untuk user yang **punya email**. **OTP phone mock TETAP** — rencana lama "ganti OTP mock dengan email" tidak 1:1: OTP existing berbasis phone ([otp.service.ts](apps/api/src/modules/auth/otp.service.ts) — console mock, purpose REGISTER/LOGIN/RESET_PASSWORD) dan `User.email` opsional, jadi email tidak bisa jadi jalur wajib tanpa membuat email required (di luar scope).
 - **Event yang dikirim** (semua: skip diam-diam kalau `user.email` kosong):
   - Order dibuat → buyer (rincian + instruksi bayar)
@@ -869,7 +871,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M14-B2. Bulk Edit Stok & Harga
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-08-02): **Rencana kurang satu guard.** Yang tertulis hanya "guard sale price (M9-B3)", padahal jalur satuan (`PATCH /seller/products/:id`) menjaga **dua** hal terhadap penurunan harga: diskon periodik **dan** harga grosir (M13-B1, `tier.price >= nextPrice` ditolak). Tanpa guard kedua, bulk edit jadi pintu belakang untuk membuat harga "grosir" lebih mahal daripada harga biasa — pembelinya memang masih terlindungi kontrak `min` di `getUnitPrice`, tapi datanya sudah telanjur tidak masuk akal. Keduanya kini ditegakkan di sini (e2e TC-172). **Jebakan routing yang nyaris kena**: `PATCH /:id` sudah ada di router yang sama, dan Express mencocokkan sesuai urutan pendaftaran — `PATCH /bulk` **wajib** dideklarasikan sebelumnya, kalau tidak permintaannya ditelan `/:id` dengan `id = "bulk"` dan gagalnya muncul sebagai error validasi `productUpdateSchema` yang membingungkan, bukan 404 yang jelas. TC-173 mengunci ini: kalau urutannya terbalik, payload tak sah akan menjawab 404, bukan 400. **Di luar rencana**: (1) zod menolak baris yang tidak mengubah kolom apa pun — baris begitu ikut terhitung di `updated` sehingga seller diberi tahu "12 produk diperbarui" padahal yang berubah lebih sedikit; (2) zod menolak id kembar dalam satu payload — dua baris untuk produk yang sama membuat nilai akhirnya bergantung urutan array, jadi kebetulan, bukan keputusan; (3) `findBulkPriceConflicts` sengaja **melewati** baris yang tidak mengubah harga, supaya produk yang datanya sudah telanjur tidak konsisten dari sebelumnya tidak ikut mengunci penyuntingan stoknya; (4) angka yang disebut di pesan konflik adalah tier **tertinggi** yang menabrak, bukan yang pertama ditemukan di array — itulah batas yang benar-benar harus dilewati. Kelas error baru `UnprocessableEntityError` (422) ditambahkan supaya konflik isi bisa dibedakan dari payload cacat (400), dan `errors` diisi per **id produk** sehingga FE menandai barisnya, bukan sekadar menampilkan satu pesan gagal. Mode edit **tidak** ditutup saat 422 — menutupnya membuang semua ketikan yang belum tersimpan. **Belum terverifikasi lokal** (Docker baru terpasang, engine-nya belum pernah dijalankan): e2e bergantung CI. Lolos lokal: `tsc` api+web+shared+database, lint, 264 unit test (18 baru), `playwright test --list`. TC-TKPDD-170–173 perlu didaftarkan di TestForge.
 - **Scope**: Mode edit inline di tabel produk seller — harga/stok/aktif banyak produk, simpan sekali klik. (CSV import tetap out-of-scope.)
 - **Konteks kode (audit 2026-07-29)**: tabel di [apps/web/src/app/seller/produk/page.tsx](apps/web/src/app/seller/produk/page.tsx); router [seller.product.routes.ts](apps/api/src/modules/seller/seller.product.routes.ts); zod di [packages/shared/src/schemas/seller.ts](packages/shared/src/schemas/seller.ts).
 - **API**: `PATCH /api/v1/seller/products/bulk` body `{ items: [{ id, price?, stock?, isActive? }] }`, max 50 item:
@@ -878,10 +881,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - **Guard sale price (M9-B3)**: kalau produk punya `salePrice` dan `price` baru ≤ `salePrice` → tolak baris itu (422 dengan daftar id bermasalah) — jangan diam-diam membuat sale mati
 - **UI**: tombol "Edit Massal" → cell harga/stok jadi input + checkbox aktif, dirty-tracking (hanya kirim baris berubah), tombol Simpan/Batal sticky bottom; validasi client harga ≥ 100, stok ≥ 0.
 - **Acceptance**:
-  - [ ] Edit 20 produk → 1 request, 1 transaksi
-  - [ ] Produk toko lain di payload → 403, tidak ada yang tersimpan
-  - [ ] Price baru ≤ salePrice aktif → error per-baris dengan pesan jelas
-  - [ ] Baris tidak diubah tidak ikut terkirim
+  - [x] Edit 20 produk → 1 request, 1 transaksi — `prisma.$transaction` atas seluruh update; e2e TC-170 memastikan kolom yang tidak dikirim tidak ikut berubah (update parsial, bukan timpa baris)
+  - [x] Produk toko lain di payload → 403, tidak ada yang tersimpan — e2e TC-171 menyertakan satu baris sah di payload yang sama dan memastikan baris itu pun tidak tertulis
+  - [x] Price baru ≤ salePrice aktif → error per-baris dengan pesan jelas — 422 ber-`errors` per id produk; **plus guard harga grosir yang tidak ada di rencana** (e2e TC-172)
+  - [x] Baris tidak diubah tidak ikut terkirim — dirty-tracking di FE (`diffRow`), dan zod menolaknya di server kalau tetap lolos
 - **Effort**: S
 
 ---

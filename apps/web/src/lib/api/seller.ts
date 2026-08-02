@@ -429,3 +429,20 @@ export const createSellerBroadcast = (
   apiFetch<SellerBroadcastRow>('/api/v1/seller/broadcast', {
     method: 'POST', token, body: JSON.stringify(body),
   });
+
+// ===== Bulk edit stok & harga (M14-B2) =====
+export interface BulkProductItem {
+  id: string;
+  price?: number;
+  stock?: number;
+  isActive?: boolean;
+}
+
+/**
+ * Kirim HANYA baris yang berubah. Server menolak baris tanpa perubahan, dan
+ * mengirim semuanya membuat pesan "N produk diperbarui" jadi bohong.
+ */
+export const bulkUpdateSellerProducts = (token: string, items: BulkProductItem[]) =>
+  apiFetch<{ updated: number }>('/api/v1/seller/products/bulk', {
+    method: 'PATCH', token, body: JSON.stringify({ items }),
+  });

@@ -3,6 +3,27 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M14-B2: Bulk Edit Stok & Harga
+
+### Added
+- **Edit massal stok & harga** (`M14-B2`) — mode edit inline di daftar produk seller, simpan sekali klik.
+  - `PATCH /api/v1/seller/products/bulk` — maks 50 baris, satu `$transaction`, respons `{ updated: n }`.
+  - Kepemilikan diperiksa **sebelum** apa pun ditulis: satu id milik toko lain membatalkan seluruh permintaan (403).
+  - Tombol "✏️ Edit Massal" di [seller/produk](apps/web/src/app/seller/produk/page.tsx) — harga/stok jadi input, checkbox aktif, bar aksi sticky di bawah dengan hitungan baris berubah.
+  - `bulkProductUpdateSchema` + `findBulkPriceConflicts` — 18 unit test.
+  - E2E `bulk-edit.spec.ts` (TC-TKPDD-170–173).
+- Kelas error `UnprocessableEntityError` (422) — memisahkan "payload cacat" (400) dari "isinya bertabrakan dengan data existing".
+
+### Notes
+- **Rencana di ROADMAP kurang satu guard.** Yang tertulis hanya guard `salePrice` (M9-B3), padahal jalur satuan menjaga **dua** hal terhadap penurunan harga: diskon periodik **dan** harga grosir (M13-B1). Tanpa guard kedua, bulk edit jadi pintu belakang untuk membuat harga "grosir" lebih mahal daripada harga biasa. Pembeli memang masih terlindungi kontrak `min` di `getUnitPrice`, tapi datanya sudah telanjur tidak masuk akal. Keduanya kini ditegakkan di sini.
+- **`PATCH /bulk` wajib dideklarasikan sebelum `PATCH /:id`.** Express mencocokkan route sesuai urutan pendaftaran; kalau dibalik, permintaannya ditelan `/:id` dengan `id = "bulk"` dan gagalnya muncul sebagai error validasi `productUpdateSchema` yang membingungkan, bukan 404 yang jelas. TC-173 mengunci urutan itu: kalau terbalik, payload tak sah akan menjawab 404, bukan 400.
+- **Baris tanpa perubahan ditolak zod.** Baris begitu ikut terhitung di `updated`, sehingga seller diberi tahu "12 produk diperbarui" padahal yang benar-benar berubah lebih sedikit. FE juga sudah menyaringnya lewat dirty-tracking — server jadi jaring kedua, bukan satu-satunya.
+- **Id produk kembar dalam satu payload ditolak.** Dua baris untuk produk yang sama membuat nilai akhirnya bergantung urutan array: mana yang menang jadi kebetulan, bukan keputusan.
+- **Baris yang tidak mengubah harga sengaja tidak diperiksa konfliknya.** Kalau sebuah produk sudah telanjur punya data harga tidak konsisten dari sebelumnya, memblokir penyesuaian stoknya tidak memperbaiki apa pun — hanya mengunci pekerjaan yang tak ada kaitannya dengan masalahnya.
+- **Angka batas di pesan konflik adalah tier tertinggi yang menabrak**, bukan tier pertama yang ditemukan di array — itulah batas yang benar-benar harus dilewati seller. Ada unit test yang membalik urutan array untuk memastikan angkanya tidak ikut berubah.
+- **Mode edit tidak ditutup saat 422.** `errors` dikirim per **id produk** sehingga barisnya bisa ditandai masing-masing; menutup mode edit akan membuang semua ketikan yang belum tersimpan.
+- **Belum terverifikasi di lingkungan lokal** — Docker baru terpasang tapi engine-nya belum pernah dijalankan, jadi e2e masih bergantung workflow `e2e.yml`. Yang lolos lokal: `tsc` api + web + shared + database, lint, **264 unit test** (18 baru), dan `playwright test --list`.
+
 ## [Unreleased] — M14-B1: Badge Reputasi Toko
 
 ### Added
