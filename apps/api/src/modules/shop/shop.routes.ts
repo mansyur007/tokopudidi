@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { prisma, Prisma } from '@tokopudidi/database';
+import { getShopBadge } from '@tokopudidi/shared';
 import { ok } from '../../lib/response';
 import { NotFoundError } from '../../lib/errors';
 import { requireAuth } from '../../middleware/auth';
-import { toProductCard } from '../product/product.service';
+import { toProductCard, CARD_SHOP_SELECT } from '../product/product.service';
 import { followShop, unfollowShop } from '../follow/follow.service';
 
 export const shopRouter = Router();
@@ -27,9 +28,17 @@ shopRouter.get('/featured', async (_req, res, next) => {
       select: {
         id: true, slug: true, name: true, logoUrl: true, city: true,
         ratingAvg: true, ratingCount: true, totalSold: true,
+        // Bahan badge (M14-B1) — dibuang lagi di bawah, hanya hasilnya dikirim.
+        ktpVerified: true, isOfficialStore: true,
       },
     });
-    return ok(res, shops);
+    return ok(
+      res,
+      shops.map(({ ktpVerified, isOfficialStore, ...s }) => ({
+        ...s,
+        badge: getShopBadge({ ktpVerified, isOfficialStore, ...s }),
+      })),
+    );
   } catch (err) { next(err); }
 });
 
@@ -41,7 +50,11 @@ shopRouter.get('/:slug', async (req, res, next) => {
         id: true, slug: true, name: true, description: true,
         logoUrl: true, bannerUrl: true, city: true, province: true,
         isOpen: true, closedReason: true, joinedAt: true,
-        ratingAvg: true, ratingCount: true, totalSold: true, ktpVerified: true,
+        ratingAvg: true, ratingCount: true, totalSold: true,
+        // Bahan badge (M14-B1). Tidak diteruskan mentah ke pembeli — sebelum
+        // item ini, `ktpVerified` inilah yang salah dipakai header toko untuk
+        // menampilkan ✅ seolah-olah tanda toko resmi.
+        ktpVerified: true, isOfficialStore: true,
         // Follower (M13-A1) — dihitung langsung, tanpa kolom counter.
         // Sengaja TIDAK ada `isFollowing` di sini: halaman toko dirender di
         // server dan token buyer hidup di localStorage (zustand persist), jadi
@@ -62,9 +75,10 @@ shopRouter.get('/:slug', async (req, res, next) => {
     if (!shop) throw new NotFoundError('Toko tidak ditemukan');
 
     // Etalase kosong disembunyikan dari buyer (tetap terlihat di panel seller).
-    const { showcases, _count, ...rest } = shop;
+    const { showcases, _count, ktpVerified, isOfficialStore, ...rest } = shop;
     return ok(res, {
       ...rest,
+      badge: getShopBadge({ ktpVerified, isOfficialStore, ...rest }),
       followerCount: _count.followers,
       showcases: showcases
         .filter((s) => s._count.products > 0)
@@ -123,7 +137,7 @@ shopRouter.get('/:slug/showcase/:showcaseSlug', async (req, res, next) => {
           product: {
             include: {
               images: { orderBy: { order: 'asc' }, take: 1 },
-              shop: { select: { id: true, name: true, slug: true, city: true } },
+              shop: { select: CARD_SHOP_SELECT },
             },
           },
         },

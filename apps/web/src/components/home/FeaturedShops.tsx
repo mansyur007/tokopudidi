@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SmartImage } from '@/components/media/SmartImage';
+import { ShopBadgeMark } from '@/components/shop/ShopBadgeMark';
 import type { ShopCard } from '@/lib/api/shops';
 
 interface Props { shops: ShopCard[] }
@@ -23,7 +24,10 @@ export function FeaturedShops({ shops }: Props) {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{s.name}</p>
+                <p className="text-sm font-medium truncate flex items-center gap-1">
+                  <span className="truncate">{s.name}</span>
+                  <ShopBadgeMark badge={s.badge} />
+                </p>
                 <p className="text-xs text-gray-500 truncate">📍 {s.city}</p>
               </div>
             </div>

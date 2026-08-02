@@ -1,3 +1,4 @@
+import type { ShopBadge } from '@tokopudidi/shared';
 import { apiFetch } from './client';
 import type { ProductCard } from './products';
 
@@ -10,6 +11,7 @@ export interface ShopCard {
   ratingAvg: number;
   ratingCount: number;
   totalSold: number;
+  badge: ShopBadge | null;
 }
 
 // Etalase toko (M11-B1) — hanya yang punya produk tampil yang dikirim API.
@@ -27,7 +29,6 @@ export interface ShopDetail extends ShopCard {
   isOpen: boolean;
   closedReason: string | null;
   joinedAt: string;
-  ktpVerified: boolean;
   showcases: ShopShowcaseSummary[];
   // M13-A1. Tidak ada `isFollowing` di sini — SSR tidak membawa token buyer,
   // status follow diambil client-side lewat store `follow`.

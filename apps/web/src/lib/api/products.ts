@@ -1,3 +1,4 @@
+import type { ShopBadge } from '@tokopudidi/shared';
 import { apiFetch } from './client';
 
 export interface ProductCard {
@@ -12,7 +13,10 @@ export interface ProductCard {
   ratingAvg: number;
   ratingCount: number;
   soldCount: number;
-  shop: { id: string; name: string; slug: string; city: string };
+  // `badge` (M14-B1) dikirim sudah jadi oleh API — FE tidak menghitung ulang
+  // kriterianya, dan bahan mentahnya (`ktpVerified`/`isOfficialStore`) memang
+  // tidak lagi ikut dikirim ke pembeli.
+  shop: { id: string; name: string; slug: string; city: string; badge: ShopBadge | null };
 }
 
 export interface ProductDetail extends Omit<ProductCard, 'originalPrice' | 'discountPct'> {
@@ -49,7 +53,6 @@ export interface ProductDetail extends Omit<ProductCard, 'originalPrice' | 'disc
     ratingCount: number;
     totalSold: number;
     isOpen: boolean;
-    ktpVerified: boolean;
   };
 }
 

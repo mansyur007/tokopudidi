@@ -5,7 +5,7 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
-> **Progress (2026-08-01)** — **M13 tuntas**: B2 Broadcast Promo selesai (A1 Follow Toko, A2 Invoice, B1 Harga Grosir sudah lebih dulu). Milestone berikutnya yang bebas di-klaim: **M14** (A1 Login Google, A2 Email Transaksional, B1 Badge Reputasi, B2 Bulk Edit).
+> **Progress (2026-08-01)** — **M13 tuntas**: B2 Broadcast Promo selesai (A1 Follow Toko, A2 Invoice, B1 Harga Grosir sudah lebih dulu). Lanjut ke **M14**: **B1 Badge Reputasi** selesai — sekaligus membayar utang M10-A10, label "Official Store"/✅ tidak lagi bersumber `ktpVerified`. Sisa M14 yang bebas di-klaim: **B2 Bulk Edit** (mandiri), serta **A1 Login Google** & **A2 Email Transaksional** yang **butuh kredensial/layanan eksternal** dulu (`GOOGLE_CLIENT_ID`, kredensial SMTP) — dua item itu tidak bisa diselesaikan tanpa itu.
 >
 > **Progress (2026-07-31)** — **M13-A2 Invoice Pesanan** & **M13-B1 Harga Grosir** selesai. Sisa M13 yang bebas di-klaim: **B2 Broadcast** (blokirnya lepas sejak M13-A1).
 >
@@ -849,7 +849,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M14-B1. Badge Reputasi Toko
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: Claude
+- **Deliver notes** (2026-08-01): rencana benar — tanpa migration, tanpa endpoint admin baru. `getShopBadge` + `getShopBadgeMeta` masuk `packages/shared/src/utils/badge.ts` (14 unit test). **Yang tidak tertulis di rencana tapi ternyata menentukan**: kartu produk dibangun oleh **enam** query berbeda (listing, related, for-you, wishlist, baru-dilihat, produk di halaman toko), masing-masing dengan `shop: { select: … }` literal sendiri. Menambah field badge satu per satu berarti cepat atau lambat ada satu yang tertinggal dan toko yang sama tampil ber-badge di beranda tapi polos di wishlist — jadi keenamnya dipusatkan ke `CARD_SHOP_SELECT` di `product.service.ts`, dan `CardRow` membuat kelalaian itu jadi error tsc, bukan bug diam. Hal serupa di `follow.service.ts`: `ShopCard` daftar toko favorit dinyatakan "sama persis dengan `/shops/featured`", jadi `badge` wajib ikut di sana juga. **Bahan mentah badge sekarang tidak lagi dikirim ke pembeli** — `ktpVerified` dan `isOfficialStore` dibuang dari respons `/shops/:slug`, `/shops/featured`, dan `/products/:slug`; hanya hasilnya yang keluar. Itu bukan penghematan payload, tapi penutup jalan: justru `ktpVerified` yang bocor itulah yang selama ini salah dipakai FE untuk melabeli "Official Store", dan selama bahannya masih ada di respons, kekeliruan yang sama gampang terulang. **Ambang badge sengaja inklusif** (`>=`) dan ada test yang memakai konstantanya langsung, sehingga menggeser ambang tidak bisa diam-diam mengubah arti test. `ktpVerified` disyaratkan untuk kedua badge performa tapi **tidak** untuk OFFICIAL: official adalah keputusan kurasi admin, sedangkan badge performa yang dihitung mesin tidak boleh bisa dikarang toko yang identitasnya belum pernah diperiksa. **Jebakan yang dicegat saat menulis e2e**: percobaan pertama memanggil `/shops/:slug/products` — route itu tidak ada, dan karena dibungkus `if (status === 200)` test-nya akan "lolos" tanpa memeriksa apa pun; diganti ke `/products?shopId=`. Nilai `ratingAvg`/`totalSold` di seed acak, jadi e2e tidak pernah menuntut badge tertentu dari data seed — yang diperiksa perubahannya saat flag official di-toggle admin lalu dikembalikan, sekaligus membuktikan badge memang diturunkan saat dibaca. **Belum terverifikasi lokal** (mesin dev tanpa Postgres/Docker, Docker sedang dipasang): e2e bergantung CI. Lolos lokal: `tsc` api+web+shared+database, lint, 246 unit test, `playwright test --list`. TC-TKPDD-167–169 perlu didaftarkan di TestForge.
 - **Scope**: Badge otomatis dari performa + Official Store. Tampil di ProductCard, halaman produk, halaman toko. **Termasuk membayar utang M10-A10** (label official yang salah sumber).
 - **Konteks kode (audit 2026-07-29)** — koreksi rencana lama:
   - `Shop.isOfficialStore` **sudah ada** ([schema.prisma:193-195](packages/database/prisma/schema.prisma#L193)) berikut toggle admin `POST /api/v1/admin/shops/:id/official-store` + kolomnya di halaman admin toko (semua dari M10-A10) → **item ini tanpa migration & tanpa endpoint admin baru**.
@@ -859,10 +860,10 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 - **API**: hitung badge **di API** dan kirim `badge: 'OFFICIAL'|'STAR_PLUS'|'STAR'|null` di `toProductCard` (subset shop di card tidak memuat ratingAvg/totalSold — lebih murah kirim hasil daripada menambah field mentah) + shop detail + product detail.
 - **UI**: icon kecil + nama toko di [ProductCard.tsx](apps/web/src/components/product/ProductCard.tsx); badge + tooltip (`title=`) di header toko & halaman produk. Ikon: 🏛️ OFFICIAL / ⭐+ / ⭐ (atau SVG konsisten design token).
 - **Acceptance**:
-  - [ ] Badge berubah otomatis saat kriteria terpenuhi (derived saat read, tanpa cron)
-  - [ ] OFFICIAL menang atas badge performa
-  - [ ] Tidak ada lagi label official/✅ bersumber `ktpVerified` di halaman produk & toko
-  - [ ] Tooltip menjelaskan arti tiap badge
+  - [x] Badge berubah otomatis saat kriteria terpenuhi (derived saat read, tanpa cron) — e2e TC-168 menyalakan flag official lalu mematikannya lagi, dan badge kembali ke nilai semula: bukti nilainya memang tidak disimpan
+  - [x] OFFICIAL menang atas badge performa — unit test (termasuk saat performanya jeblok) + e2e TC-168
+  - [x] Tidak ada lagi label official/✅ bersumber `ktpVerified` di halaman produk & toko — dan `ktpVerified`/`isOfficialStore` **dihapus dari respons buyer** supaya tidak bisa terulang; e2e TC-167 menembak ketiga endpoint
+  - [x] Tooltip menjelaskan arti tiap badge — `title` + `aria-label` diisi dari `getShopBadgeMeta`, dijaga unit test (deskripsi tidak boleh kosong) & e2e TC-169
 - **Effort**: M (mengecil dari rencana — schema & admin toggle sudah ada)
 
 ---

@@ -8,6 +8,7 @@ import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
 import { useWishlistStore } from '@/store/wishlist';
 import { Icon } from '@/components/shell/Icon';
+import { ShopBadgeMark } from '@/components/shop/ShopBadgeMark';
 import type { ProductCard as ProductCardType } from '@/lib/api/products';
 
 interface Props {
@@ -130,6 +131,9 @@ export function ProductCard({ product, variant = 'grid', onAdded }: Props) {
           <span>{product.soldCount} terjual</span>
         </div>
         <div className="flex items-center gap-1 text-[11px] text-ink-muted truncate">
+          {/* Badge reputasi toko (M14-B1) — ikon saja, kartunya sudah padat.
+              Artinya tetap terbaca lewat tooltip & aria-label komponennya. */}
+          <ShopBadgeMark badge={product.shop.badge} />
           <Icon name="pin" size={11} className="text-ink-muted shrink-0" />
           <span className="truncate">{product.shop.city}</span>
         </div>

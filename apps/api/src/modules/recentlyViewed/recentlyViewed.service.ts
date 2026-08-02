@@ -1,5 +1,5 @@
 import { prisma } from '@tokopudidi/database';
-import { toProductCard } from '../product/product.service';
+import { toProductCard, CARD_SHOP_SELECT } from '../product/product.service';
 import type { ProductCard } from '../product/product.service';
 
 export interface Viewer {
@@ -37,7 +37,7 @@ export async function getRecentProducts(viewer: Viewer, limit = 10): Promise<Pro
       product: {
         include: {
           images: { orderBy: { order: 'asc' }, take: 1 },
-          shop: { select: { id: true, name: true, slug: true, city: true } },
+          shop: { select: CARD_SHOP_SELECT },
         },
       },
     },
