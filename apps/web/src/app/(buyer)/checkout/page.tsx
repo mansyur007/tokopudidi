@@ -5,7 +5,7 @@ import { SmartImage } from '@/components/media/SmartImage';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatRupiah } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
 import { listAddresses, type Address } from '@/lib/api/addresses';
 import { getShippingQuote, getShippingOptions } from '@/lib/api/shipping';
@@ -42,6 +42,7 @@ interface PerShopState {
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const { data, refresh } = useCartStore();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -61,14 +62,17 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Init: redirect kalau belum login, load alamat & cart.
+  // `hydrated` wajib ditunggu — tanpa itu pembeli yang me-refresh halaman
+  // checkout dibuang ke /masuk padahal sesinya masih ada (lihat `useAuthHydrated`).
   useEffect(() => {
+    if (!hydrated) return;
     if (!user) { router.push('/masuk'); return; }
     const stored = sessionStorage.getItem('checkout-items');
     if (stored) {
       try { setSelectedIds(new Set(JSON.parse(stored))); } catch {}
     }
     refresh();
-  }, [user, router, refresh]);
+  }, [hydrated, user, router, refresh]);
 
   useEffect(() => {
     if (!tokens?.accessToken) return;
@@ -242,6 +246,10 @@ export default function CheckoutPage() {
     }
   }
 
+  // Dijaga SEBELUM layar "belum ada item": sebelum sesi terbaca, keranjangnya
+  // memang masih kosong — menampilkan "Belum ada item yang dipilih" di situ
+  // menuduh pembeli tidak memilih apa-apa padahal halamannya belum siap.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat checkout...</div>;
   if (!user) return null;
 
   if (groups.length === 0) {
