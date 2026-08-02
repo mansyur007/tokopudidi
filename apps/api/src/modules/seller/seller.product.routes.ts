@@ -128,6 +128,8 @@ sellerProductRouter.post('/', validateBody(productCreateSchema), async (req, res
           condition: req.body.condition,
           codAvailable: req.body.codAvailable,
           freeShippingEligible: req.body.freeShippingEligible,
+          isPreorder: req.body.isPreorder,
+          preorderDays: req.body.isPreorder ? req.body.preorderDays : null,
           isActive: req.body.isActive,
           images: {
             create: req.body.imageUrls.map((url: string, order: number) => ({ url, order })),
@@ -227,6 +229,21 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
       // Hapus diskon → bersihkan periodenya juga.
       rest.saleStartAt = null;
       rest.saleEndAt = null;
+    }
+
+    // Konsistensi pre-order (M15-B1) — zod hanya memeriksa payload create; di
+    // update, `isPreorder` bisa tidak ikut dikirim sama sekali. Gabungkan
+    // dengan data existing supaya "aktif tanpa lama hari" tidak pernah tersimpan,
+    // dan mematikan toggle selalu membersihkan `preorderDays` walau field itu
+    // tidak disertakan payload.
+    const nextIsPreorder = rest.isPreorder !== undefined ? rest.isPreorder : existing.isPreorder;
+    if (nextIsPreorder) {
+      const nextPreorderDays = rest.preorderDays !== undefined ? rest.preorderDays : existing.preorderDays;
+      if (nextPreorderDays == null || nextPreorderDays < 1 || nextPreorderDays > 90) {
+        throw new BadRequestError('Lama pre-order wajib diisi 1-90 hari');
+      }
+    } else if (rest.isPreorder === false) {
+      rest.preorderDays = null;
     }
 
     // Konsistensi harga grosir (M13-B1) terhadap harga normal HASIL update.

@@ -13,6 +13,9 @@ export interface ProductCard {
   ratingAvg: number;
   ratingCount: number;
   soldCount: number;
+  // Pre-order (M15-B1) — badge murni informasi, tidak mempengaruhi harga.
+  isPreorder: boolean;
+  preorderDays: number | null;
   // `badge` (M14-B1) dikirim sudah jadi oleh API — FE tidak menghitung ulang
   // kriterianya, dan bahan mentahnya (`ktpVerified`/`isOfficialStore`) memang
   // tidak lagi ikut dikirim ke pembeli.

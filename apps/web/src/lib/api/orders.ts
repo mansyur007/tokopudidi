@@ -21,7 +21,12 @@ export interface OrderListItem {
   shippingMethod: 'REGULAR' | 'SAME_DAY' | 'PICKUP_SENDIRI';
   createdAt: string;
   shop: { id: string; name: string; slug: string; logoUrl: string | null };
-  items: { id: string; productName: string; productImage: string | null; price: number; quantity: number; subtotal: number; variantName: string | null }[];
+  items: {
+    id: string; productName: string; productImage: string | null; price: number;
+    quantity: number; subtotal: number; variantName: string | null;
+    // Snapshot lead time pre-order (M15-B1) — null kalau item bukan pre-order saat dibeli.
+    preorderDays: number | null;
+  }[];
 }
 
 export interface OrderListResult {

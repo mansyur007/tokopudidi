@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { formatRupiah } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
+import { PreorderBadge } from '@/components/product/PreorderBadge';
 
 export default function KeranjangPage() {
   const router = useRouter();
@@ -116,6 +117,9 @@ export default function KeranjangPage() {
                     </Link>
                     {it.variant && (
                       <p className="text-xs text-gray-500">Varian: {it.variant.name}</p>
+                    )}
+                    {it.product.isPreorder && it.product.preorderDays != null && (
+                      <PreorderBadge days={it.product.preorderDays} className="mt-1" />
                     )}
                     <p className="text-sm font-semibold mt-1">{formatRupiah(it.price)}</p>
                     <div className="flex items-center gap-2 mt-2">

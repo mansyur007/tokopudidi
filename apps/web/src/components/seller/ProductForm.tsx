@@ -50,6 +50,9 @@ interface FormState {
   saleEndAt: string;
   // Harga grosir (M13-B1).
   wholesaleTiers: { minQty: number; price: number }[];
+  // Pre-order (M15-B1).
+  isPreorder: boolean;
+  preorderDays: number;
 }
 
 // ISO → format input datetime-local ("YYYY-MM-DDTHH:mm", waktu lokal).
@@ -87,6 +90,8 @@ function initialFromProduct(p?: SellerProductDetail): FormState {
     saleStartAt: toLocalInput(p?.saleStartAt),
     saleEndAt:   toLocalInput(p?.saleEndAt),
     wholesaleTiers: p?.wholesaleTiers?.map((t) => ({ minQty: t.minQty, price: t.price })) ?? [],
+    isPreorder:   p?.isPreorder   ?? false,
+    preorderDays: p?.preorderDays ?? 7,
   };
 }
 
@@ -135,7 +140,8 @@ export function ProductForm({ initial, productId }: Props) {
     setError(null);
 
     const {
-      saleEnabled, salePrice, saleStartAt, saleEndAt, options, combos, wholesaleTiers, ...base
+      saleEnabled, salePrice, saleStartAt, saleEndAt, options, combos, wholesaleTiers,
+      isPreorder, preorderDays, ...base
     } = state;
     // Buang opsi setengah jadi (nama/nilai kosong) supaya tidak ditolak zod
     // hanya karena baris yang belum diisi seller.
@@ -155,6 +161,8 @@ export function ProductForm({ initial, productId }: Props) {
       wholesaleTiers: wholesaleTiers
         .filter((t) => t.minQty >= 2 && t.price >= 100)
         .sort((a, b) => a.minQty - b.minQty),
+      isPreorder,
+      preorderDays: isPreorder ? preorderDays : null,
     };
     const parsed = productCreateSchema.safeParse(candidate);
     if (!parsed.success) {
@@ -377,6 +385,35 @@ export function ProductForm({ initial, productId }: Props) {
               Maksimal {MAX_WHOLESALE_TIERS} tingkat. Minimal beli harus makin besar,
               harganya makin murah, dan semuanya di bawah harga normal
               {state.price > 0 ? ` (${formatRupiah(state.price)})` : ''}.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Pre-Order (M15-B1) — murni informasi, tidak ada SLA otomatis. */}
+      <div className="border rounded-lg p-3 space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={state.isPreorder}
+            onChange={(e) => setField('isPreorder', e.target.checked)}
+          />
+          <span className="font-medium text-sm">📦 Pre-Order</span>
+          <span className="text-xs text-gray-500">— produk perlu waktu diproses sebelum dikirim</span>
+        </label>
+        {state.isPreorder && (
+          <div>
+            <label className="label">Lama Proses (hari)</label>
+            <input
+              type="number"
+              className="input max-w-[160px]"
+              value={state.preorderDays}
+              min={1}
+              max={90}
+              onChange={(e) => setField('preorderDays', Number(e.target.value))}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Badge &ldquo;Pre-Order · {state.preorderDays || 0} hari&rdquo; tampil di kartu produk & sepanjang pembelian.
             </p>
           </div>
         )}

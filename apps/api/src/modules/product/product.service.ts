@@ -32,6 +32,9 @@ export interface ProductCard {
   ratingAvg: number;
   ratingCount: number;
   soldCount: number;
+  // Pre-order (M15-B1) — murni informasi lead time, tidak mempengaruhi harga.
+  isPreorder: boolean;
+  preorderDays: number | null;
   // Badge dikirim sebagai HASIL, bukan bahan mentahnya: `ratingAvg`/`totalSold`
   // milik toko tidak dipakai untuk apa pun lagi di kartu, jadi mengirimnya cuma
   // memperbesar payload dan menggoda FE menghitung ulang aturan yang sama.
@@ -42,6 +45,7 @@ export type CardRow = {
   id: string; slug: string; name: string;
   price: number; salePrice: number | null; saleStartAt: Date | null; saleEndAt: Date | null;
   ratingAvg: number; ratingCount: number; soldCount: number;
+  isPreorder: boolean; preorderDays: number | null;
   images: { url: string }[];
   shop: {
     id: string; name: string; slug: string; city: string;
@@ -64,6 +68,8 @@ export function toProductCard(p: CardRow): ProductCard {
     ratingAvg: p.ratingAvg,
     ratingCount: p.ratingCount,
     soldCount: p.soldCount,
+    isPreorder: p.isPreorder,
+    preorderDays: p.isPreorder ? p.preorderDays : null,
     shop: {
       id: p.shop.id,
       name: p.shop.name,

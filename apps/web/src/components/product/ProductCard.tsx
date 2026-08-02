@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/auth';
 import { useWishlistStore } from '@/store/wishlist';
 import { Icon } from '@/components/shell/Icon';
 import { ShopBadgeMark } from '@/components/shop/ShopBadgeMark';
+import { PreorderBadge } from './PreorderBadge';
 import type { ProductCard as ProductCardType } from '@/lib/api/products';
 
 interface Props {
@@ -107,6 +108,9 @@ export function ProductCard({ product, variant = 'grid', onAdded }: Props) {
       {/* body */}
       <div className="px-2.5 pt-2.5 pb-3 flex flex-col gap-1">
         <h3 className="pcard-name">{product.name}</h3>
+        {product.isPreorder && product.preorderDays != null && (
+          <PreorderBadge days={product.preorderDays} className="self-start" />
+        )}
         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
           <span className="text-[15.5px] font-extrabold text-ink tracking-tight">
             {formatRupiah(product.price)}
