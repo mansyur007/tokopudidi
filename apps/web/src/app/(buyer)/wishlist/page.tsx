@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { useWishlistStore } from '@/store/wishlist';
 import { getWishlist, type WishlistResult } from '@/lib/api/wishlist';
 import { ProductGrid } from '@/components/product/ProductGrid';
@@ -13,6 +13,7 @@ export default function WishlistPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.tokens?.accessToken);
+  const hydrated = useAuthHydrated();
   const wishlistIds = useWishlistStore((s) => s.ids);
   const refreshWishlist = useWishlistStore((s) => s.refresh);
 
@@ -21,8 +22,11 @@ export default function WishlistPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pemilik wishlist yang membuka
+    // /wishlist lewat URL langsung dibuang ke /masuk. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   useEffect(() => {
     if (!token) return;
@@ -33,6 +37,9 @@ export default function WishlistPage() {
       .finally(() => setLoading(false));
   }, [token, page, refreshWishlist]);
 
+  // Sebelum "Wishlist kamu masih kosong": sebelum sesi terbaca isinya memang
+  // belum ada, jadi empty-state di situ menuduh yang bukan-bukan.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
 
   // Filter berdasarkan store — begitu hati di-unfollow, produk langsung hilang dari grid.

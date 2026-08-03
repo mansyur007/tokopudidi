@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SmartImage } from '@/components/media/SmartImage';
 import Link from 'next/link';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import {
   getPendingReviews,
   createReview,
@@ -15,13 +15,17 @@ import { ApiClientError } from '@/lib/api/client';
 export default function PendingReviewPage() {
   const router = useRouter();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [items, setItems] = useState<ReviewableItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pembeli yang membuka
+    // /pesanan/ulasan lewat URL langsung dibuang ke /masuk. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -32,6 +36,9 @@ export default function PendingReviewPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Sebelum layar "semua sudah diulas": sebelum sesi terbaca daftarnya memang
+  // kosong, dan pujian "Mantap, semua sudah diulas" di situ jelas keliru.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
   const active = items.find((it) => it.id === activeId);
 

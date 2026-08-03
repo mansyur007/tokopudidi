@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import { timeAgo } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import {
   listNotifications,
   markNotificationRead,
@@ -25,13 +25,17 @@ const TYPE_LABEL: Record<NotificationItem['type'], { emoji: string; tag: string 
 export default function NotificationsPage() {
   const router = useRouter();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini tautan dari push notification
+    // ke /notifikasi selalu mendarat di /masuk. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -60,6 +64,8 @@ export default function NotificationsPage() {
     if (it.linkUrl) router.push(it.linkUrl);
   }
 
+  // Sebelum layar "Belum ada notifikasi": sebelum sesi terbaca daftarnya memang kosong.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
   const unread = items.filter((it) => !it.readAt).length;
 

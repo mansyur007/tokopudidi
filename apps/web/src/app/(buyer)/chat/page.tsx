@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { SmartImage } from '@/components/media/SmartImage';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { timeAgo } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { listChatRooms, openRoom, type ChatRoomBuyer } from '@/lib/api/chat';
 import { ChatRoom } from '@/components/chat/ChatRoom';
 
@@ -20,11 +20,16 @@ function ChatPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [rooms, setRooms] = useState<ChatRoomBuyer[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
 
   // ?shop=slug atau ?room=id
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini tautan chat dari notifikasi
+    // atau halaman produk (`/chat?shop=slug`) membuang pembeli ke /masuk.
+    // Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) { router.push('/masuk'); return; }
     if (!tokens?.accessToken) return;
 
@@ -58,8 +63,10 @@ function ChatPageInner() {
         setActiveRoomId(items[0].id);
       }
     });
-  }, [user, tokens?.accessToken, searchParams, router]);
+  }, [hydrated, user, tokens?.accessToken, searchParams, router]);
 
+  // Sebelum layar "Belum ada chat": sebelum sesi terbaca daftar room memang kosong.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat chat...</div>;
   if (!user) return null;
   const active = rooms.find((r) => r.id === activeRoomId);
 

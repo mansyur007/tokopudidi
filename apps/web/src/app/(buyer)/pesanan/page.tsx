@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SmartImage } from '@/components/media/SmartImage';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { listOrders, type OrderListItem } from '@/lib/api/orders';
 import { formatRupiah, timeAgo } from '@tokopudidi/shared';
 import { STATUS_LABEL, STATUS_COLOR, TABS } from '@/lib/orderStatus';
@@ -13,14 +13,19 @@ function PesananListInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [items, setItems] = useState<OrderListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const activeTab = searchParams.get('tab') ?? 'ALL';
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pembeli yang membuka
+    // /pesanan lewat URL langsung (bookmark, tautan notifikasi) dibuang ke
+    // /masuk padahal sesinya masih ada. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   useEffect(() => {
     if (!tokens?.accessToken) return;
@@ -30,6 +35,9 @@ function PesananListInner() {
       .finally(() => setLoading(false));
   }, [tokens?.accessToken, activeTab]);
 
+  // Sebelum layar "Belum ada pesanan di tab ini": sebelum sesi terbaca daftarnya
+  // memang kosong, dan menuduh pembeli belum pernah pesan itu menyesatkan.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat pesanan...</div>;
   if (!user) return null;
 
   return (
