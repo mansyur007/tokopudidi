@@ -3,6 +3,30 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M15-D1: PWA (Manifest + Installable)
+
+### Added
+- **PWA installable** (`M15-D1`) — Tokopudidi bisa dipasang ke home screen Android / desktop. **Tanpa service worker**: offline caching di luar lingkup, dan tidak ditambahkan diam-diam.
+  - [`app/manifest.ts`](apps/web/src/app/manifest.ts) — metadata route Next 14, tersaji di `/manifest.webmanifest`. `display: standalone`, `start_url: /`, `scope: /`, `lang: id`, `orientation: portrait`.
+  - Ikon PNG 192/512 (`any`) + 192/512 (`maskable`) di `apps/web/public/` — folder `public/` ini **baru lahir** di sini.
+  - [`lib/brand.ts`](apps/web/src/lib/brand.ts) — satu sumber untuk warna & nama merek, dipakai `theme_color` manifest, `themeColor` viewport di root layout, dan token `primary` di [tailwind.config.ts](apps/web/tailwind.config.ts).
+  - e2e `pwa.spec.ts` (TC-TKPDD-186–188).
+
+### Notes
+- **`id: '/'` diset eksplisit.** Tanpa itu identitas aplikasi terinstal diturunkan dari `start_url`, jadi mengubah `start_url` suatu hari nanti akan terbaca sebagai aplikasi **baru** — pengguna yang sudah memasang tidak kebagian update, dan ikonnya jadi dua.
+- **`any` dan `maskable` jadi entri terpisah, bukan `purpose: 'any maskable'`.** Ikon maskable itu full-bleed (sudut membulatnya dilepas, karena launcher Android menerapkan mask-nya sendiri dan sudut bawaan menyisakan celah transparan di dalam mask). Dipakai sebagai `any` — mis. di tab desktop atau daftar aplikasi — dia tampil sebagai kotak hijau penuh tanpa sudut.
+- **Ikon di-generate dari `app/icon.svg`, bukan digambar ulang.** [`scripts/generate-pwa-icons.mjs`](scripts/generate-pwa-icons.mjs) menurunkan keempat PNG dari favicon brand yang sudah ada; varian maskable lahir dari transform yang **di-assert** (kalau latar rounded-rect di SVG berubah bentuk, script berhenti dengan pesan, bukan diam-diam menghasilkan maskable bersudut). Glyph-nya sudah diskalakan 0.64 terhadap titik tengah, jadi jarak maksimumnya ~9.6/16 dari pusat — masih di dalam safe zone maskable (12.8/16), tanpa padding tambahan.
+- **`sharp` sengaja TIDAK jadi devDependency.** Dia menarik binary platform-specific ~30 MB yang akan ikut ter-install di CI dan image Docker setiap build, untuk script yang jalan sekali seumur ikon. Yang di-commit hasil PNG-nya; regenerate ad-hoc dengan `npm i --no-save sharp && node scripts/generate-pwa-icons.mjs`.
+- **Nilai merek dipusatkan supaya bilah judul tidak beda warna dengan header.** `#1FA463` sebelumnya ditulis ulang di root layout dan di Tailwind; `theme_color` manifest akan jadi salinan ketiga. Sekarang ketiganya membaca `lib/brand.ts` — `tailwind.config.ts` meng-import-nya lewat path relatif, bukan alias `@/`, karena config itu dimuat loader Tailwind sendiri yang tidak selalu membaca `paths` di tsconfig. (Terverifikasi: `.bg-primary` di CSS hasil build tetap `rgb(31 164 99)`.)
+- **Root layout tetap tanpa field `manifest:`.** Klaim awal saya bahwa menambahkannya menghasilkan `<link rel="manifest">` ganda **salah** — diuji, keluarannya persis sama. Alasan sebenarnya lebih sederhana: field itu mubazir karena `app/manifest.ts` sudah membuat Next menyisipkan tag-nya, dan menyimpannya berarti menyimpan lagi href yang bisa lepas dari manifest asli — persis kejadian sebelum M15-D1, saat field itu ada tanpa file manifest dan tag-nya menunjuk 404.
+
+### Verifikasi
+- **Terverifikasi lokal** lewat dev server: `/manifest.webmanifest` 200 dengan `content-type: application/manifest+json`; keempat ikon 200 `image/png` dengan dimensi **piksel sungguhan** (dibaca dari chunk IHDR) sesuai deklarasi `sizes`; `<head>` memuat tepat satu `<link rel="manifest">` dan satu `<meta name="theme-color">` yang nilainya sama dengan `theme_color`. `npm run build` & `npm run lint` bersih.
+- **Penjaganya dibuktikan bergigi**: `app/manifest.ts` dilumpuhkan sementara → ketiga TC merah; satu berkas ikon disembunyikan → TC-187 merah dengan sebab yang tepat (`/icon-maskable-512.png tidak tersaji`), dua lainnya tetap hijau.
+- **`pwa.spec.ts` dijalankan terpisah dari suite penuh.** Docker/Postgres tidak hidup di mesin ini, jadi `globalSetup` (login → cache token) gagal dan suite penuh tidak bisa jalan. Ketiga TC ini tidak butuh sesi sama sekali, jadi dijalankan dengan config sementara tanpa `globalSetup`. **Suite penuh belum dijalankan ulang untuk perubahan ini** — CI yang membuktikannya.
+- **Belum diverifikasi: "Add to Home Screen" di Chrome Android dan Lighthouse installable check.** Keduanya butuh origin HTTPS sungguhan dan Chrome asli; belum bisa dibuktikan dari sini. Kalau prompt install tidak muncul di https://toko.emha.space setelah deploy, langkahnya menambah service worker no-op minimal **dan mencatatnya** — bukan diam-diam menambahkan offline caching.
+- TC-TKPDD-186–188 perlu didaftarkan di TestForge.
+
 ## [Unreleased] — M15-B1: Pre-Order
 
 ### Added

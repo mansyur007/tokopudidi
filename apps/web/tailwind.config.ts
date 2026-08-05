@@ -1,4 +1,7 @@
 import type { Config } from 'tailwindcss';
+// Path relatif, bukan alias `@/` — config ini dimuat oleh loader Tailwind
+// sendiri, yang tidak selalu membaca `paths` di tsconfig.
+import { BRAND_COLOR } from './src/lib/brand';
 
 // Token desain Tokopudidi — diturunkan dari handoff (hijau primer + aksen merah).
 const config: Config = {
@@ -7,13 +10,13 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#1FA463',
+          DEFAULT: BRAND_COLOR,
           50:  '#e8f5ee',
           100: '#d2ecdd',
           200: '#a6d9bc',
           300: '#79c69b',
           400: '#4dbf82',
-          500: '#1FA463',
+          500: BRAND_COLOR,
           600: '#18935a',
           700: '#147a4a',
           800: '#0f5e39',
