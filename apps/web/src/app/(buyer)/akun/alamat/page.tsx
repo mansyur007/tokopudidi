@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addressInputSchema, type AddressInput } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import {
   listAddresses,
   createAddress,
@@ -18,14 +18,18 @@ import { ApiClientError } from '@/lib/api/client';
 export default function AlamatPage() {
   const router = useRouter();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [items, setItems] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Address | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pemilik alamat yang membuka
+    // /akun/alamat lewat URL langsung dibuang ke /masuk. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -46,6 +50,9 @@ export default function AlamatPage() {
     await refresh();
   }
 
+  // Sebelum layar "Belum ada alamat": sebelum sesi terbaca daftarnya memang
+  // masih kosong, dan menuduh pembeli belum punya alamat itu menyesatkan.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
 
   return (

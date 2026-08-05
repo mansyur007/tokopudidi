@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SmartImage } from '@/components/media/SmartImage';
 import { ShopBadgeMark } from '@/components/shop/ShopBadgeMark';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { useFollowStore } from '@/store/follow';
 import { getFollowedShops, type FollowingResult } from '@/lib/api/follow';
 
@@ -15,6 +15,7 @@ export default function TokoFavoritPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.tokens?.accessToken);
+  const hydrated = useAuthHydrated();
   const followedIds = useFollowStore((s) => s.ids);
   const refreshFollow = useFollowStore((s) => s.refresh);
   const toggleFollow = useFollowStore((s) => s.toggle);
@@ -25,8 +26,11 @@ export default function TokoFavoritPage() {
   const [busySlug, setBusySlug] = useState<string | null>(null);
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pengikut toko yang membuka
+    // /akun/toko-favorit lewat URL langsung dibuang ke /masuk. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   useEffect(() => {
     if (!token) return;
@@ -37,6 +41,9 @@ export default function TokoFavoritPage() {
       .finally(() => setLoading(false));
   }, [token, page, refreshFollow]);
 
+  // Sebelum layar "belum mengikuti toko mana pun": sebelum sesi terbaca daftarnya
+  // memang kosong, jadi empty-state di situ cuma menyesatkan.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
 
   async function handleUnfollow(shopId: string, slug: string) {

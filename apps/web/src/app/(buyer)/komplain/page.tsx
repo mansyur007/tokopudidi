@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { canEscalateComplaint, complaintStatusValues, COMPLAINT_STATUS_LABEL } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { listMyComplaints, escalateComplaint, type Complaint } from '@/lib/api/complaints';
 import { ComplaintCard } from '@/components/complaint/ComplaintCard';
 import { ApiClientError } from '@/lib/api/client';
@@ -17,6 +17,7 @@ const TABS = [
 export default function KomplainPage() {
   const router = useRouter();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const [items, setItems] = useState<Complaint[]>([]);
   const [status, setStatus] = useState('ALL');
   const [loading, setLoading] = useState(true);
@@ -24,8 +25,11 @@ export default function KomplainPage() {
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pelapor yang membuka
+    // /komplain lewat URL langsung dibuang ke /masuk. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -50,6 +54,8 @@ export default function KomplainPage() {
     } finally { setBusy(false); }
   }
 
+  // Sebelum layar "Belum ada komplain": sebelum sesi terbaca daftarnya memang kosong.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
 
   return (

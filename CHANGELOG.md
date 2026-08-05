@@ -3,6 +3,22 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — fix: guard hidrasi auth di sisa halaman buyer
+
+### Fixed
+- **Guard hidrasi auth di 10 halaman buyer** (bug pre-existing, kelas yang sama dengan `/pesanan/[id]` di M13-A2 dan `/keranjang`+`/checkout`). Semuanya memanggil `router.push('/masuk')` di `useEffect` berdasarkan `user` tanpa menunggu `persist` selesai memulihkan sesi, jadi pembeli yang SUDAH login dan membuka halaman itu lewat URL langsung (bookmark, tautan notifikasi, refresh keras) dibuang ke halaman masuk. Yang diperbaiki: `/akun`, `/akun/alamat`, `/akun/toko-favorit`, `/chat`, `/komplain`, `/notifikasi`, `/pesanan`, `/pesanan/ulasan`, `/pesanan/[id]/bayar`, `/wishlist`. Solusinya (`useAuthHydrated`) sudah ada di repo sejak PR #43; halaman-halaman ini saja yang belum memakainya.
+- E2E `auth-hydration.spec.ts` (TC-TKPDD-184–185) — menyapu **12** halaman buyer bertoken lewat URL langsung + refresh keras. Termasuk `/keranjang` dan `/checkout` yang diperbaiki di #53: keduanya ditambahkan saat merge `main`, jadi perbaikan itu sekarang ikut terjaga otomatis (sebelumnya belum ada e2e yang membuktikannya).
+
+### Notes
+- **Cek `!hydrated` selalu ditaruh sebelum empty-state, bukan sesudahnya.** Sebelum sesi terbaca, daftar alamat/komplain/notifikasi/wishlist memang masih kosong — menampilkan "Belum ada alamat" atau "Mantap, semua sudah diulas" di situ menuduh pembeli tidak punya data padahal halamannya yang belum siap. Di `/pesanan/[id]/bayar` taruhannya paling jelas: layar `!order` berbunyi "Pesanan tidak ditemukan" untuk pesanan yang sebenarnya ada.
+- **`/lupa-password` diperiksa dan sengaja tidak diubah.** Halaman itu memang untuk pengunjung yang belum login; tidak ada `useAuthStore` maupun guard di sana, jadi tidak termasuk kelas bug ini.
+- **TC-185 ada supaya perbaikannya tidak kebablasan.** Menunggu `hydrated` gampang berubah jadi "tidak pernah redirect sama sekali", dan itu membuka halaman bertoken untuk siapa saja. TC-184 menjaga pengguna yang sudah login tetap masuk; TC-185 menjaga pengunjung anonim tetap dibuang ke `/masuk`.
+- **Jeda 1 detik di TC-184 itu inti pengujiannya, bukan `waitForTimeout` malas.** Guard yang salah menembakkan `router.push` dari effect sementara commit berikutnya sudah sempat merender isi halaman — versi pertama spec ini lolos di celah balapan itu untuk halaman pertama yang diuji, dan baru menangkapnya setelah URL diperiksa ulang pasca-jeda.
+- **Bug ini hanya muncul di build produksi.** `next dev` tidak menunjukkannya, dan navigasi dari dalam aplikasi selalu jalan karena store sudah terisi duluan — dua alasan kenapa kelas bug ini lolos berkali-kali. Verifikasi karena itu wajib lewat `next build` + `next start`.
+- **Terverifikasi lokal (2026-08-03)** pada build produksi (`next build` + `next start`), bukan `next dev`: TC-184 **gagal** di kode sebelum perbaikan dan **lolos** sesudahnya, TC-185 lolos di keduanya. Lolos juga `tsc` api + web + shared + database dan lint. TC-TKPDD-184–185 perlu didaftarkan di TestForge.
+- **Merge `main` (2026-08-05)** membawa #53 (guard `/keranjang` + `/checkout`) dan #55 (PWA). Konflik `CHANGELOG.md` murni "kedua sisi menambah bagian [Unreleased] baru" — keduanya dipertahankan, urutan terbaru di atas. Daftar halaman di spec dinaikkan dari 10 ke **12**: janji di PR ini untuk menambahkan `/keranjang` dan `/checkout` begitu #53 masuk `main` ditepati, jadi perbaikan #53 sekarang ikut terjaga otomatis.
+- **Suite belum dijalankan ulang pasca-merge.** Docker/Postgres tidak hidup di mesin ini, jadi `globalSetup` (login → cache token) gagal dan e2e tidak bisa jalan sama sekali — termasuk dua TC yang baru ditambahkan halamannya. Yang sudah dibuktikan tanpa DB: kedua halaman baru memang dijaga `useAuthHydrated` dan sama-sama membuang pengunjung anonim ke `/masuk` (jadi TC-185 tidak jebol), dan penanda yang dipakai cocok dengan kode hasil merge — `<h1>Keranjang Belanja</h1>` dan "Belum ada item yang dipilih untuk checkout.". Sisanya **CI yang membuktikan**, bukan klaim lokal.
+
 ## [Unreleased] — M15-D1: PWA (Manifest + Installable)
 
 ### Added

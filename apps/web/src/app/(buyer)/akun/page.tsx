@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 
 const MENU = [
   { href: '/akun/alamat',     label: 'Alamat Saya',      emoji: '📍' },
@@ -22,11 +22,17 @@ const MENU = [
 export default function AkunPage() {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const hydrated = useAuthHydrated();
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu — tanpa ini pemilik akun yang membuka
+    // /akun lewat URL langsung (bookmark, refresh keras) dibuang ke /masuk
+    // padahal sesinya masih ada. Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
 
   function logout() {

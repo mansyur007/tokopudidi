@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { formatRupiah } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import {
   getOrder,
   getPaymentInstruction,
@@ -23,6 +23,7 @@ export default function BayarPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const { user, tokens } = useAuthStore();
+  const hydrated = useAuthHydrated();
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [instruction, setInstruction] = useState<PaymentInstruction | null>(null);
@@ -40,8 +41,13 @@ export default function BayarPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu. Halaman ini paling sering dibuka lewat
+    // URL langsung — tautan "bayar sekarang" dari notifikasi atau riwayat chat —
+    // dan tanpa ini pembeli yang mau membayar malah mendarat di /masuk.
+    // Lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) router.push('/masuk');
-  }, [user, router]);
+  }, [hydrated, user, router]);
 
   const load = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -122,6 +128,9 @@ export default function BayarPage() {
     }
   }
 
+  // Dijaga SEBELUM "Pesanan tidak ditemukan": sebelum sesi terbaca belum ada
+  // token untuk mengambil pesanannya, jadi klaim "tidak ditemukan" itu salah.
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!user) return null;
   if (loading) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat...</div>;
   if (!order) return <div className="px-4 py-8 text-center">Pesanan tidak ditemukan.</div>;
