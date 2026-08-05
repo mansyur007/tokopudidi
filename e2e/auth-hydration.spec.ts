@@ -10,7 +10,7 @@
 // Penyebabnya: pada commit render pertama `user` selalu null (zustand memberi
 // React `getInitialState` sebagai server snapshot), jadi guard yang membaca
 // `user` tanpa `useAuthHydrated()` langsung menyimpulkan "belum login".
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { tc, V1, auth, tokenFor } from './helpers/testforge';
 
 /**
@@ -51,12 +51,20 @@ async function anyOrderId(request: APIRequestContext): Promise<string> {
  * `tanda` adalah elemen yang HANYA ada kalau halamannya benar-benar dirender —
  * kalau guard-nya salah, halaman keburu pindah ke /masuk dan tanda ini hilang.
  *
- * BELUM terdaftar: /keranjang dan /checkout. Keduanya diperbaiki di PR #53 yang
- * masih terbuka; tambahkan ke daftar ini begitu PR itu masuk main.
+ * Daftar ini harus memuat SEMUA halaman buyer bertoken. Kalau nanti ada halaman
+ * baru yang memakai `useAuthHydrated`, tambahkan ke sini juga — regresi kelas
+ * ini tidak terlihat di `next dev` maupun saat berpindah halaman dari dalam
+ * aplikasi, jadi spec inilah satu-satunya yang menangkapnya otomatis.
  */
 function halamanBuyer(orderId: string) {
   return [
     { url: '/akun',                 tanda: (p: Page) => p.getByRole('link', { name: 'Alamat Saya' }) },
+    { url: '/keranjang',            tanda: (p: Page) => p.getByRole('heading', { name: 'Keranjang Belanja' }) },
+    // Dibuka lewat URL langsung, `sessionStorage.checkout-items` kosong, jadi
+    // yang tampil layar "belum ada item" — bukan <h1>Checkout</h1>. Itu justru
+    // layar yang paling penting dijaga di sini: sebelum #53, layar itulah yang
+    // muncul saat sesi belum terbaca dan menuduh pembeli tidak memilih apa-apa.
+    { url: '/checkout',             tanda: (p: Page) => p.getByText('Belum ada item yang dipilih') },
     { url: '/akun/alamat',          tanda: (p: Page) => p.getByRole('heading', { name: 'Alamat Saya' }) },
     { url: '/akun/toko-favorit',    tanda: (p: Page) => p.getByRole('heading', { name: 'Toko Favorit' }) },
     { url: '/chat',                 tanda: (p: Page) => p.getByRole('heading', { name: 'Chat' }) },
@@ -86,7 +94,7 @@ function akhiranUrl(url: string): RegExp {
 async function bertahanDiTempat(
   page: Page,
   url: string,
-  tanda: (p: Page) => ReturnType<Page['getByRole']>,
+  tanda: (p: Page) => Locator,
   konteks: string,
 ) {
   await expect(tanda(page), `${url} (${konteks}): isi halaman tidak pernah muncul`).toBeVisible();

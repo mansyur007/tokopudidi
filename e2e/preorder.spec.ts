@@ -4,8 +4,32 @@
 // ditegakkan SERVER (bukan cuma zod) saat update parsial, badge tampil sama di
 // listing/detail/keranjang/checkout, dan snapshot OrderItem.preorderDays tidak
 // ikut berubah saat seller mengedit lead time produk setelah ada pesanan.
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { tc, V1, auth, tokenFor } from './helpers/testforge';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Suntik sesi buyer sebelum skrip halaman jalan — pola yang sama dengan TC-159. */
+async function injectBuyerSession(page: Page, request: APIRequestContext) {
+  const token = tokenFor('buyer');
+  const me = await request.get(`${V1}/auth/me`, { headers: auth(token) });
+  expect(me.status(), await me.text()).toBe(200);
+  const sesi = JSON.stringify({
+    state: { user: (await me.json()).data, tokens: { accessToken: token, refreshToken: '' } },
+    version: 0,
+  });
+  await page.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key, value),
+    ['tokopudidi-auth', sesi],
+  );
+}
+
+async function emptyCart(request: APIRequestContext, token: string) {
+  const res = await request.get(`${V1}/cart`, { headers: auth(token) });
+  for (const it of (await res.json()).data.items) {
+    await request.delete(`${V1}/cart/items/${it.id}`, { headers: auth(token) });
+  }
+}
 
 async function createPreorderProduct(
   request: import('@playwright/test').APIRequestContext,
@@ -52,6 +76,18 @@ test(tc('179', 'Seller wajib isi lama pre-order 1-90 hari kalau isPreorder aktif
   const produk = (await sah.res.json()).data;
   expect(produk.isPreorder).toBe(true);
   expect(produk.preorderDays).toBe(14);
+
+  // Duplikasi membawa setelan pre-order. Salinan yang diam-diam mengaku ready
+  // stock adalah janji ke pembeli yang tidak pernah diketik seller — dan
+  // gampang lolos karena salinan lahir nonaktif, jadi tidak ada yang melihat
+  // badge-nya hilang sampai produknya diaktifkan.
+  const salinan = await request.post(`${V1}/seller/products/${produk.id}/duplicate`, {
+    headers: auth(token),
+  });
+  expect(salinan.status(), await salinan.text()).toBe(201);
+  const dup = (await salinan.json()).data;
+  expect(dup.isPreorder).toBe(true);
+  expect(dup.preorderDays).toBe(14);
 });
 
 test(tc('180', 'Toggle isPreorder off membersihkan preorderDays walau tidak ikut dikirim'), async ({ request }) => {
@@ -78,6 +114,27 @@ test(tc('180', 'Toggle isPreorder off membersihkan preorderDays walau tidak ikut
     data: { isPreorder: true },
   });
   expect(onTanpaHari.status()).toBe(400);
+
+  // Jalur sebaliknya, yang sempat lolos: kirim `preorderDays` SENDIRIAN pada
+  // produk yang bukan pre-order. Kalau angkanya tersimpan, `PATCH
+  // { isPreorder: true }` berikutnya akan lolos memakai nilai yang tidak pernah
+  // diketik seller di sesi itu — pintu belakang untuk aturan di atas.
+  const hariSendirian = await request.patch(`${V1}/seller/products/${produk.id}`, {
+    headers: auth(token),
+    data: { preorderDays: 30 },
+  });
+  expect(hariSendirian.status(), await hariSendirian.text()).toBe(200);
+  expect(
+    (await hariSendirian.json()).data.preorderDays,
+    'preorderDays tidak boleh menempel di produk yang bukan pre-order',
+  ).toBeNull();
+
+  // Karena itu, menyalakan toggle tetap harus ditolak.
+  const onLagi = await request.patch(`${V1}/seller/products/${produk.id}`, {
+    headers: auth(token),
+    data: { isPreorder: true },
+  });
+  expect(onLagi.status(), 'nilai gantung tidak boleh jadi jalan pintas').toBe(400);
 });
 
 test(tc('181', 'Badge pre-order konsisten di listing dan detail produk'), async ({ request }) => {
@@ -167,12 +224,105 @@ test(tc('182', 'Checkout menyimpan preorderDays sebagai snapshot — edit lead t
 
 test(tc('183', 'BuyBox & keranjang menampilkan badge Pre-Order'), async ({ page, request }) => {
   const sellerToken = tokenFor('seller');
+  const buyerToken = tokenFor('buyer');
   const { res } = await createPreorderProduct(request, sellerToken, { preorderDays: 5 });
   expect(res.status(), await res.text()).toBe(201);
   const produk = (await res.json()).data;
 
+  // 1. Halaman detail (BuyBox).
   await page.goto(`/produk/${produk.slug}`);
-  const badge = page.getByTestId('preorder-badge').first();
-  await expect(badge).toBeVisible();
-  await expect(badge).toContainText('5 hari');
+  const badgeDetail = page.getByTestId('preorder-badge').first();
+  await expect(badgeDetail).toBeVisible();
+  await expect(badgeDetail).toContainText('5 hari');
+
+  // 2. Keranjang — bagian yang dulu disebut di judul test ini tapi tidak pernah
+  //    benar-benar dibuka. Badge di keranjang adalah kriteria penerimaan
+  //    tersendiri: di sanalah pembeli terakhir kali bisa berubah pikiran.
+  await emptyCart(request, buyerToken);
+  try {
+    const add = await request.post(`${V1}/cart/items`, {
+      headers: auth(buyerToken),
+      data: { productId: produk.id, quantity: 1 },
+    });
+    expect(add.status(), await add.text()).toBe(201);
+
+    await injectBuyerSession(page, request);
+    await page.goto('/keranjang');
+    const badgeKeranjang = page.getByTestId('preorder-badge').first();
+    await expect(badgeKeranjang).toBeVisible();
+    await expect(badgeKeranjang).toContainText('5 hari');
+  } finally {
+    await emptyCart(request, buyerToken);
+  }
+});
+
+test(tc('184', 'Pesanan campur ready + pre-order: tiap baris bawa snapshot-nya sendiri'), async ({ request }) => {
+  const sellerToken = tokenFor('seller');
+  const buyerToken = tokenFor('buyer');
+
+  // Tiga item sengaja berbeda sifat: dua pre-order dengan lama berbeda, satu
+  // produk biasa. Itu bentuk pesanan yang paling gampang salah dihitung.
+  const cepat = (await (await createPreorderProduct(request, sellerToken, { preorderDays: 3 })).res.json()).data;
+  const lama = (await (await createPreorderProduct(request, sellerToken, { preorderDays: 10 })).res.json()).data;
+  const biasa = (await (await createPreorderProduct(request, sellerToken, { isPreorder: false, preorderDays: null })).res.json()).data;
+
+  await emptyCart(request, buyerToken);
+  for (const p of [cepat, lama, biasa]) {
+    const add = await request.post(`${V1}/cart/items`, {
+      headers: auth(buyerToken),
+      data: { productId: p.id, quantity: 1 },
+    });
+    expect(add.status(), await add.text()).toBe(201);
+  }
+
+  const daftar = (await (await request.get(`${V1}/users/me/addresses`, { headers: auth(buyerToken) })).json()).data as { id: string }[];
+  const addressId = daftar.find((a) => UUID.test(a.id))?.id;
+  expect(addressId, 'butuh alamat buyer ber-uuid').toBeTruthy();
+
+  const grouped = (await (await request.get(`${V1}/cart`, { headers: auth(buyerToken) })).json()).data.grouped as
+    { shop: { id: string }; items: { id: string }[] }[];
+
+  const checkout = await request.post(`${V1}/orders/checkout`, {
+    headers: auth(buyerToken),
+    data: {
+      addressId,
+      paymentMethod: 'TRANSFER_MANUAL',
+      shops: grouped.map((g) => ({
+        shopId: g.shop.id,
+        cartItemIds: g.items.map((i) => i.id),
+        shippingMethod: 'REGULAR',
+      })),
+    },
+  });
+  expect(checkout.status(), await checkout.text()).toBe(201);
+  const body = (await checkout.json()).data;
+  const orders = (Array.isArray(body) ? body : body.orders) as { id: string }[];
+
+  try {
+    const semuaItem = [];
+    for (const o of orders) {
+      const detail = await request.get(`${V1}/orders/${o.id}`, { headers: auth(buyerToken) });
+      semuaItem.push(...(await detail.json()).data.items);
+    }
+
+    const cari = (id: string) => semuaItem.find((i: { productId: string }) => i.productId === id);
+    expect(cari(cepat.id).preorderDays).toBe(3);
+    expect(cari(lama.id).preorderDays).toBe(10);
+    // Produk biasa TIDAK boleh ikut kebagian lead time tetangganya di pesanan
+    // yang sama — snapshot-nya per baris, bukan per pesanan.
+    expect(cari(biasa.id).preorderDays).toBeNull();
+
+    // Estimasi yang dipakai halaman = yang terlama (10), bukan 3 dan bukan
+    // rata-rata. Rumusnya sendiri dikunci unit test `preorder.test.ts`.
+    const terlama = Math.max(...semuaItem.map((i: { preorderDays: number | null }) => i.preorderDays ?? 0));
+    expect(terlama).toBe(10);
+  } finally {
+    for (const o of orders) {
+      await request.post(`${V1}/orders/${o.id}/cancel`, {
+        headers: auth(buyerToken),
+        data: { reason: 'Pembersihan data uji otomatis' },
+      });
+    }
+    await emptyCart(request, buyerToken);
+  }
 });

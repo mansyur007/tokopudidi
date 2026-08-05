@@ -233,16 +233,22 @@ sellerProductRouter.patch('/:id', validateBody(productUpdateSchema), async (req,
 
     // Konsistensi pre-order (M15-B1) — zod hanya memeriksa payload create; di
     // update, `isPreorder` bisa tidak ikut dikirim sama sekali. Gabungkan
-    // dengan data existing supaya "aktif tanpa lama hari" tidak pernah tersimpan,
-    // dan mematikan toggle selalu membersihkan `preorderDays` walau field itu
-    // tidak disertakan payload.
+    // dengan data existing supaya "aktif tanpa lama hari" tidak pernah tersimpan.
     const nextIsPreorder = rest.isPreorder !== undefined ? rest.isPreorder : existing.isPreorder;
     if (nextIsPreorder) {
       const nextPreorderDays = rest.preorderDays !== undefined ? rest.preorderDays : existing.preorderDays;
       if (nextPreorderDays == null || nextPreorderDays < 1 || nextPreorderDays > 90) {
         throw new BadRequestError('Lama pre-order wajib diisi 1-90 hari');
       }
-    } else if (rest.isPreorder === false) {
+    } else {
+      // Hasil akhirnya bukan pre-order → `preorderDays` tidak punya arti, jadi
+      // dibersihkan TANPA SYARAT — bukan hanya ketika payload mematikan toggle.
+      // Versi pertama memakai `else if (rest.isPreorder === false)` dan itu
+      // menyisakan jalur diam-diam: `PATCH { preorderDays: 30 }` sendirian pada
+      // produk biasa tersimpan apa adanya, lalu `PATCH { isPreorder: true }`
+      // berikutnya lolos memakai angka yang tidak pernah diketik seller di sesi
+      // itu. Menulis `null` di sini juga menyembuhkan baris lama yang telanjur
+      // menyimpan sisa nilai seperti itu.
       rest.preorderDays = null;
     }
 
@@ -350,6 +356,12 @@ sellerProductRouter.post('/:id/duplicate', async (req, res, next) => {
         condition: existing.condition,
         codAvailable: existing.codAvailable,
         freeShippingEligible: existing.freeShippingEligible,
+        // Pre-order ikut disalin (M15-B1): ini sifat produknya — sama seperti
+        // `condition` & `codAvailable` di atas — bukan promo berbatas waktu
+        // seperti `salePrice` yang memang sengaja tidak dibawa. Salinan yang
+        // diam-diam mengaku ready stock adalah janji yang tidak diketik siapa pun.
+        isPreorder: existing.isPreorder,
+        preorderDays: existing.preorderDays,
         isActive: false,
         images: { create: existing.images.map((img, i) => ({ url: img.url, order: i })) },
         variants: {

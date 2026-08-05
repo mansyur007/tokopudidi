@@ -5,23 +5,30 @@ import { SmartImage } from '@/components/media/SmartImage';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatRupiah } from '@tokopudidi/shared';
-import { useAuthStore } from '@/store/auth';
+import { useAuthStore, useAuthHydrated } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
 import { PreorderBadge } from '@/components/product/PreorderBadge';
 
 export default function KeranjangPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const hydrated = useAuthHydrated();
   const { data, loading, refresh, update, remove } = useCartStore();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    // Tunggu sesi tersimpan terbaca dulu. Tanpa ini, pemilik keranjang yang
+    // membuka /keranjang lewat URL langsung (bookmark, tautan, refresh keras)
+    // selalu dibuang ke /masuk: pada commit pertama `user` masih null karena
+    // `persist` belum selesai memulihkan. Bug yang sama dengan yang dibayar
+    // di /pesanan/[id]; lihat `useAuthHydrated`.
+    if (!hydrated) return;
     if (!user) {
       router.push('/masuk');
       return;
     }
     refresh();
-  }, [user, refresh, router]);
+  }, [hydrated, user, refresh, router]);
 
   const grouped = data?.grouped ?? [];
 
@@ -56,6 +63,7 @@ export default function KeranjangPage() {
     setSelected(next);
   }
 
+  if (!hydrated) return <div className="px-4 py-8 text-center text-sm text-gray-500">Memuat keranjang...</div>;
   if (!user) return null;
 
   return (

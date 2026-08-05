@@ -20,6 +20,7 @@ export * from './utils/broadcast';
 export * from './utils/format';
 export * from './utils/image';
 export * from './utils/invoice';
+export * from './utils/preorder';
 export * from './utils/price';
 export * from './utils/returnUrl';
 export * from './utils/seo';
