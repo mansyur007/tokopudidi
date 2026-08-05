@@ -5,6 +5,8 @@
 >
 > **Perubahan Draft 3 (2026-07-29)** — spesifikasi seluruh item M11–M15 diperdetail hasil audit kode, supaya tiap item bisa langsung dikerjakan tanpa audit ulang: tiap item kini punya section **Konteks kode** (file/baris terverifikasi + pola existing yang harus ditiru) dan **Jebakan**. Koreksi rencana lama yang basi: M14-A1 login berbasis **phone** (bukan email) → flow Google OAuth jadi 2 langkah; M14-A2 OTP berbasis phone → re-scope ke email event transaksional; M14-B1 `Shop.isOfficialStore` sudah ada sejak M10-A10 (tanpa migration); M13-B1 kolom snapshot bernama `OrderItem.price` (bukan `priceAtPurchase`); M13-B2 ternyata butuh migration enum `NotificationType`; M11-B4 metrik ATC di-drop (CartItem dihapus saat checkout, tidak ada data historis); M15-C1 butuh kolom snapshot baru `OrderItem.flashSaleItemId` untuk pelepasan kuota.
 >
+> **Progress (2026-08-05)** — **M15-D1 PWA** selesai: `app/manifest.ts` + ikon 192/512 (`any` & `maskable` sebagai entri terpisah) diturunkan dari `app/icon.svg`, tanpa service worker sesuai scope. Warna merek dipusatkan ke `apps/web/src/lib/brand.ts` supaya `theme_color` manifest, `themeColor` layout, dan token `primary` Tailwind tidak bisa berbeda. Dengan ini **seluruh item fitur M15 (C1 · B1 · D1) selesai** — sisa yang belum tuntas di roadmap tinggal M14-A1/A2 (⚪ BLOCKED menunggu kredensial eksternal) dan antrean **OPS-5…OPS-12**. Dua kriteria penerimaan M15-D1 (prompt install Chrome Android & Lighthouse) sengaja **dibiarkan terbuka** — butuh HTTPS sungguhan, harus dicek pasca-deploy.
+>
 > **Progress (2026-08-02, malam)** — **M15-B1 Pre-Order** selesai: badge lead time murni informasi (tanpa SLA/auto-cancel) di card/BuyBox/keranjang/checkout via komponen bersama `PreorderBadge`, konsistensi `isPreorder`/`preorderDays` ditegakkan server-side (bukan cuma zod), dan snapshot `OrderItem.preorderDays` menjaga estimasi order lama tidak berubah saat seller mengedit lead time. Sisa M15 yang bebas di-klaim: **D1 PWA** (S), mandiri.
 >
 > **Progress (2026-08-02, sore)** — **M15-C1 Flash Sale** selesai: event terjadwal dikurasi admin, ber-kuota atomik, dengan kontrak harga lintas-milestone (flash > sale > grosir) yang akhirnya lengkap di `price.ts` — **dengan koreksi**: prioritas menentukan pemenang saat harga seri, bukan izin menaikkan harga. Sisa M15 yang bebas di-klaim: **B1 Pre-Order** (S–M) & **D1 PWA** (S), keduanya mandiri.
@@ -951,7 +953,8 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 ---
 
 ### M15-D1. PWA (Manifest + Installable)
-- **Status**: 🔵 TODO · **Owner**: _belum di-klaim_
+- **Status**: 🟢 DONE · **Owner**: mansyur007
+- **Deliver notes** (2026-08-05): Manifest via `app/manifest.ts` (Next menyajikan `/manifest.webmanifest` + menyisipkan `<link rel="manifest">` sendiri — root layout **tetap tanpa** field `manifest:`; dugaan awal bahwa field itu menggandakan tag ternyata **salah**, keluarannya sama, tapi field-nya tetap mubazir dan cuma menambah href yang bisa lepas dari manifest asli). `id: '/'` diset eksplisit supaya `start_url` masih bisa berubah tanpa aplikasi terinstal terbaca sebagai aplikasi baru. `any` & `maskable` jadi **entri terpisah**, bukan `purpose: 'any maskable'`: maskable-nya full-bleed (rounded corner dilepas — launcher Android menerapkan mask sendiri), jadi kalau dipakai sebagai `any` dia tampil kotak hijau penuh. Keempat PNG diturunkan dari `app/icon.svg` lewat `scripts/generate-pwa-icons.mjs`; varian maskable lahir dari transform yang **di-assert** (SVG berubah → script berhenti, bukan diam-diam menghasilkan maskable bersudut). Ternyata **tidak perlu padding tambahan**: glyph sudah diskalakan 0.64 terhadap titik tengah, jarak maksimum ~9.6/16 dari pusat vs safe zone 12.8/16. `sharp` **tidak** jadi devDependency (binary ~30 MB ikut ter-install di CI & image Docker tiap build untuk script sekali-jalan) — pasang ad-hoc `npm i --no-save sharp`. `#1FA463` yang tadinya ditulis ulang di root layout & Tailwind dipusatkan ke `apps/web/src/lib/brand.ts` sebelum manifest jadi salinan ketiga; `tailwind.config.ts` meng-import-nya **relatif**, bukan lewat alias `@/` (loader Tailwind tidak selalu baca `paths` tsconfig). e2e `pwa.spec.ts` TC-186–188, dibuktikan bergigi: manifest.ts dilumpuhkan → ketiganya merah; satu ikon disembunyikan → TC-187 merah dengan sebab yang tepat. **Yang belum dibuktikan**: prompt "Add to Home Screen" Chrome Android & Lighthouse installable — butuh origin HTTPS + Chrome asli, harus dicek pasca-deploy di https://toko.emha.space.
 - **Scope**: Installable di Android/desktop — manifest + ikon + theme color. Service worker/offline **tidak** termasuk.
 - **Konteks kode (audit 2026-07-29)**:
   - `apps/web/public/` **belum ada** — buat. Ikon sumber: `apps/web/src/app/icon.svg` (favicon brand, commit `3dfd290`).
@@ -961,9 +964,9 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - Root layout: export `viewport`/`themeColor` sesuai API Next 14
 - **Catatan keputusan**: tanpa service worker, kriteria installability Chrome terbaru umumnya masih terpenuhi dengan manifest lengkap; kalau prompt tidak muncul saat verifikasi → tambah SW no-op minimal dan catat di PR (jangan diam-diam menambah offline caching).
 - **Acceptance**:
-  - [ ] Chrome Android tawarkan "Add to Home Screen"
-  - [ ] Lighthouse installable check pass
-  - [ ] Ikon (termasuk maskable) & splash benar saat launch dari home screen; theme color = brand
+  - [ ] Chrome Android tawarkan "Add to Home Screen" — **belum diverifikasi**, butuh HTTPS + Chrome Android (cek pasca-deploy)
+  - [ ] Lighthouse installable check pass — **belum diverifikasi**, alasan sama
+  - [x] Ikon (termasuk maskable) & splash benar saat launch dari home screen; theme color = brand — manifest, keempat ikon (dimensi piksel sungguhan), `background_color` splash, dan kesamaan `theme_color` ↔ `<meta name="theme-color">` dikunci TC-186–188
 - **Effort**: S
 
 ---
@@ -1014,7 +1017,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
 | **M12 — Mobile, SEO, Audit** | Polish | A11 · D3 · D4 · C3 | ~2 hari |
 | **M13 — Loyalitas & Toko** | Retensi | A1 · A2 · B1 · B2 | ~3 hari |
 | **M14 — Akun & Kepercayaan** | Trust & onboarding | A1 · A2 · B1 · B2 | ~3–4 hari |
-| **M15 — Event & Polish Mobile** | Konversi & event | C1 · B1 · D1 | ~4 hari |
+| 🟢 **M15 — Event & Polish Mobile** | Konversi & event | C1 · B1 · D1 | **DONE** (PR #51, #52, #53, + PR M15-D1) |
 
 Estimasi asumsi **1 orang full-time per milestone**. Bisa diparalelkan antar-orang dalam satu milestone selama tidak sentuh file yang sama.
 
