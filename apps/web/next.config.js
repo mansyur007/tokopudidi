@@ -10,10 +10,11 @@ const { ALLOWED_IMAGE_HOSTS } = require('@tokopudidi/shared');
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@tokopudidi/shared'],
-  // Deploy: jangan gagalkan production build karena type/lint error yang belum dibereskan.
-  // (Type-check & lint tetap bisa dijalankan terpisah via `npm run lint` / tsc.)
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  // OPS-9: `typescript.ignoreBuildErrors` & `eslint.ignoreDuringBuilds` dilepas.
+  // Keduanya dipasang saat deploy pertama untuk melewati error yang belum sempat
+  // dibereskan; per 2026-08-05 `tsc --noEmit` dan `next lint` sama-sama bersih,
+  // jadi bungkamnya sudah tidak menutupi apa pun — hanya menyisakan risiko error
+  // baru lolos ke produksi diam-diam. `next build` sekarang kembali jadi gerbang.
   images: {
     remotePatterns: ALLOWED_IMAGE_HOSTS.map((hostname) => ({ protocol: 'https', hostname })),
   },
