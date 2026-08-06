@@ -53,6 +53,25 @@ Versioning follows [SemVer](https://semver.org/).
 - `npm run build -w @tokopudidi/web` lolos penuh tanpa `ignoreBuildErrors`.
 - **Yang belum dibuktikan**: image Docker `target: api` belum di-build & dijalankan di sini (daemon Docker tidak hidup di mesin ini) — perubahan `CMD` dan step build api di Dockerfile baru terbukti pasca-deploy. Titik gagal yang paling mungkin bukan kodenya melainkan urutan stage, jadi **pantau deploy pertama setelah merge**: kalau `dist/` tidak terbawa, container api mati saat start dan smoke-test OPS-3 (`/api/health`) akan menandainya merah.
 
+## [Unreleased] — fix(e2e): TC-176 flash sale tidak lagi bergantung produk mana yang kebetulan pertama
+
+### Fixed
+- **TC-TKPDD-176 gagal di `main` (2026-08-06)** dengan `Expected 201, received 422` pada penambahan item flash sale yang seharusnya sah — padahal run PR-nya (#56) hijau dengan isi yang sama. Bukan regresi kode: test-nya memilih produk uji lewat `GET /products?limit=20` lalu mengambil `items[0]`, dan siapa yang berada di posisi pertama tidak deterministik.
+  - **Jalur 1 — tumpang tindih.** Produk yang sedang ikut flash sale ikut muncul di listing umum (justru itu yang dijaga TC-174). Kalau `items[0]` salah satunya, event seed yang sedang berjalan bertabrakan dengan periode yang dibuat TC-176, dan aturan tumpang tindih menolak penambahan itu — 422.
+  - **Jalur 2 — produk diskon (latent, belum sempat menggigit).** Untuk produk ber-sale (M9-B3), `price` di kartu adalah harga **efektif**, sedangkan server membandingkan dengan harga **normal** di DB. Assertion "harga kemahalan harus 422" karena itu justru tidak akan jadi 422 kalau produk terpilih sedang diskon.
+  - Kenapa jarang: tujuh spec lain membuat produk baru, jadi posisi pertama berubah antar run dan antar urutan paralel.
+- Perbaikannya memilih produk dengan syarat eksplisit: **tidak sedang diskon**, **harga > Rp 2.000**, dan **belum ikut event mana pun yang periodenya bertabrakan** — daftar terakhir diambil dari `GET /admin/flash-sales` + detail tiap event yang periodenya beririsan.
+
+### Notes
+- **Definisi tumpang tindih di test disalin persis dari server** (`startAt < endAt lawan && endAt > startAt lawan`, `cariTumpangTindih` di `admin.flashSale.routes.ts`). Kalau test dan server beda tafsir soal batas, test akan memilih produk yang tetap ditolak server dan gagal lagi dengan sebab yang sama.
+- **Pesan assertion sekarang membawa body respons.** Kegagalan kemarin cuma berbunyi "Expected 201, received 422"; route ini punya **dua** aturan berbeda yang sama-sama menghasilkan 422, jadi status saja tidak cukup untuk tahu mana yang menolak. Ini yang membuat diagnosisnya memakan waktu.
+- **Bukan efek OPS-9.** Isi PR #56 dan merge commit-nya identik dan run PR-nya hijau; e2e juga tidak menyentuh image Docker maupun `dist/`.
+
+### Verifikasi
+- **`tsc` bersih** pada spec yang diubah.
+- **Belum dijalankan lokal** — e2e butuh Postgres/Docker yang tidak hidup di mesin ini. **CI yang membuktikan**, bukan klaim lokal.
+- **Batas yang jujur: satu run CI hijau tidak membuktikan flake-nya mati** — run PR sebelumnya juga hijau. Yang bisa diklaim: dua sumber non-determinisme yang teridentifikasi sudah ditutup, dan kegagalan berikutnya (kalau ada) akan menyebutkan alasannya sendiri.
+
 ## [Unreleased] — fix: guard hidrasi auth di sisa halaman buyer
 
 ### Fixed
