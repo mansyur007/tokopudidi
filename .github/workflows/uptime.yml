@@ -1,0 +1,54 @@
+name: Uptime
+
+# OPS-10 — heartbeat produksi. Tujuannya satu kalimat: insiden diketahui dari
+# sistem, bukan dari pembeli yang mengeluh.
+#
+# Yang dicek ada di scripts/uptime-check.sh (logikanya sengaja di script supaya
+# bisa dijalankan & diuji di luar CI, termasuk terhadap host yang sengaja salah).
+#
+# Cara tahu kalau mati: run terjadwal yang gagal memicu notifikasi kegagalan
+# GitHub Actions ke pemilik repo (Settings → Notifications → "Actions"). Tidak
+# ada integrasi pager/Slack di sini — itu bagian OPS-10 yang masih terbuka.
+#
+# BATAS YANG HARUS DISADARI:
+#  - Cron GitHub Actions bukan penjadwal presisi. Run bisa tertunda beberapa
+#    menit saat antrean padat, dan sesekali dilewati. Ini heartbeat murah tiap
+#    ~15 menit, bukan pager sub-menit. Outage pendek bisa lolos di antara run.
+#  - GitHub MENONAKTIFKAN workflow terjadwal di repo yang 60 hari tanpa aktivitas
+#    commit. Monitor yang mati diam-diam lebih buruk daripada tidak ada monitor,
+#    jadi kalau repo ini pernah menganggur selama itu, aktifkan lagi manual di
+#    tab Actions.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      host:
+        description: 'Host yang dicek (default toko.emha.space)'
+        required: false
+        default: ''
+  # Perubahan pada monitor ini ikut diuji sebelum merge. Tanpa ini, salah ketik
+  # di script baru ketahuan saat produksi benar-benar mati — persis saat monitor
+  # paling dibutuhkan.
+  pull_request:
+    paths:
+      - '.github/workflows/uptime.yml'
+      - 'scripts/uptime-check.sh'
+
+# Run yang tertunda tidak perlu menumpuk; yang terbaru saja yang relevan.
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cek ketersediaan produksi
+        env:
+          UPTIME_HOST: ${{ github.event.inputs.host || 'toko.emha.space' }}
+        run: bash scripts/uptime-check.sh
