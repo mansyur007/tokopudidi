@@ -35,6 +35,35 @@ async function kosongkanKeranjang(request: APIRequestContext, token: string) {
   }
 }
 
+/**
+ * Kumpulan productId yang sudah ikut event mana pun yang periodenya bertabrakan
+ * dengan [mulai, selesai]. Definisi tumpang tindihnya sengaja disalin persis
+ * dari `cariTumpangTindih` di admin.flashSale.routes.ts (`startAt < endAt lawan
+ * && endAt > startAt lawan`) — kalau test dan server beda tafsir soal batas,
+ * test ini akan memilih produk yang tetap ditolak server dan gagal lagi.
+ */
+async function produkDiEventBertabrakan(
+  request: APIRequestContext,
+  token: string,
+  mulai: Date,
+  selesai: Date,
+) {
+  const res = await request.get(ADMIN_FS, { headers: auth(token) });
+  expect(res.status()).toBe(200);
+  const events = (await res.json()).data as { id: string; startAt: string; endAt: string }[];
+
+  const ids = new Set<string>();
+  for (const ev of events) {
+    if (!(new Date(ev.startAt) < selesai && new Date(ev.endAt) > mulai)) continue;
+    const detail = await request.get(`${ADMIN_FS}/${ev.id}`, { headers: auth(token) });
+    expect(detail.status()).toBe(200);
+    for (const it of (await detail.json()).data.items as { productId: string }[]) {
+      ids.add(it.productId);
+    }
+  }
+  return ids;
+}
+
 test(tc('174', 'Flash sale berjalan tampil dengan harga & sisa kuota, dan kartunya konsisten dengan listing'), async ({ request }) => {
   const event = await eventBerjalan(request);
   expect(event, 'seed butuh flash sale berjalan — jalankan `npm run db:seed` terbaru').toBeTruthy();
@@ -165,21 +194,54 @@ test(tc('176', 'Admin flash sale: harga wajib di bawah harga normal, dan produk 
     });
     expect(terbalik.status()).toBe(400);
 
-    const listing = await request.get(`${V1}/products?limit=20`);
-    const produk = (await listing.json()).data.items[0] as { id: string; price: number };
+    // Produk uji dipilih dengan syarat eksplisit, bukan `items[0]` dari listing
+    // umum. `items[0]` membuat test ini bergantung nasib lewat dua jalur, dan
+    // keduanya sudah pernah menggigit — TC-176 gagal di `main` 2026-08-06 dengan
+    // 422 di penambahan yang seharusnya sah, sementara run PR-nya hijau:
+    //
+    //   1. Produk yang sedang ikut flash sale IKUT muncul di listing umum (itu
+    //      justru yang dijaga TC-174). Kalau yang terpilih salah satunya, event
+    //      seed yang sedang berjalan bertabrakan dengan periode di sini, dan
+    //      penambahan "sah" di bawah ditolak aturan tumpang tindih.
+    //   2. Produk yang sedang diskon (M9-B3) membuat `price` di kartu adalah
+    //      harga efektif, sedangkan server membandingkan dengan harga normal di
+    //      DB — jadi assertion "kemahalan" di atas justru TIDAK jadi 422.
+    //
+    // Tujuh spec lain membuat produk baru, jadi siapa yang di posisi pertama
+    // berubah antar run dan antar urutan paralel: gagalnya jarang, bukan tidak ada.
+    const terpakai = await produkDiEventBertabrakan(request, token, mulai, selesai);
+    const listing = await request.get(`${V1}/products?limit=50`);
+    const kandidat = (await listing.json()).data.items as {
+      id: string;
+      price: number;
+      originalPrice: number | null;
+      discountPct: number | null;
+    }[];
+    // price > 2000 supaya `price - 1000` tetap potongan yang berarti dan tidak
+    // terjepit lantai Rp 100 di bawah.
+    const produk = kandidat.find(
+      (p) => !terpakai.has(p.id) && !p.originalPrice && !p.discountPct && p.price > 2000,
+    );
+    expect(
+      produk,
+      'butuh 1 produk tanpa diskon, berharga > Rp 2.000, dan belum ikut event yang bertabrakan',
+    ).toBeTruthy();
 
     // Harga flash >= harga normal bukan promo — 422, bukan diam-diam disimpan.
     const kemahalan = await request.post(`${ADMIN_FS}/${eventId}/items`, {
       headers: auth(token),
-      data: { productId: produk.id, salePrice: produk.price, quota: 5 },
+      data: { productId: produk!.id, salePrice: produk!.price, quota: 5 },
     });
     expect(kemahalan.status()).toBe(422);
 
     const sah = await request.post(`${ADMIN_FS}/${eventId}/items`, {
       headers: auth(token),
-      data: { productId: produk.id, salePrice: Math.max(100, produk.price - 1000), quota: 5 },
+      data: { productId: produk!.id, salePrice: Math.max(100, produk!.price - 1000), quota: 5 },
     });
-    expect(sah.status()).toBe(201);
+    // Pesan server ikut dibawa: kegagalan yang menggigit di `main` cuma berbunyi
+    // "Expected 201, received 422" — dua aturan berbeda menghasilkan 422 di route
+    // ini, jadi status saja tidak cukup untuk tahu yang mana yang menolak.
+    expect(sah.status(), `penambahan sah ditolak: ${await sah.text()}`).toBe(201);
 
     // Produk yang sama, event lain, periode bertabrakan → ditolak. Kalau lolos,
     // `resolveFlashPrices` harus menebak harga mana yang berlaku.
@@ -197,7 +259,7 @@ test(tc('176', 'Admin flash sale: harga wajib di bawah harga normal, dan produk 
     try {
       const bentrok = await request.post(`${ADMIN_FS}/${eventLainId}/items`, {
         headers: auth(token),
-        data: { productId: produk.id, salePrice: Math.max(100, produk.price - 2000), quota: 5 },
+        data: { productId: produk!.id, salePrice: Math.max(100, produk!.price - 2000), quota: 5 },
       });
       expect(bentrok.status(), 'produk yang sama di dua event yang periodenya bertabrakan harus ditolak').toBe(422);
     } finally {
