@@ -3,6 +3,34 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — OPS-10a: uptime check produksi
+
+### Added
+- **Heartbeat produksi** (`OPS-10a`) — [`.github/workflows/uptime.yml`](.github/workflows/uptime.yml) memanggil [`scripts/uptime-check.sh`](scripts/uptime-check.sh) tiap ~15 menit. Tiga probe: `/api/health` (yang membalas 503 kalau `SELECT 1` ke Postgres gagal, jadi database ikut tercakup), homepage, dan sisa umur sertifikat TLS. Gagal → run merah → notifikasi kegagalan Actions ke pemilik repo.
+
+### Notes
+- **OPS-10 dipecah jadi 10a & 10b.** Satu baris roadmap berisi "uptime check, log terpusat, Sentry" tidak akan pernah bisa ditandai selesai: bagian Sentry butuh akun & DSN eksternal, bagian uptime tidak butuh apa pun. Dipisah supaya yang bisa dikerjakan tidak tersandera yang tidak bisa. **10b (error tracking & log terpusat) tetap 🔵 TODO** dan tidak diklaim selesai di sini.
+- **Kenapa script, bukan `run: curl` di YAML.** Logika yang hanya hidup di dalam workflow cuma bisa dibuktikan saat produksi kebetulan mati. Ditaruh di script, ia bisa dijalankan terhadap host yang sengaja salah — dan memang begitu cara ia diuji.
+- **Bedanya dengan smoke-test deploy (OPS-3).** Smoke-test jalan sekali, dari DALAM VPS, dengan `--resolve` ke `127.0.0.1` — jadi ia sengaja melewati DNS publik dan jaringan luar. Monitor ini jalan berkala lewat internet, jadi ia menangkap kelas kegagalan yang tak terlihat dari dalam box: DNS mati, sertifikat kedaluwarsa, Caddy tak terjangkau dari luar. Keduanya saling melengkapi, bukan duplikat.
+- **HTTP 200 tidak dianggap sehat begitu saja.** Kedua probe HTTP mewajibkan penanda di body (`"database":"ok"` dan `Tokopudidi`), karena Caddy bisa menyajikan halaman lain dengan status 200 dan monitor yang cuma melihat status code akan menyebutnya hijau.
+- **Gagal sekali bukan insiden.** Tiap probe dicoba 3× berjeda 20 detik sebelum dilaporkan. Monitor yang memekik pada satu paket hilang akan cepat diabaikan, dan monitor yang diabaikan sama saja dengan tidak ada.
+- **Sertifikat dicek karena Caddy memperbarui di sisa ~30 hari.** Kalau sisanya sudah di bawah 7 hari, perpanjangannya sedang gagal diam-diam — dan itu berakhir sebagai outage total berupa peringatan keamanan di browser pembeli, bukan error 500 yang terlihat di log.
+- **Workflow ini juga jalan di PR** yang menyentuh script/YAML-nya. Tanpa itu, salah ketik di monitor baru ketahuan saat produksi benar-benar mati — persis saat ia paling dibutuhkan.
+
+### Batas yang jujur
+- **Cron GitHub Actions bukan penjadwal presisi.** Run bisa tertunda beberapa menit saat antrean padat dan sesekali dilewati. Ini heartbeat murah ~15 menit, **bukan pager sub-menit**; outage pendek bisa lolos di antara dua run.
+- **GitHub menonaktifkan workflow terjadwal setelah repo 60 hari tanpa commit.** Monitor yang mati diam-diam lebih buruk daripada tidak ada monitor — didokumentasikan di header workflow, tapi tetap harus diaktifkan manual kalau repo pernah menganggur selama itu.
+- **Notifikasinya email GitHub, bukan pager.** Tidak ada integrasi Slack/PagerDuty — itu bagian dari OPS-10b yang masih terbuka.
+
+### Verifikasi
+- **Dibuktikan bergigi terhadap host yang sengaja salah**, bukan cuma hijau terhadap produksi:
+  | Kasus | Hasil |
+  |---|---|
+  | `toko.emha.space` (produksi asli) | **exit 0** — dua probe 200 + penanda cocok, sertifikat sisa 34 hari |
+  | `example.com` (hidup, tapi bukan aplikasi kita) | **exit 1** — `/api/health` HTTP 404, homepage **HTTP 200 tapi tanpa penanda** ⇒ membuktikan cek penanda bukan hiasan |
+  | host yang tidak ada | **exit 1** — ketiga probe gagal, dengan sebab `curl: (6) Could not resolve host` |
+  | ambang sertifikat dinaikkan ke 9999 hari | **exit 1** hanya pada probe sertifikat ⇒ membuktikan cek umur sertifikat benar-benar mengevaluasi |
+- Cacat yang ketemu saat pengujian dan diperbaiki: stderr curl digabung `2>&1` dengan body membuat alasan kegagalan **kosong** pada kasus DNS mati (`tidak ada respons HTTP — `). Ditampung terpisah, sekarang alasannya ikut terbawa.
 ## [Unreleased] — OPS-9: kembalikan gate `tsc` & lepas runtime `tsx`
 
 ### Changed
