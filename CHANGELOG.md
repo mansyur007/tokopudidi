@@ -31,6 +31,27 @@ Versioning follows [SemVer](https://semver.org/).
   | host yang tidak ada | **exit 1** — ketiga probe gagal, dengan sebab `curl: (6) Could not resolve host` |
   | ambang sertifikat dinaikkan ke 9999 hari | **exit 1** hanya pada probe sertifikat ⇒ membuktikan cek umur sertifikat benar-benar mengevaluasi |
 - Cacat yang ketemu saat pengujian dan diperbaiki: stderr curl digabung `2>&1` dengan body membuat alasan kegagalan **kosong** pada kasus DNS mati (`tidak ada respons HTTP — `). Ditampung terpisah, sekarang alasannya ikut terbawa.
+## [Unreleased] — OPS-9: kembalikan gate `tsc` & lepas runtime `tsx`
+
+### Changed
+- **`next.config.js`: `typescript.ignoreBuildErrors` & `eslint.ignoreDuringBuilds` dilepas.** Keduanya dipasang saat deploy pertama untuk melewati error yang belum sempat dibereskan. Per hari ini keduanya sudah tidak menutupi apa pun — `tsc --noEmit` dan `next lint` sama-sama bersih — jadi yang tersisa hanya risiko error baru lolos diam-diam ke produksi. `next build` kembali jadi gerbang.
+- **API produksi jalan dari `dist/`, bukan `npx tsx src/index.ts`.** [Dockerfile](Dockerfile) sekarang ikut `npm run build -w @tokopudidi/api` di stage build, dan `CMD`-nya `node dist/index.js`. Yang berjalan di produksi jadi persis artefak yang sudah lulus type-check, tanpa lapisan transpile saat start.
+- **CI ([ci.yml](.github/workflows/ci.yml)) dapat step `Typecheck api` + `Build api`.** Sebelumnya api tidak di-`tsc` sama sekali di CI — konsekuensi wajar dari runtime tsx, tapi artinya type error di api tidak pernah menggagalkan apa pun.
+
+### Added
+- [`apps/api/tsconfig.build.json`](apps/api/tsconfig.build.json) — config emit yang mengecualikan `**/*.test.ts`, plus script `typecheck` di api & web.
+
+### Notes
+- **Ternyata tidak ada type error yang perlu "dibereskan".** Judul OPS-9 di roadmap ("Bereskan type API → kembalikan `tsc` gate") menduga ada utang type yang menumpuk. Diukur dulu sebelum dikerjakan: `tsc --noEmit` di api **0 error**, di web **0 error**, `next lint` bersih. Utangnya sudah lunas entah kapan lewat pekerjaan milestone; yang tersisa cuma bungkamnya yang tidak pernah dicabut. Jadi item ini soal mencabut bypass dan mengunci pintunya, bukan soal memperbaiki kode.
+- **Kenapa build dan typecheck pakai config berbeda.** `tsconfig.build.json` mengecualikan file test supaya kode test tidak ikut ke image produksi; `typecheck` tetap pakai `tsconfig.json` yang mencakup `*.test.ts`, jadi cakupan type-check **tidak** ikut menyempit. Nama config yang berbeda sekaligus memberi `.tsbuildinfo` yang berbeda — run `--noEmit` tidak bisa membuat run emit berikutnya menyangka output sudah mutakhir lalu melewatkan penulisan `.js`, kegagalan yang pernah kena di build Docker dan masih disisakan `find -name '*.tsbuildinfo' -delete` di Dockerfile.
+- **`tsx` tetap dipasang dan `src/` tetap ikut ter-copy ke image.** `tsx` masih dipakai `npm run dev`, dan `src/` masih dibutuhkan kalau `npm run test` dijalankan dari container. Yang berubah hanya apa yang dieksekusi saat start.
+- **Batas yang jujur: ESLint _warning_ tetap tidak menggagalkan `next build`** — hanya error yang menggagalkan (dibuktikan: probe `@next/next/no-img-element`, yang di versi ini masih `warn`, lolos build). Repo saat ini nol warning; kalau warning mulai menumpuk, gerbangnya butuh `next lint --max-warnings=0` terpisah, bukan `next build`.
+
+### Verifikasi
+- **Gerbangnya dibuktikan bergigi, bukan diasumsikan.** Empat probe disuntik lalu dicabut lagi: (1) type error di `apps/api/src/index.ts` → `npm run build -w api` **gagal**; (2) type error di `auth.test.ts` → `build` **lolos** (benar, test tidak ikut emit) tapi `typecheck` **gagal** — inilah yang membuat step CI terpisah itu ada gunanya; (3) type error di komponen web → `next build` **gagal** di "Linting and checking validity of types"; (4) ESLint error (`no-sync-scripts`) di komponen web → `next build` **gagal**. Sebelum perubahan ini, probe (3) dan (4) sama-sama lolos.
+- **Artefak `dist/` dibuktikan benar-benar melayani**, bukan sekadar ter-compile: `node dist/index.js` boot (log "API siap" + Socket.IO), dan `GET /rute-tidak-ada` menjawab **404** dari router express. `dist/` juga diperiksa tidak memuat satu pun `*.test.js`.
+- `npm run build -w @tokopudidi/web` lolos penuh tanpa `ignoreBuildErrors`.
+- **Yang belum dibuktikan**: image Docker `target: api` belum di-build & dijalankan di sini (daemon Docker tidak hidup di mesin ini) — perubahan `CMD` dan step build api di Dockerfile baru terbukti pasca-deploy. Titik gagal yang paling mungkin bukan kodenya melainkan urutan stage, jadi **pantau deploy pertama setelah merge**: kalau `dist/` tidak terbawa, container api mati saat start dan smoke-test OPS-3 (`/api/health`) akan menandainya merah.
 
 ## [Unreleased] — fix: guard hidrasi auth di sisa halaman buyer
 
