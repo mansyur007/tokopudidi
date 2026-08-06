@@ -1,9 +1,11 @@
 name: CI
 
 # Gerbang mutu: jalan di setiap PR ke main (dan push ke main).
-# Validasi yang sama dengan yang dipakai produksi: prisma generate, lint, test,
-# lalu build database + shared + web (api dijalankan via tsx di produksi, jadi
-# tidak di-`tsc` di sini — lihat ROADMAP OPS-9 untuk mengembalikan tsc gate).
+# Validasi yang sama dengan yang dipakai produksi: prisma generate, lint,
+# type-check, test, lalu build database + shared + api + web.
+# OPS-9 (2026-08-05): api sekarang ikut di-`tsc` dan dijalankan dari dist/ di
+# produksi, dan `next build` tidak lagi di-bypass `ignoreBuildErrors` — jadi
+# type error di web pun menggagalkan step "Build web" di bawah.
 on:
   pull_request:
     branches: [main]
@@ -44,8 +46,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Terpisah dari "Build api" karena cakupannya lebih luas: tsconfig.json
+      # mencakup *.test.ts, sedangkan tsconfig.build.json (dipakai build) tidak.
+      - name: Typecheck api
+        run: npm run typecheck -w @tokopudidi/api
+
       - name: Test
         run: npm run test
+
+      # Artefak yang sama dengan yang dijalankan produksi (Dockerfile: node dist/index.js).
+      - name: Build api
+        run: npm run build -w @tokopudidi/api
 
       - name: Build web (mirror produksi)
         env:

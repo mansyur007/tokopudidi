@@ -27,14 +27,16 @@ ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
-# Catatan: API dijalankan via tsx (transpile-only) di runtime — sama seperti dev —
-# sehingga tidak perlu `tsc` build untuk api (yang belum lulus strict type-check).
-# database & shared tetap di-build karena api & web meng-import dist-nya.
+# OPS-9: api ikut di-`tsc` (dulu dilewati karena belum lulus strict type-check,
+# lalu dijalankan transpile-only via tsx di runtime). Sekarang build gagal keras
+# kalau api tidak lulus type-check — bukan lolos ke produksi lalu meledak saat
+# request. database & shared tetap di-build karena api & web meng-import dist-nya.
 # Hapus .tsbuildinfo basi (sempat ter-commit) supaya tsc incremental tidak skip emit .js.
 RUN find . -name '*.tsbuildinfo' -not -path '*/node_modules/*' -delete \
  && npm run db:generate \
  && npm run build -w @tokopudidi/database \
  && npm run build -w @tokopudidi/shared \
+ && npm run build -w @tokopudidi/api \
  && npm run build -w @tokopudidi/web
 
 # ---------- api runtime ----------
@@ -67,8 +69,12 @@ COPY --from=build /app/packages/database ./packages/database
 COPY --from=build /app/apps/api ./apps/api
 EXPOSE 4000
 WORKDIR /app/apps/api
-# tsx (esbuild) tersedia di node_modules (devDep api). Transpile-only, tanpa type-check.
-CMD ["npx", "tsx", "src/index.ts"]
+# OPS-9: jalankan hasil `tsc` (dist/) langsung dengan node, bukan `npx tsx src/index.ts`.
+# Yang berjalan di produksi jadi persis artefak yang sudah lulus type-check saat build,
+# tanpa lapisan transpile saat start dan tanpa devDependency yang wajib ada di runtime.
+# `src/` tetap ikut ter-copy (apps/api utuh) — dipakai `npm run test` bila perlu dari
+# container, tapi tidak lagi menjadi yang dieksekusi.
+CMD ["node", "dist/index.js"]
 
 # ---------- web runtime ----------
 FROM base AS web

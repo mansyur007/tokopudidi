@@ -1,0 +1,15 @@
+// Config khusus emit `dist/` yang dijalankan produksi (OPS-9).
+//
+// Bedanya dengan tsconfig.json cuma satu: file test tidak ikut ter-emit, supaya
+// image produksi tidak membawa kode test. Type-check-nya TIDAK ikut menyempit —
+// `npm run typecheck` tetap pakai tsconfig.json yang mencakup *.test.ts, jadi
+// test tetap wajib lulus tsc meski tidak dikirim ke dist.
+//
+// Nama file yang berbeda juga memberi .tsbuildinfo yang berbeda
+// (tsconfig.build.tsbuildinfo vs tsconfig.tsbuildinfo), sehingga run `--noEmit`
+// tidak bisa membuat run emit berikutnya menganggap output sudah mutakhir lalu
+// melewatkan penulisan .js — kegagalan yang pernah kena di build Docker.
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["**/*.test.ts"]
+}
