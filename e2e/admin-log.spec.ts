@@ -127,7 +127,18 @@ test(tc('153', 'Filter aksi, sasaran & rentang tanggal bekerja + paginasi'), asy
   // `to` hari ini harus INKLUSIF — entri yang baru saja dibuat wajib ikut
   // terhitung. Kalau `to` dipakai apa adanya sebagai tengah malam awal hari,
   // seluruh isi hari terakhir hilang; itu bug yang paling gampang lolos.
-  const hariIni = new Date().toISOString().slice(0, 10);
+  // Tanggal dihitung dalam waktu LOKAL, bukan `toISOString()` (UTC).
+  //
+  // Filter di server memakai hari lokal (`akhirHariEksklusif` memanggil
+  // `setHours` yang berbasis zona waktu proses). Selama mesinnya ber-UTC —
+  // seperti runner CI — kedua cara memberi tanggal yang sama, jadi bug ini
+  // tidak pernah terlihat di sana. Di WIB (UTC+7) keduanya berbeda tiap jam
+  // 00:00–07:00: entri yang baru dibuat sudah masuk hari lokal berikutnya
+  // sementara test masih menanyakan hari UTC kemarin, dan TC-153 merah dengan
+  // tuduhan "filter tanggal rusak" padahal filternya benar.
+  const kini = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const hariIni = `${kini.getFullYear()}-${pad(kini.getMonth() + 1)}-${pad(kini.getDate())}`;
   const rentang = await request.get(
     `${V1}/admin/logs?action=CREATE_CATEGORY&from=${hariIni}&to=${hariIni}&limit=50`,
     { headers: t },
