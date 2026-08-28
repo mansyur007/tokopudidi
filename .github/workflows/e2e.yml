@@ -95,7 +95,10 @@ jobs:
         run: |
           npm run start -w @tokopudidi/api &
           npm run start -w @tokopudidi/web &
-          npx wait-on http://localhost:4000/api/health http://localhost:3000 http://localhost:8025 --timeout 120000
+          # MailHog dicek lewat `http-get://`, bukan `http://`: wait-on memakai
+          # HEAD untuk skema http, dan server MailHog tidak melayani HEAD di `/`
+          # sehingga menunggunya selalu habis waktu meski containernya sehat.
+          npx wait-on http://localhost:4000/api/health http://localhost:3000 http-get://localhost:8025/api/v2/messages --timeout 120000
 
       - name: Jalankan suite E2E
         run: npm run e2e
