@@ -10,6 +10,7 @@ export function apiRegister(input: {
   phone: string;
   password: string;
   fullName: string;
+  email?: string;
   referralCode?: string;
 }) {
   return apiFetch<AuthResult>('/api/v1/auth/register', {
@@ -41,4 +42,13 @@ export function apiVerifyOtp(phone: string, code: string, purpose: 'REGISTER' | 
 
 export function apiMe(token: string) {
   return apiFetch<UserPublic>('/api/v1/auth/me', { token });
+}
+
+/** M14-A2 — ubah email akun sendiri. String kosong = hapus email. */
+export function apiUpdateProfile(token: string, input: { email?: string }) {
+  return apiFetch<UserPublic>('/api/v1/auth/me', {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify(input),
+  });
 }

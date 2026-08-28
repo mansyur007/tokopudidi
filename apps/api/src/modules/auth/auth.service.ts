@@ -4,6 +4,7 @@ import { prisma, User } from '@tokopudidi/database';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../lib/jwt';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../../lib/errors';
 import type { UserPublic, AuthTokens } from '@tokopudidi/shared';
+import { notifyWelcome } from '../../lib/emailEvents';
 
 const BCRYPT_COST = 12;
 const REFRESH_TTL_DAYS = 7;
@@ -39,11 +40,20 @@ export async function registerUser(input: {
   phone: string;
   password: string;
   fullName: string;
+  email?: string;
   referralCode?: string;
 }): Promise<{ user: UserPublic; tokens: AuthTokens }> {
   const existing = await prisma.user.findUnique({ where: { phone: input.phone } });
   if (existing) {
     throw new ConflictError('Nomor HP ini sudah pernah didaftarkan');
+  }
+
+  // Kolom email unique: string kosong dari form harus jadi `undefined`, bukan
+  // '' — dua akun tanpa email akan bertabrakan pada '' yang kedua.
+  const email = input.email?.trim() ? input.email.trim().toLowerCase() : undefined;
+  if (email) {
+    const emailTaken = await prisma.user.findUnique({ where: { email } });
+    if (emailTaken) throw new ConflictError('Email ini sudah dipakai akun lain');
   }
 
   let referredById: string | undefined;
@@ -60,6 +70,7 @@ export async function registerUser(input: {
   const user = await prisma.user.create({
     data: {
       phone: input.phone,
+      email,
       passwordHash,
       fullName: input.fullName,
       referralCode,
@@ -68,8 +79,44 @@ export async function registerUser(input: {
     },
   });
 
+  // M14-A2 — welcome email hanya kalau memang ada alamatnya. Tidak di-`await`:
+  // pendaftaran sudah berhasil sebelum email jadi urusan siapa pun.
+  void notifyWelcome(user.email, user.fullName);
+
   const tokens = await issueTokens(user);
   return { user: toPublicUser(user), tokens };
+}
+
+/**
+ * Ubah email akun sendiri. Satu-satunya jalur pengisian `User.email` bagi user
+ * yang sudah terdaftar — register hanya melayani akun baru.
+ *
+ * String kosong berarti **menghapus** email (berhenti berlangganan email
+ * transaksional), bukan menyimpan ''. Kolomnya unique: '' yang kedua akan
+ * ditolak database dan user kedua tidak akan pernah tahu kenapa.
+ */
+export async function updateOwnProfile(
+  userId: string,
+  input: { email?: string },
+): Promise<UserPublic> {
+  const email = input.email?.trim() ? input.email.trim().toLowerCase() : null;
+
+  if (email) {
+    const taken = await prisma.user.findFirst({
+      where: { email, id: { not: userId } },
+      select: { id: true },
+    });
+    if (taken) throw new ConflictError('Email ini sudah dipakai akun lain');
+  }
+
+  const sebelum = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const user = await prisma.user.update({ where: { id: userId }, data: { email } });
+
+  // Welcome dikirim saat email *pertama kali* terpasang di akun yang tadinya
+  // tanpa email — bukan tiap kali disimpan ulang, dan bukan saat dihapus.
+  if (email && sebelum?.email !== email) void notifyWelcome(email, user.fullName);
+
+  return toPublicUser(user);
 }
 
 export async function loginUser(phone: string, password: string): Promise<{

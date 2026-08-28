@@ -39,6 +39,16 @@ services:
     volumes:
       - tokopudidi_miniodata:/data
 
+  # M14-A2 — SMTP palsu untuk dev & e2e. Menerima email apa pun tanpa auth dan
+  # menahannya di UI :8025 (API JSON di /api/v2/messages, dipakai e2e).
+  # Opsional: tanpa `SMTP_HOST`, API tetap jalan dalam mode log-only.
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: tokopudidi-mailhog
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # UI + API
+
 volumes:
   tokopudidi_pgdata:
   tokopudidi_redisdata:

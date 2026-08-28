@@ -18,7 +18,7 @@ export default function DaftarPage() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { referralCode: '' },
+    defaultValues: { referralCode: '', email: '' },
   });
 
   async function onSubmit(data: RegisterInput) {
@@ -29,6 +29,7 @@ export default function DaftarPage() {
         phone: data.phone,
         password: data.password,
         fullName: data.fullName,
+        email: data.email || undefined,
         referralCode: data.referralCode || undefined,
       });
       setAuth(result.user, result.tokens);
@@ -86,6 +87,20 @@ export default function DaftarPage() {
           />
           {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password.message}</p>}
           <p className="text-xs text-gray-500 mt-1">Minimal 6 karakter</p>
+        </div>
+
+        <div>
+          <label htmlFor="email" className="label">Email <span className="text-gray-400 font-normal">(opsional)</span></label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="budi@email.com"
+            className="input"
+            {...register('email')}
+          />
+          {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>}
+          <p className="text-xs text-gray-500 mt-1">Buat kirim invoice & status pesanan. Bisa diisi nanti di Akun.</p>
         </div>
 
         <div>
