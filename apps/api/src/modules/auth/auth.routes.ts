@@ -7,6 +7,7 @@ import {
   otpVerifySchema,
   refreshSchema,
   forgotPasswordSchema,
+  updateProfileSchema,
 } from '@tokopudidi/shared';
 import { validateBody } from '../../middleware/validate';
 import { requireAuth } from '../../middleware/auth';
@@ -21,6 +22,7 @@ import {
   logoutUser,
   resetPassword,
   toPublicUser,
+  updateOwnProfile,
 } from './auth.service';
 
 export const authRouter = Router();
@@ -107,6 +109,16 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
     if (!user) throw new NotFoundError('User tidak ditemukan');
     return ok(res, toPublicUser(user));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/v1/auth/me — ubah profil sendiri (untuk sekarang: email).
+authRouter.patch('/me', requireAuth, validateBody(updateProfileSchema), async (req, res, next) => {
+  try {
+    const user = await updateOwnProfile(req.user!.sub, req.body);
+    return ok(res, user, 'Profil tersimpan');
   } catch (err) {
     next(err);
   }

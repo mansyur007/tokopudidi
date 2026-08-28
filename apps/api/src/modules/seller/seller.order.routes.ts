@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import { requireShopOwner } from './seller.middleware';
 import { validateBody } from '../../middleware/validate';
 import { NotFoundError, ForbiddenError } from '../../lib/errors';
+import { notifyOrderShipped } from '../../lib/emailEvents';
 
 export const sellerOrderRouter = Router();
 sellerOrderRouter.use(requireAuth, requireShopOwner);
@@ -114,6 +115,9 @@ sellerOrderRouter.post('/:id/ship', validateBody(shipOrderSchema), async (req, r
         linkUrl: `/pesanan/${order.id}`,
       },
     });
+    // M14-A2 — resi juga dikirim lewat email; dibaca ulang dari order yang
+    // sudah ter-update supaya isinya tidak bisa berbeda dari yang tersimpan.
+    void notifyOrderShipped(order.id);
     return ok(res, updated, 'Pesanan ditandai dikirim');
   } catch (err) { next(err); }
 });

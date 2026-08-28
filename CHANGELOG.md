@@ -3,6 +3,18 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+## [Unreleased] — M14-A2: email transaksional
+
+### Added
+- **Email transaksional** (`M14-A2`) — [`apps/api/src/lib/email.ts`](apps/api/src/lib/email.ts) (transport nodemailer, fire-and-forget, timeout) + [`email.templates.ts`](apps/api/src/lib/email.templates.ts) (lima template, seluruh interpolasi lewat `escapeHtml`) + [`emailEvents.ts`](apps/api/src/lib/emailEvents.ts) (jembatan ke peristiwa domain). Lima event: pesanan dibuat → pembeli, dibayar → pemilik toko, dikirim+resi → pembeli, komplain/refund diputus → pembeli, welcome saat email pertama terpasang.
+- **Jalur pengisian email akun** — `email` opsional di form daftar, `PATCH /api/v1/auth/me`, dan kartu Email di `/akun`. Sebelum ini `User.email` tidak punya satu pun cara diisi (9 dari 10 user produksi tanpa email), sehingga seluruh email transaksional tidak akan pernah punya tujuan kirim.
+- **MailHog** di [`docker-compose.yml`](docker-compose.yml) (dev) dan sebagai service di [`e2e.yml`](.github/workflows/e2e.yml) (CI) — SMTP palsu supaya isi email bisa diperiksa e2e, bukan diasumsikan.
+- **e2e TC-TKPDD-189–194** ([`e2e/email.spec.ts`](e2e/email.spec.ts)) + 30 unit test baru.
+
+### Notes
+- **`SMTP_HOST` kosong = mode log-only.** Aplikasi jalan normal tanpa kredensial apa pun; isi email hanya tercatat di pino. Produksi tetap dalam mode ini sampai `SMTP_HOST` diisi di `.env.production` — tidak ada perubahan perilaku yang terlihat pembeli sampai saat itu.
+- **Status BLOCKED item ini keliru sejak awal**: verifikasinya memang dirancang lewat MailHog (SMTP palsu), bukan penyedia berbayar. Yang benar-benar butuh akun eksternal cuma pengiriman ke inbox sungguhan.
+
 ## [Unreleased] — OPS-10a: uptime check produksi
 
 ### Added

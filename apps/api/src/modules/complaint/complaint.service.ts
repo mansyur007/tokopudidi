@@ -10,6 +10,7 @@ import {
 } from '@tokopudidi/shared';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../lib/errors';
 import { settleOrderRefund } from '../order/refund.settlement';
+import { notifyComplaintDecided } from '../../lib/emailEvents';
 
 // Bentuk yang dipakai semua listing komplain — cukup untuk kartu di UI.
 const complaintInclude = {
@@ -213,6 +214,10 @@ export async function decideComplaint(complaintId: string, input: DecideComplain
       });
     }
   });
+
+  // M14-A2 — sesudah transaksi commit, bukan di dalamnya: email untuk keputusan
+  // yang kemudian di-rollback tidak bisa ditarik kembali.
+  void notifyComplaintDecided(complaint.id, input.outcome === 'RESOLVED');
 
   return getComplaintOrThrow(complaint.id);
 }

@@ -30,6 +30,13 @@ jobs:
       JWT_ACCESS_SECRET: e2e-access-secret-not-for-production
       JWT_REFRESH_SECRET: e2e-refresh-secret-not-for-production
       OTP_MOCK: 'true'
+      # M14-A2 — arahkan API ke MailHog supaya email transaksional benar-benar
+      # terkirim dan bisa diperiksa e2e. Tanpa ini suite jalan di mode log-only
+      # dan spec email akan skip dengan sebab yang jelas.
+      SMTP_HOST: localhost
+      SMTP_PORT: '1025'
+      EMAIL_FROM: Tokopudidi <no-reply@e2e.local>
+      E2E_MAILHOG_URL: http://localhost:8025
       WEB_ORIGIN: http://localhost:3000
       NEXT_PUBLIC_API_URL: http://localhost:4000
       E2E_API_URL: http://localhost:4000
@@ -58,6 +65,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      # M14-A2 — SMTP palsu. Tanpa healthcheck: image mailhog tidak punya
+      # shell/curl, jadi cek kesiapannya dilakukan `wait-on` di step app.
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports: ['1025:1025', '8025:8025']
+
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -82,7 +95,7 @@ jobs:
         run: |
           npm run start -w @tokopudidi/api &
           npm run start -w @tokopudidi/web &
-          npx wait-on http://localhost:4000/api/health http://localhost:3000 --timeout 120000
+          npx wait-on http://localhost:4000/api/health http://localhost:3000 http://localhost:8025 --timeout 120000
 
       - name: Jalankan suite E2E
         run: npm run e2e

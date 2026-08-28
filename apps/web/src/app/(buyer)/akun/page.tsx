@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore, useAuthHydrated } from '@/store/auth';
+import ProfileEmail from '@/components/akun/ProfileEmail';
 
 const MENU = [
   { href: '/akun/alamat',     label: 'Alamat Saya',      emoji: '📍' },
@@ -51,6 +52,8 @@ export default function AkunPage() {
           <p className="text-sm text-gray-500 truncate">{user.phone}</p>
         </div>
       </header>
+
+      <ProfileEmail />
 
       {user.role === 'ADMIN' && (
         <Link href="/admin" className="card flex items-center gap-3 px-4 py-3 mb-4 hover:bg-gray-50 border-purple-200">

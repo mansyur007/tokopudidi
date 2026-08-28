@@ -3,6 +3,7 @@ import type { OrderStatus, PaymentMethod } from '@tokopudidi/database';
 import { resolveUnitPrice } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
+import { notifyOrderCreated, notifyOrderPaid } from '../../lib/emailEvents';
 import { quoteShipping, isCodAvailable } from '../shipping/shipping.service';
 import { resolveFlashPrices, reserveFlashQuota } from '../flashSale/flashSale.service';
 import { restoreStock } from './stock';
@@ -334,6 +335,16 @@ export async function checkout(userId: string, input: CheckoutInput) {
 
     return orderRecords;
   });
+
+  // M14-A2 — email di luar transaksi dan tanpa `await`: pembeli sudah berhak
+  // mendapat responsnya begitu pesanan tersimpan, dan tidak ada isi email yang
+  // memengaruhi hasil checkout.
+  void notifyOrderCreated(userId, created.map((o) => o.id));
+  // COD ditandai PAID sejak dibuat, jadi pemilik toko baru tahu ada uang masuk
+  // di sini — jalur bayar lainnya mengirim email itu saat statusnya berubah.
+  if (input.paymentMethod === 'COD') {
+    for (const o of created) void notifyOrderPaid(o.id);
+  }
 
   return created;
 }
