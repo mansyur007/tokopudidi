@@ -5,7 +5,7 @@
 // ia memberi potongan atas barang yang tidak pernah masuk promo.
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
-import { tc, V1, auth, tokenFor } from './helpers/testforge';
+import { tc, V1, auth, tokenFor, pickBuyableFrom, type ProdukTerbeli } from './helpers/testforge';
 
 const KODE = 'SEMBAKO10'; // seed: 10% khusus kategori Sembako, maks 20.000
 
@@ -22,13 +22,11 @@ async function kosongkanKeranjang(request: APIRequestContext) {
   }
 }
 
-type Produk = { id: string; price: number };
-
-/** Satu produk dari kategori tertentu. Memakai filter server, bukan menyaring
- *  hasil listing: kartu produk sengaja tidak membawa `categoryId`. */
-async function produkDiKategori(request: APIRequestContext, categoryId: string): Promise<Produk | undefined> {
-  const res = await request.get(`${V1}/products?categoryId=${categoryId}&limit=1`);
-  return (await res.json()).data.items[0];
+/** Satu produk dari kategori tertentu yang benar-benar bisa dibeli. Memakai
+ *  filter server, bukan menyaring hasil listing: kartu produk sengaja tidak
+ *  membawa `categoryId`. */
+async function produkDiKategori(request: APIRequestContext, categoryId: string): Promise<ProdukTerbeli | null> {
+  return pickBuyableFrom(request, `${V1}/products?categoryId=${categoryId}&limit=20`);
 }
 
 /** Satu produk dari kategori mana pun SELAIN yang diberikan. */
@@ -36,13 +34,13 @@ async function produkLuarKategori(
   request: APIRequestContext,
   categoryId: string,
   semua: Array<{ id: string }>,
-): Promise<Produk | undefined> {
+): Promise<ProdukTerbeli | null> {
   for (const c of semua) {
     if (c.id === categoryId) continue;
     const p = await produkDiKategori(request, c.id);
     if (p) return p;
   }
-  return undefined;
+  return null;
 }
 
 async function kategoriSembako(request: APIRequestContext) {
@@ -63,14 +61,24 @@ test(tc('195', 'Voucher kategori hanya memotong item kategori itu'), async ({ re
   expect(dalam, 'tidak ada produk kategori sembako').toBeTruthy();
   expect(luar, 'tidak ada produk di luar kategori sembako').toBeTruthy();
 
-  await request.post(`${V1}/cart/items`, {
+  const tambah_dalam = await request.post(`${V1}/cart/items`, {
     headers: auth(token),
-    data: { productId: dalam!.id, quantity: 1 },
+    data: {
+      productId: dalam!.productId,
+      ...(dalam!.variantId ? { variantId: dalam!.variantId } : {}),
+      quantity: 1,
+    },
   });
-  await request.post(`${V1}/cart/items`, {
+  expect(tambah_dalam.status(), `gagal menambah dalam ke keranjang: ${await tambah_dalam.text()}`).toBe(201);
+  const tambah_luar = await request.post(`${V1}/cart/items`, {
     headers: auth(token),
-    data: { productId: luar!.id, quantity: 1 },
+    data: {
+      productId: luar!.productId,
+      ...(luar!.variantId ? { variantId: luar!.variantId } : {}),
+      quantity: 1,
+    },
   });
+  expect(tambah_luar.status(), `gagal menambah luar ke keranjang: ${await tambah_luar.text()}`).toBe(201);
 
   // Ekspektasi dihitung dari harga yang BENAR-BENAR dilihat pembeli di
   // keranjang, bukan dari harga kartu produk. Bedanya menentukan: kartu bisa
@@ -78,8 +86,8 @@ test(tc('195', 'Voucher kategori hanya memotong item kategori itu'), async ({ re
   // dan versi pertama implementasi ini memang begitu — /validate menjanjikan
   // potongan yang tidak akan direproduksi checkout (6.800 vs 4.700).
   const isiKeranjang = (await (await request.get(`${V1}/cart`, { headers: auth(token) })).json()).data.items;
-  const barisDalam = isiKeranjang.find((i: { productId: string }) => i.productId === dalam!.id);
-  const barisLuar = isiKeranjang.find((i: { productId: string }) => i.productId === luar!.id);
+  const barisDalam = isiKeranjang.find((i: { productId: string }) => i.productId === dalam!.productId);
+  const barisLuar = isiKeranjang.find((i: { productId: string }) => i.productId === luar!.productId);
   expect(barisDalam && barisLuar, 'kedua item uji harus ada di keranjang').toBeTruthy();
 
   // Angka `subtotal` yang dikirim klien sengaja dibuat ngawur. Server harus
@@ -112,10 +120,15 @@ test(tc('196', 'Voucher kategori ditolak kalau kategorinya tidak ada di keranjan
   await kosongkanKeranjang(request);
   const luar = await produkLuarKategori(request, sembako.id, semua);
   expect(luar).toBeTruthy();
-  await request.post(`${V1}/cart/items`, {
+  const tambah_luar = await request.post(`${V1}/cart/items`, {
     headers: auth(token),
-    data: { productId: luar!.id, quantity: 1 },
+    data: {
+      productId: luar!.productId,
+      ...(luar!.variantId ? { variantId: luar!.variantId } : {}),
+      quantity: 1,
+    },
   });
+  expect(tambah_luar.status(), `gagal menambah luar ke keranjang: ${await tambah_luar.text()}`).toBe(201);
 
   const validate = await request.post(`${V1}/promo/validate`, {
     headers: auth(token),
@@ -133,10 +146,15 @@ test(tc('197', 'Checkout dengan voucher kategori hanya mendiskon order yang berh
   await kosongkanKeranjang(request);
   const dalam = await produkDiKategori(request, sembako.id);
   expect(dalam).toBeTruthy();
-  await request.post(`${V1}/cart/items`, {
+  const tambah_dalam = await request.post(`${V1}/cart/items`, {
     headers: auth(token),
-    data: { productId: dalam!.id, quantity: 1 },
+    data: {
+      productId: dalam!.productId,
+      ...(dalam!.variantId ? { variantId: dalam!.variantId } : {}),
+      quantity: 1,
+    },
   });
+  expect(tambah_dalam.status(), `gagal menambah dalam ke keranjang: ${await tambah_dalam.text()}`).toBe(201);
 
   const addr = await request.post(`${V1}/users/me/addresses`, {
     headers: auth(token),

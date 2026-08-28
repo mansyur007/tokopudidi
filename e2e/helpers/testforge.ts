@@ -83,27 +83,52 @@ export function randomPhone(): string {
  * lengkap dengan variantId kalau produknya bervarian (addItem menolak
  * varian yang tidak disebut untuk produk bervarian).
  */
-export async function pickBuyableProduct(request: APIRequestContext): Promise<{
+export interface ProdukTerbeli {
   productId: string;
   variantId?: string;
   slug: string;
   shopId: string;
-}> {
-  const list = await request.get(`${V1}/products?limit=20`);
+  price: number;
+}
+
+/**
+ * Produk pertama dari sebuah listing yang benar-benar bisa dibeli.
+ *
+ * **Selalu pakai ini, jangan `items[0]`.** Urutan listing bergeser sepanjang
+ * suite (diurutkan antara lain oleh `soldCount`, yang naik tiap test membeli
+ * sesuatu), jadi "produk pertama" bukan produk yang sama dari run ke run.
+ * Begitu yang kebetulan terpilih adalah produk **bervarian**, menambahkannya ke
+ * keranjang tanpa `variantId` membuat checkout ditolak 400 — kegagalan yang
+ * muncul di test yang sama sekali tidak sedang menguji varian, dan hanya di CI.
+ */
+export async function pickBuyableFrom(
+  request: APIRequestContext,
+  listUrl: string,
+): Promise<ProdukTerbeli | null> {
+  const list = await request.get(listUrl);
+  if (!list.ok()) return null;
   const { data } = await list.json();
-  for (const card of data.items) {
+  for (const card of data.items ?? []) {
     const detailRes = await request.get(`${V1}/products/${card.slug}`);
     if (!detailRes.ok()) continue;
     const p = (await detailRes.json()).data;
     if (p.stock < 1) continue;
     const variant = (p.variants ?? []).find((v: { stock: number }) => v.stock > 0);
+    // Produk bervarian tanpa satu pun varian berstok tidak bisa dibeli.
     if ((p.variants ?? []).length > 0 && !variant) continue;
     return {
       productId: p.id,
       variantId: variant?.id,
       slug: p.slug,
       shopId: p.shop.id,
+      price: p.price,
     };
   }
-  throw new Error('Tidak ada produk aktif berstok di katalog — jalankan `npm run db:seed` dulu.');
+  return null;
+}
+
+export async function pickBuyableProduct(request: APIRequestContext): Promise<ProdukTerbeli> {
+  const hit = await pickBuyableFrom(request, `${V1}/products?limit=20`);
+  if (!hit) throw new Error('Tidak ada produk aktif berstok di katalog — jalankan `npm run db:seed` dulu.');
+  return hit;
 }

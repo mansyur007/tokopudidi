@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
-import { tc, V1, auth, tokenFor } from './helpers/testforge';
+import { tc, V1, auth, tokenFor, pickBuyableFrom } from './helpers/testforge';
 
 test(tc('124', 'RBAC lintas peran ditegakkan'), async ({ request }) => {
   const buyer = tokenFor('buyer');
@@ -35,12 +35,19 @@ async function pastikanAdaPesanan(request: APIRequestContext, buyer: string): Pr
   const orders = Array.isArray(body) ? body : body.items;
   if (orders?.length) return orders[0].id;
 
-  const produk = (await (await request.get(`${V1}/products?limit=1`)).json()).data.items[0];
+  // Lewat pemilih yang sadar varian — produk bervarian yang ditambahkan tanpa
+  // `variantId` membuat checkout ditolak 400.
+  const produk = await pickBuyableFrom(request, `${V1}/products?limit=20`);
   expect(produk, 'tidak ada produk untuk membuat pesanan uji').toBeTruthy();
-  await request.post(`${V1}/cart/items`, {
+  const tambah = await request.post(`${V1}/cart/items`, {
     headers: auth(buyer),
-    data: { productId: produk.id, quantity: 1 },
+    data: {
+      productId: produk!.productId,
+      ...(produk!.variantId ? { variantId: produk!.variantId } : {}),
+      quantity: 1,
+    },
   });
+  expect(tambah.status(), `gagal menambah ke keranjang: ${await tambah.text()}`).toBe(201);
 
   const addr = await request.post(`${V1}/users/me/addresses`, {
     headers: auth(buyer),
@@ -71,7 +78,7 @@ async function pastikanAdaPesanan(request: APIRequestContext, buyer: string): Pr
       })),
     },
   });
-  expect(checkout.status(), 'gagal menyiapkan pesanan untuk uji IDOR').toBe(201);
+  expect(checkout.status(), `gagal menyiapkan pesanan untuk uji IDOR: ${await checkout.text()}`).toBe(201);
   const data = (await checkout.json()).data;
   return (Array.isArray(data) ? data : (data.orders ?? [data]))[0].id;
 }
