@@ -411,7 +411,36 @@ async function main() {
       create: { ...p, validFrom, validUntil, isActive: true },
     });
   }
-  console.log(`✅ ${promoData.length} promo code (HEMAT10K, DISKON5, GRATISONGKIR)`);
+  // Satu voucher ber-scope kategori (M9-C1) — ada di seed dengan alasan yang
+  // sama seperti flash sale & harga grosir: tanpa satu pun voucher kategori,
+  // cabang "hanya item kategori ini yang berhak" tidak pernah dijalankan di dev
+  // maupun e2e, dan bugnya baru ketahuan di produksi.
+  const kategoriSembako = await prisma.category.findFirst({
+    where: { slug: 'sembako' },
+    select: { id: true },
+  });
+  if (kategoriSembako) {
+    await prisma.promoCode.upsert({
+      where: { code: 'SEMBAKO10' },
+      // Kategori ikut di-`update`: database dev yang di-seed sebelum M9-C1 sudah
+      // punya barisnya tanpa categoryId, dan `update: {}` akan membiarkannya
+      // selamanya tidak ter-scope.
+      update: { categoryId: kategoriSembako.id },
+      create: {
+        code: 'SEMBAKO10',
+        discountType: 'PERCENTAGE',
+        discountValue: 10,
+        minPurchase: 0,
+        maxDiscount: 20000,
+        usageLimit: 1000,
+        validFrom,
+        validUntil,
+        isActive: true,
+        categoryId: kategoriSembako.id,
+      },
+    });
+  }
+  console.log(`✅ ${promoData.length + (kategoriSembako ? 1 : 0)} promo code (HEMAT10K, DISKON5, GRATISONGKIR${kategoriSembako ? ', SEMBAKO10 khusus kategori' : ''})`);
 
   // 6b. Flash sale berjalan (M15-C1).
   //
