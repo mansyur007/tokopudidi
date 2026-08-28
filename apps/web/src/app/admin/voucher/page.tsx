@@ -5,7 +5,8 @@ import { formatRupiah, formatTanggal } from '@tokopudidi/shared';
 import { useAuthStore } from '@/store/auth';
 import {
   listAdminVouchers, createAdminVoucher, updateAdminVoucher, deleteAdminVoucher,
-  type AdminVoucherRow,
+  listAdminCategories,
+  type AdminVoucherRow, type AdminCategory,
 } from '@/lib/api/admin';
 import { ApiClientError } from '@/lib/api/client';
 
@@ -26,6 +27,7 @@ const EMPTY_FORM = {
   usageLimit: '',
   validFrom: '',
   validUntil: '',
+  categoryId: '', // '' = semua kategori (M9-C1)
 };
 
 // ISO → format input datetime-local ("YYYY-MM-DDTHH:mm", waktu lokal).
@@ -46,6 +48,7 @@ export default function AdminVoucherPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
 
   const refresh = useCallback(async () => {
     if (!tokens?.accessToken) return;
@@ -55,6 +58,13 @@ export default function AdminVoucherPage() {
   }, [tokens?.accessToken, scope]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Daftar kategori untuk pembatasan scope voucher (M9-C1). Dimuat sekali —
+  // isinya tidak berubah saat tab scope diganti.
+  useEffect(() => {
+    if (!tokens?.accessToken) return;
+    listAdminCategories(tokens.accessToken).then(setCategories).catch(() => setCategories([]));
+  }, [tokens?.accessToken]);
 
   function openCreate() {
     setEditing(null);
@@ -74,6 +84,7 @@ export default function AdminVoucherPage() {
       usageLimit: v.usageLimit ? String(v.usageLimit) : '',
       validFrom: toLocalInput(v.validFrom),
       validUntil: toLocalInput(v.validUntil),
+      categoryId: v.categoryId ?? '',
     });
     setFormError(null);
     setFormOpen(true);
@@ -94,6 +105,9 @@ export default function AdminVoucherPage() {
       usageLimit: form.usageLimit ? Number(form.usageLimit) : null,
       validFrom: new Date(form.validFrom).toISOString(),
       validUntil: new Date(form.validUntil).toISOString(),
+      // '' → null: "semua kategori" harus terkirim sebagai pelepasan scope,
+      // bukan sebagai field yang hilang (yang berarti "jangan diubah").
+      categoryId: form.categoryId || null,
     };
 
     setBusy(true); setFormError(null);
@@ -177,6 +191,11 @@ export default function AdminVoucherPage() {
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-semibold">🏪 {v.shop?.name}</span>
                 ) : (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">🌐 Platform</span>
+                )}
+                {v.category && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-semibold">
+                    🏷️ {v.category.name}
+                  </span>
                 )}
                 {expired ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">Kedaluwarsa</span>
@@ -266,6 +285,24 @@ export default function AdminVoucherPage() {
                     onChange={(e) => setForm({ ...form, maxDiscount: e.target.value })}
                   />
                 </div>
+              </div>
+              <div>
+                <p className="label">Kategori <span className="text-gray-400">(kosongkan = semua kategori)</span></p>
+                <select
+                  className="input w-full"
+                  value={form.categoryId}
+                  onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                >
+                  <option value="">Semua kategori</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.parentId ? '— ' : ''}{c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Diskon hanya dihitung dari item kategori ini beserta seluruh sub-kategorinya.
+                </p>
               </div>
               <div>
                 <p className="label">Kuota Total <span className="text-gray-400">(kosongkan = tanpa batas)</span></p>

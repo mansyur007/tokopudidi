@@ -312,7 +312,13 @@ export const withdrawSchema = z.object({
 });
 
 // ===== Voucher (M9-B2 seller / M9-C1 admin) =====
-export const voucherCreateSchema = z.object({
+//
+// Objek dasarnya dipisah dari refinement supaya varian admin bisa meng-`extend`
+// dengan `categoryId`: `.refine()` mengubah ZodObject jadi ZodEffects, dan
+// ZodEffects tidak punya `.extend()`. Aturan tanggal & batas persen berlaku
+// sama untuk keduanya, jadi ditulis sekali lalu dipasangkan ke dua-duanya —
+// kalau disalin, cepat atau lambat salah satunya ketinggalan saat diubah.
+const voucherBase = z.object({
   code: z.string().trim().toUpperCase()
     .min(3, 'Kode minimal 3 karakter').max(20)
     .regex(/^[A-Z0-9]+$/, 'Kode hanya huruf & angka'),
@@ -323,14 +329,35 @@ export const voucherCreateSchema = z.object({
   usageLimit: z.number().int().min(1).nullable().optional(),
   validFrom: z.string().datetime(),
   validUntil: z.string().datetime(),
-}).refine((v) => new Date(v.validFrom) < new Date(v.validUntil), {
-  message: 'Tanggal berakhir harus setelah tanggal mulai',
-  path: ['validUntil'],
-}).refine((v) => v.discountType !== 'PERCENTAGE' || v.discountValue <= 100, {
-  message: 'Diskon persen maksimal 100%',
-  path: ['discountValue'],
 });
+
+/** Aturan yang berlaku untuk voucher toko maupun voucher platform. */
+function aturanVoucher<T extends z.ZodTypeAny>(schema: T) {
+  return schema
+    .refine((v: z.infer<T>) => new Date(v.validFrom) < new Date(v.validUntil), {
+      message: 'Tanggal berakhir harus setelah tanggal mulai',
+      path: ['validUntil'],
+    })
+    .refine((v: z.infer<T>) => v.discountType !== 'PERCENTAGE' || v.discountValue <= 100, {
+      message: 'Diskon persen maksimal 100%',
+      path: ['discountValue'],
+    });
+}
+
+export const voucherCreateSchema = aturanVoucher(voucherBase);
 export type VoucherCreateInput = z.infer<typeof voucherCreateSchema>;
+
+/**
+ * Varian admin: boleh membatasi voucher ke satu kategori (M9-C1).
+ *
+ * Sengaja **tidak** ditambahkan ke `voucherCreateSchema` yang dipakai route
+ * seller: kalau field-nya diterima lalu diabaikan diam-diam di sana, seller
+ * akan mengira vouchernya ter-scope padahal tidak.
+ */
+export const adminVoucherCreateSchema = aturanVoucher(
+  voucherBase.extend({ categoryId: z.string().uuid().nullable().optional() }),
+);
+export type AdminVoucherCreateInput = z.infer<typeof adminVoucherCreateSchema>;
 
 export const voucherUpdateSchema = z.object({
   discountType: z.enum(['FIXED', 'PERCENTAGE']).optional(),
@@ -343,6 +370,12 @@ export const voucherUpdateSchema = z.object({
   isActive: z.boolean().optional(), // pause / resume
 });
 export type VoucherUpdateInput = z.infer<typeof voucherUpdateSchema>;
+
+export const adminVoucherUpdateSchema = voucherUpdateSchema.extend({
+  // null = lepas pembatasan kategori.
+  categoryId: z.string().uuid().nullable().optional(),
+});
+export type AdminVoucherUpdateInput = z.infer<typeof adminVoucherUpdateSchema>;
 
 // ===== Template chat seller (M8-B6) =====
 export const chatTemplateSchema = z.object({
