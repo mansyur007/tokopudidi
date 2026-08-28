@@ -636,7 +636,7 @@ Hal-hal berikut **eksplisit di luar lingkup MVP** — jangan dikerjakan tanpa di
   - [x] Cart/order lama yang mereferensikan variant lama tetap valid _(id kombinasi dipertahankan saat edit; yang hilang dinonaktifkan)_
   - [x] Pilih "Merah" → ukuran tanpa stok Merah disable
   - [x] Guard 50 kombinasi bekerja di FE dan API
-  - [ ] Drop `name` baru dijalankan setelah semua acceptance lain hijau — **tahap 4, belum dikerjakan**
+  - [ ] Drop `name` baru dijalankan setelah semua acceptance lain hijau — **tahap 4, dipecah dua langkah**. **Langkah 1 (selesai 2026-08-29)**: backfill akhirnya dijalankan di **produksi** — ternyata **belum pernah dijalankan sejak 29 Juli**, jadi ke-14 variant produksi masih bergantung penuh pada kolom `name` dan menjalankan drop lebih dulu akan menghapus label varian ke-4 produk itu. Sesudah backfill: 14/14 variant punya tautan nilai, 4 option, 14 option value; dijalankan ulang = no-op. Lalu seluruh pembaca dilepas dari kolomnya (keranjang, pesan stok, snapshot `OrderItem.variantName`, tabel spesifikasi) lewat `variantLabel` di shared. **Langkah 2 (drop kolom) sengaja belum dikerjakan**: migration destruktif dan rollback aplikasi ke image sebelumnya akan menabrak skema yang kolomnya sudah hilang — sementara strategi rollback (`OPS-7`) memang belum ada. Urutan yang benar: deploy langkah 1, biarkan mengendap, baru drop
 - **Effort**: L (paling besar di milestone — kerjakan terakhir supaya tidak block B1/B4)
 
 ---
