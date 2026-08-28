@@ -12,7 +12,7 @@
 // sebab yang jelas** — bukan lolos diam-diam.
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
-import { tc, V1, auth, tokenFor, randomPhone } from './helpers/testforge';
+import { tc, V1, auth, tokenFor, randomPhone, pickBuyableFrom } from './helpers/testforge';
 import { bersihkanInbox, mailhogAda, pastikanTidakAdaEmail, tungguEmail } from './helpers/mailhog';
 
 let token: string;
@@ -72,19 +72,27 @@ async function checkoutSatuProduk(
 ) {
   await kosongkanKeranjang(request);
 
-  let url = `${V1}/products?limit=1`;
+  let url = `${V1}/products?limit=20`;
   if (opts.tokenSeller) {
     const shopRes = await request.get(`${V1}/users/me/shop`, { headers: auth(opts.tokenSeller) });
     const shopId = (await shopRes.json()).data.id;
-    url = `${V1}/products?shopId=${shopId}&limit=1`;
+    url = `${V1}/products?shopId=${shopId}&limit=20`;
   }
-  const produk = (await (await request.get(url)).json()).data.items[0];
+  // Lewat pemilih yang sadar varian: produk bervarian yang ditambahkan tanpa
+  // `variantId` membuat checkout ditolak 400, dan itu muncul sebagai kegagalan
+  // di test yang tidak sedang menguji varian sama sekali.
+  const produk = await pickBuyableFrom(request, url);
   expect(produk, 'tidak ada produk yang bisa dibeli di DB ini').toBeTruthy();
 
-  await request.post(`${V1}/cart/items`, {
+  const tambah = await request.post(`${V1}/cart/items`, {
     headers: auth(token),
-    data: { productId: produk.id, quantity: 1 },
+    data: {
+      productId: produk!.productId,
+      ...(produk!.variantId ? { variantId: produk!.variantId } : {}),
+      quantity: 1,
+    },
   });
+  expect(tambah.status(), `gagal menambah ke keranjang: ${await tambah.text()}`).toBe(201);
 
   const addressId = await buatAlamat(request, opts.label);
   const grouped = (await (await request.get(`${V1}/cart`, { headers: auth(token) })).json()).data.grouped;
@@ -101,7 +109,7 @@ async function checkoutSatuProduk(
       })),
     },
   });
-  expect(res.status()).toBe(201);
+  expect(res.status(), `checkout ditolak: ${await res.text()}`).toBe(201);
   const data = (await res.json()).data;
   const order = (Array.isArray(data) ? data : (data.orders ?? [data]))[0];
   expect(order?.id, 'bentuk respons checkout tidak dikenali').toBeTruthy();
