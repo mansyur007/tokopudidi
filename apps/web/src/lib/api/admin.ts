@@ -206,6 +206,9 @@ export interface AdminVoucherRow {
   code: string;
   shopId: string | null;
   shop: { name: string; slug: string } | null;
+  // M9-C1 — terisi = voucher hanya berlaku untuk item di kategori ini (+turunannya).
+  categoryId: string | null;
+  category: { id: string; name: string } | null;
   discountType: 'FIXED' | 'PERCENTAGE';
   discountValue: number;
   minPurchase: number;
@@ -227,6 +230,7 @@ export interface AdminVoucherInput {
   usageLimit?: number | null;
   validFrom: string;
   validUntil: string;
+  categoryId?: string | null;
 }
 
 export const listAdminVouchers = (token: string, scope: 'platform' | 'shop' | 'all' = 'platform') =>

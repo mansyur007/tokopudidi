@@ -3,6 +3,22 @@
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/).
 
+<<<<<<< HEAD
+## [Unreleased] — M9-C1: voucher scope kategori
+
+### Added
+- **Voucher ber-scope kategori** (`M9-C1`) — kolom `PromoCode.categoryId` (nullable, `onDelete: SetNull`), penegakan per item di checkout dan di `POST /promo/validate`, pemilih kategori di halaman admin voucher, dan badge kategori di daftar voucher.
+- [`expandCategoryTree`](packages/shared/src/utils/categoryTree.ts) di `packages/shared` — memperluas kategori ke seluruh turunannya (9 unit test), termasuk penjaga siklus.
+- **e2e TC-TKPDD-195–197** ([`e2e/voucher-kategori.spec.ts`](e2e/voucher-kategori.spec.ts)) + voucher `SEMBAKO10` di seed.
+
+### Changed
+- **`POST /api/v1/promo/validate` sekarang butuh autentikasi.** Dasar diskon voucher kategori dihitung dari keranjang milik user di server; angka `subtotal` kiriman klien sengaja tidak dipakai untuk kasus itu supaya diskonnya tidak bisa dikarang klien.
+- **Pembagian diskon per order disederhanakan** dari tiga cabang (voucher toko / platform / tanpa promo) jadi satu aturan: proporsional terhadap subtotal yang **berhak** per toko. Voucher toko dan voucher kategori jatuh keluar sebagai kasus khusus dengan sendirinya.
+
+### Notes
+- Kategori berbentuk pohon dan produk hidup di daunnya, jadi voucher untuk kategori induk **wajib** mencakup turunannya — tanpa itu voucher seperti "Elektronik" tidak akan pernah kena produk mana pun.
+- `categoryId` hanya ada di skema voucher **admin**, bukan di skema yang dipakai route seller: field yang diterima lalu diabaikan diam-diam akan membuat seller mengira vouchernya ter-scope padahal tidak.
+=======
 ## [Unreleased] — M14-A2: email transaksional
 
 ### Added
@@ -14,6 +30,7 @@ Versioning follows [SemVer](https://semver.org/).
 ### Notes
 - **`SMTP_HOST` kosong = mode log-only.** Aplikasi jalan normal tanpa kredensial apa pun; isi email hanya tercatat di pino. Produksi tetap dalam mode ini sampai `SMTP_HOST` diisi di `.env.production` — tidak ada perubahan perilaku yang terlihat pembeli sampai saat itu.
 - **Status BLOCKED item ini keliru sejak awal**: verifikasinya memang dirancang lewat MailHog (SMTP palsu), bukan penyedia berbayar. Yang benar-benar butuh akun eksternal cuma pengiriman ke inbox sungguhan.
+>>>>>>> origin/main
 
 ## [Unreleased] — OPS-10a: uptime check produksi
 

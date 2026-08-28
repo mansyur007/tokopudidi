@@ -266,7 +266,8 @@ model Category {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  products Product[]
+  products   Product[]
+  promoCodes PromoCode[]
 
   @@index([parentId])
   @@index([slug])
@@ -639,6 +640,12 @@ model PromoCode {
   // null = voucher platform (berlaku semua toko); terisi = voucher khusus toko (M9-B2).
   shopId        String?
   shop          Shop?        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  // null = berlaku semua kategori; terisi = hanya item di kategori itu **dan
+  // seluruh turunannya** yang jadi dasar diskon (M9-C1). Kategori berbentuk
+  // pohon, jadi voucher untuk induk yang mengabaikan anaknya praktis tidak
+  // pernah kena — produk hidup di kategori daun.
+  categoryId    String?
+  category      Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   discountType  DiscountType
   discountValue Int
   minPurchase   Int          @default(0)
@@ -653,6 +660,7 @@ model PromoCode {
 
   @@index([code])
   @@index([shopId, isActive])
+  @@index([categoryId])
 }
 
 // ============= REFUND =============

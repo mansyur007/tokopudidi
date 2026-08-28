@@ -17,6 +17,7 @@ export * from './schemas/seller';
 export * from './types/api';
 export * from './utils/badge';
 export * from './utils/broadcast';
+export * from './utils/categoryTree';
 export * from './utils/format';
 export * from './utils/image';
 export * from './utils/invoice';

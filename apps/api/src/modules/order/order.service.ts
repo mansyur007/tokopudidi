@@ -1,6 +1,6 @@
 import { prisma, Prisma } from '@tokopudidi/database';
 import type { OrderStatus, PaymentMethod } from '@tokopudidi/database';
-import { resolveUnitPrice } from '@tokopudidi/shared';
+import { resolveUnitPrice, expandCategoryTree } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
 import { notifyOrderCreated, notifyOrderPaid } from '../../lib/emailEvents';
@@ -26,31 +26,67 @@ export interface PromoApplied {
   discountAmount: number;
   // Terisi kalau voucher khusus toko (M9-B2) — diskon hanya dipotong ke order toko ini.
   shopId: string | null;
+  /**
+   * Subtotal yang BERHAK atas diskon, per toko. Inilah dasar pembagian diskon
+   * ke tiap order — bukan subtotal toko apa adanya.
+   *
+   * Bedanya baru terasa sejak voucher kategori (M9-C1): membagi diskon
+   * proporsional terhadap subtotal toko akan memberi potongan kepada toko yang
+   * satu pun itemnya tidak masuk kategori voucher.
+   */
+  basePerShop: Map<string, number>;
+}
+
+/** Satu baris item yang sudah berharga final — dasar semua perhitungan promo. */
+interface ItemPromo {
+  shopId: string;
+  categoryId: string;
+  subtotal: number;
 }
 
 async function validatePromo(
   tx: Prisma.TransactionClient,
   code: string,
-  totalSubtotal: number,
-  shopSubtotals: Map<string, number>,
+  items: ItemPromo[],
 ): Promise<PromoApplied | null> {
   if (!code) return null;
   const promo = await tx.promoCode.findUnique({
     where: { code },
-    include: { shop: { select: { name: true } } },
+    include: { shop: { select: { name: true } }, category: { select: { name: true } } },
   });
   if (!promo || !promo.isActive) {
     throw new BadRequestError('Kode promo tidak valid');
   }
-  // Voucher toko: basis diskon & min belanja = subtotal toko tsb saja.
-  let baseSubtotal = totalSubtotal;
+
+  // Saring item yang berhak, lapis demi lapis: toko dulu (M9-B2), lalu kategori
+  // (M9-C1). Keduanya bisa aktif bersamaan — voucher toko untuk satu kategori.
+  let berhak = items;
   if (promo.shopId) {
-    const shopSubtotal = shopSubtotals.get(promo.shopId);
-    if (shopSubtotal === undefined) {
+    berhak = berhak.filter((it) => it.shopId === promo.shopId);
+    if (berhak.length === 0) {
       throw new BadRequestError(`Voucher ini khusus belanja di toko ${promo.shop?.name ?? 'tertentu'}`);
     }
-    baseSubtotal = shopSubtotal;
   }
+  if (promo.categoryId) {
+    // Kategori berbentuk pohon dan produk hidup di daunnya, jadi voucher untuk
+    // kategori induk harus mencakup seluruh turunannya — kalau tidak, ia tidak
+    // akan pernah kena apa pun.
+    const semuaKategori = await tx.category.findMany({ select: { id: true, parentId: true } });
+    const scope = expandCategoryTree(promo.categoryId, semuaKategori);
+    berhak = berhak.filter((it) => scope.has(it.categoryId));
+    if (berhak.length === 0) {
+      throw new BadRequestError(
+        `Voucher ini hanya untuk produk kategori ${promo.category?.name ?? 'tertentu'}`,
+      );
+    }
+  }
+
+  const basePerShop = new Map<string, number>();
+  for (const it of berhak) {
+    basePerShop.set(it.shopId, (basePerShop.get(it.shopId) ?? 0) + it.subtotal);
+  }
+  const baseSubtotal = Array.from(basePerShop.values()).reduce((a, b) => a + b, 0);
+
   const now = new Date();
   if (now < promo.validFrom || now > promo.validUntil) {
     throw new BadRequestError('Kode promo sudah tidak berlaku');
@@ -71,7 +107,7 @@ async function validatePromo(
   if (promo.maxDiscount && discount > promo.maxDiscount) discount = promo.maxDiscount;
   if (discount > baseSubtotal) discount = baseSubtotal;
 
-  return { code: promo.code, discountAmount: discount, shopId: promo.shopId };
+  return { code: promo.code, discountAmount: discount, shopId: promo.shopId, basePerShop };
 }
 
 export async function checkout(userId: string, input: CheckoutInput) {
@@ -230,26 +266,36 @@ export async function checkout(userId: string, input: CheckoutInput) {
         so.items.reduce((sum, it) => sum + hargaPerItem.get(it.id)!.price * it.quantity, 0),
       ]),
     );
-    const combinedSubtotal = Array.from(subtotalPerToko.values()).reduce((a, b) => a + b, 0);
 
-    // 5b. Validasi promo. Voucher platform → combined subtotal (dipotong proporsional
-    //     per order); voucher toko (M9-B2) → hanya subtotal & order toko tsb.
-    const promoApplied = await validatePromo(
-      tx,
-      input.promoCode ?? '',
-      combinedSubtotal,
-      subtotalPerToko,
+    // 5b. Validasi promo. Dasar diskon dihitung dari daftar item berharga final,
+    //     bukan dari subtotal toko: voucher bisa di-scope ke toko (M9-B2) dan/atau
+    //     kategori (M9-C1), dan yang kedua hanya bisa dijawab per item.
+    const itemsPromo = shopOrders.flatMap((so) =>
+      so.items.map((it) => ({
+        shopId: so.shopId,
+        categoryId: it.product.categoryId,
+        subtotal: hargaPerItem.get(it.id)!.price * it.quantity,
+      })),
     );
+    const promoApplied = await validatePromo(tx, input.promoCode ?? '', itemsPromo);
 
     const orderRecords = [];
     for (const so of shopOrders) {
       const subtotal = subtotalPerToko.get(so.shopId)!;
-      // Voucher toko: diskon penuh ke order toko tsb; platform: proporsional per share subtotal.
+      // Satu aturan untuk ketiga jenis voucher: diskon dibagi proporsional
+      // terhadap subtotal yang BERHAK di tiap toko.
+      //
+      // Voucher toko jatuh keluar sebagai kasus khusus dengan sendirinya —
+      // `basePerShop` hanya berisi satu toko, jadi ia menerima seluruhnya.
+      // Voucher kategori juga: toko yang tak punya item di kategori itu tidak
+      // muncul di peta, jadi potongannya nol tanpa cabang if tersendiri.
       let discount = 0;
-      if (promoApplied && promoApplied.shopId) {
-        discount = promoApplied.shopId === so.shopId ? promoApplied.discountAmount : 0;
-      } else if (promoApplied && combinedSubtotal > 0) {
-        discount = Math.floor((promoApplied.discountAmount * subtotal) / combinedSubtotal);
+      if (promoApplied) {
+        const baseToko = promoApplied.basePerShop.get(so.shopId) ?? 0;
+        const baseTotal = Array.from(promoApplied.basePerShop.values()).reduce((a, b) => a + b, 0);
+        if (baseTotal > 0) {
+          discount = Math.floor((promoApplied.discountAmount * baseToko) / baseTotal);
+        }
       }
       const total = subtotal + so.shippingCost - discount;
 
