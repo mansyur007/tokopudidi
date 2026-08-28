@@ -5,7 +5,8 @@ import { ok } from '../../lib/response';
 import { requireAuth } from '../../middleware/auth';
 import { validateBody } from '../../middleware/validate';
 import { BadRequestError } from '../../lib/errors';
-import { expandCategoryTree, subtotalDalamKategori } from '@tokopudidi/shared';
+import { expandCategoryTree, subtotalDalamKategori, getUnitPrice } from '@tokopudidi/shared';
+import { resolveFlashPrices } from '../flashSale/flashSale.service';
 
 export const promoRouter = Router();
 
@@ -22,19 +23,43 @@ async function muatKonteksKeranjang(userId: string) {
     prisma.cart.findUnique({
       where: { userId },
       include: {
-        items: { include: { product: { select: { categoryId: true, shopId: true, price: true } } } },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true, categoryId: true, shopId: true, price: true,
+                salePrice: true, saleStartAt: true, saleEndAt: true,
+                wholesaleTiers: { select: { minQty: true, price: true } },
+              },
+            },
+            variant: { select: { priceModifier: true } },
+          },
+        },
       },
     }),
     prisma.category.findMany({ select: { id: true, parentId: true } }),
   ]);
-  const items = (cart?.items ?? []).map((it) => ({
-    categoryId: it.product.categoryId,
-    shopId: it.product.shopId,
-    // Harga daftar — flash/grosir baru pasti saat checkout. Cukup untuk menilai
-    // KELAYAKAN & angka tampilan; nominal final tetap dihitung ulang server
-    // saat pesanan dibuat.
-    subtotal: it.product.price * it.quantity,
-  }));
+
+  // Harga satuan dihitung dengan helper yang SAMA dengan keranjang & checkout
+  // (`getUnitPrice` + harga flash + modifier varian).
+  //
+  // Percobaan pertama memakai `product.price` mentah dengan alasan "harga
+  // daftar cukup untuk menilai kelayakan" — dan itu keliru: untuk produk yang
+  // sedang diskon, basisnya jadi lebih besar daripada yang benar-benar ditagih,
+  // sehingga /validate menjanjikan potongan yang tidak akan direproduksi
+  // checkout. Ketahuan karena TC-195 menghitung ekspektasinya dari harga yang
+  // dilihat pembeli: 6.800 vs 4.700.
+  const flashHits = await resolveFlashPrices((cart?.items ?? []).map((it) => it.productId));
+  const items = (cart?.items ?? []).map((it) => {
+    const flashPrice = flashHits.get(it.productId)?.salePrice ?? null;
+    const harga =
+      getUnitPrice({ ...it.product, flashPrice }, it.quantity) + (it.variant?.priceModifier ?? 0);
+    return {
+      categoryId: it.product.categoryId,
+      shopId: it.product.shopId,
+      subtotal: harga * it.quantity,
+    };
+  });
   return { items, semuaKategori };
 }
 

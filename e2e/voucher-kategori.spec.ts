@@ -72,9 +72,19 @@ test(tc('195', 'Voucher kategori hanya memotong item kategori itu'), async ({ re
     data: { productId: luar!.id, quantity: 1 },
   });
 
-  // Angka `subtotal` yang dikirim klien sengaja dibuat ngawur (seluruh keranjang
-  // + jauh lebih besar). Server harus mengabaikannya dan memakai subtotal
-  // kategori dari keranjang — kalau tidak, diskonnya bisa dikarang klien.
+  // Ekspektasi dihitung dari harga yang BENAR-BENAR dilihat pembeli di
+  // keranjang, bukan dari harga kartu produk. Bedanya menentukan: kartu bisa
+  // menampilkan harga diskon sementara basis diskon dihitung dari harga daftar,
+  // dan versi pertama implementasi ini memang begitu — /validate menjanjikan
+  // potongan yang tidak akan direproduksi checkout (6.800 vs 4.700).
+  const isiKeranjang = (await (await request.get(`${V1}/cart`, { headers: auth(token) })).json()).data.items;
+  const barisDalam = isiKeranjang.find((i: { productId: string }) => i.productId === dalam!.id);
+  const barisLuar = isiKeranjang.find((i: { productId: string }) => i.productId === luar!.id);
+  expect(barisDalam && barisLuar, 'kedua item uji harus ada di keranjang').toBeTruthy();
+
+  // Angka `subtotal` yang dikirim klien sengaja dibuat ngawur. Server harus
+  // mengabaikannya dan memakai subtotal kategori dari keranjang — kalau tidak,
+  // diskonnya bisa dikarang klien.
   const validate = await request.post(`${V1}/promo/validate`, {
     headers: auth(token),
     data: { code: KODE, subtotal: 99_000_000 },
@@ -82,14 +92,14 @@ test(tc('195', 'Voucher kategori hanya memotong item kategori itu'), async ({ re
   expect(validate.status()).toBe(200);
   const hasil = (await validate.json()).data;
 
-  const diskonSeharusnya = Math.min(Math.floor((dalam!.price * 10) / 100), 20000);
+  const diskonSeharusnya = Math.min(Math.floor((barisDalam.subtotal * 10) / 100), 20000);
   expect(hasil.discountAmount).toBe(diskonSeharusnya);
 
   // Yang membuktikan scope-nya bekerja: diskon **lebih kecil** daripada 10%
   // seluruh keranjang. Tanpa perbandingan ini, implementasi yang mendiskon
   // semua item tetap bisa lolos kalau kebetulan harga keduanya mirip.
   const diskonSeluruhKeranjang = Math.min(
-    Math.floor(((dalam!.price + luar!.price) * 10) / 100),
+    Math.floor(((barisDalam.subtotal + barisLuar.subtotal) * 10) / 100),
     20000,
   );
   expect(diskonSeluruhKeranjang, 'harga uji tidak membedakan kedua skenario').toBeGreaterThan(diskonSeharusnya);
