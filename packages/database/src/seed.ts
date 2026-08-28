@@ -341,7 +341,19 @@ async function main() {
       stock: v.stock,
     }));
 
-    if (options.length && combos.length) {
+    // Produk yang sudah punya option dilewati. Seluruh seed ini bersifat upsert
+    // dan aman dijalankan berulang — kecuali blok ini, yang sejak M11-A8
+    // meng-`create` option tanpa memeriksa apa pun, sehingga `npm run db:seed`
+    // yang kedua di database yang sama berhenti dengan
+    // `Unique constraint failed on (productId, name)`. Tidak terasa di CI
+    // (tiap run memakai container Postgres baru), tapi di mesin dev artinya
+    // seed hanya bisa dijalankan sekali seumur database.
+    const sudahPunyaOption = await prisma.productOption.findFirst({
+      where: { productId: product.id },
+      select: { id: true },
+    });
+
+    if (options.length && combos.length && !sudahPunyaOption) {
       const valueId = new Map<string, string>(); // "optionIdx|value" -> id
       for (const [oi, opt] of options.entries()) {
         const option = await prisma.productOption.create({

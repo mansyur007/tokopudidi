@@ -8,6 +8,7 @@
 import QRCode from 'qrcode';
 import { prisma } from '@tokopudidi/database';
 import { logger } from '../../lib/logger';
+import { notifyOrderPaid } from '../../lib/emailEvents';
 
 // Batas waktu bayar QRIS. Dipakai bersama order.service (lazy-expire) & FE countdown.
 export const QRIS_EXPIRY_MINUTES = 15;
@@ -99,5 +100,7 @@ export async function markOrderAsPaid(orderId: string): Promise<void> {
         linkUrl: `/seller/pesanan/${order.id}`,
       },
     });
+    // M14-A2 — email ke pemilik toko, sejalan dengan notifikasi in-app di atas.
+    void notifyOrderPaid(order.id);
   }
 }
