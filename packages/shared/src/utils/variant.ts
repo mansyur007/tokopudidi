@@ -100,3 +100,25 @@ export function findVariant<T extends VariantLike>(
   const key = comboKey(selected as string[]);
   return variants.find((v) => comboKey(v.values) === key) ?? null;
 }
+
+/**
+ * Label variant yang dilihat manusia, diturunkan dari tautan nilainya.
+ *
+ * `ProductVariant.name` adalah **cache** dari label ini (ditulis ulang tiap
+ * variant disimpan), bukan sumber kebenarannya — nilai yang sesungguhnya hidup
+ * di `ProductVariantValue`. Selama pembaca masih membaca kolom itu, ada dua
+ * sumber untuk satu fakta, dan kolomnya tidak akan pernah bisa dibuang
+ * (M11-A8 tahap 4).
+ *
+ * `fallback` dipakai hanya untuk data yang **belum di-backfill** — variant lama
+ * tanpa satu pun tautan nilai. Produksi sudah di-backfill 2026-08-29, jadi
+ * jalur ini praktis mati; ia dipertahankan supaya database lain (dev lama,
+ * salinan staging) tidak menampilkan varian tanpa nama.
+ */
+export function variantLabel(
+  optionValues: readonly string[] | null | undefined,
+  fallback?: string | null,
+): string {
+  if (optionValues && optionValues.length > 0) return comboLabel([...optionValues]);
+  return fallback?.trim() ?? '';
+}

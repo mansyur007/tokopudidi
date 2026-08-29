@@ -1,5 +1,7 @@
 'use client';
 
+import { variantLabel } from '@tokopudidi/shared';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import type { ProductDetail } from '@/lib/api/products';
@@ -88,7 +90,9 @@ export function InfoTabs({ product }: { product: ProductDetail }) {
             {product.variants.length > 0 && (
               <Row
                 label="Varian"
-                value={product.variants.map((v) => v.name).join(' · ')}
+                // M11-A8: label diturunkan dari nilai option; `name` cuma
+                // cadangan untuk data lama yang belum di-backfill.
+                value={product.variants.map((v) => variantLabel(v.optionValues, v.name)).join(' · ')}
               />
             )}
           </div>

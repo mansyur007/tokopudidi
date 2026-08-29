@@ -1,6 +1,6 @@
 import { prisma, Prisma } from '@tokopudidi/database';
 import type { OrderStatus, PaymentMethod } from '@tokopudidi/database';
-import { resolveUnitPrice, expandCategoryTree } from '@tokopudidi/shared';
+import { resolveUnitPrice, expandCategoryTree, variantLabel } from '@tokopudidi/shared';
 import type { CheckoutInput } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../lib/errors';
 import { notifyOrderCreated, notifyOrderPaid } from '../../lib/emailEvents';
@@ -13,6 +13,17 @@ import {
   generateQrisPayment,
   markOrderAsPaid,
 } from '../payment/payment.service';
+
+/** Label variant dari baris Prisma, urut sesuai urutan option. */
+function labelVariantRow(v: {
+  name?: string | null;
+  values?: { optionValue: { value: string; option: { order: number } } }[];
+}): string {
+  const urut = [...(v.values ?? [])].sort(
+    (a, b) => a.optionValue.option.order - b.optionValue.option.order,
+  );
+  return variantLabel(urut.map((x) => x.optionValue.value), v.name);
+}
 
 function generateOrderNumber(): string {
   const now = new Date();
@@ -125,7 +136,15 @@ export async function checkout(userId: string, input: CheckoutInput) {
               wholesaleTiers: { select: { minQty: true, price: true } },
             },
           },
-          variant: true,
+          variant: {
+            include: {
+              // M11-A8: snapshot `OrderItem.variantName` diturunkan dari tautan
+              // nilai, bukan dari kolom `ProductVariant.name` yang cuma cache.
+              values: {
+                select: { optionValue: { select: { value: true, option: { select: { order: true } } } } },
+              },
+            },
+          },
         },
       },
     },
@@ -333,7 +352,10 @@ export async function checkout(userId: string, input: CheckoutInput) {
                 variantId: it.variantId,
                 productName: it.product.name,
                 productImage: it.product.images[0]?.url ?? null,
-                variantName: it.variant?.name,
+                // Snapshot label variant. Diturunkan saat checkout dan disimpan
+                // apa adanya — seller yang mengubah nama varian nanti tidak
+                // boleh mengubah isi pesanan yang sudah jadi.
+                variantName: it.variant ? labelVariantRow(it.variant) : undefined,
                 price,
                 quantity: it.quantity,
                 subtotal: price * it.quantity,

@@ -1,7 +1,21 @@
 import { prisma } from '@tokopudidi/database';
-import { getUnitPrice } from '@tokopudidi/shared';
+import { getUnitPrice, variantLabel } from '@tokopudidi/shared';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
 import { resolveFlashPrices } from '../flashSale/flashSale.service';
+
+/**
+ * Label variant dari baris Prisma. Nilai diurutkan sesuai urutan option supaya
+ * "Merah / M" tidak pernah tampil sebagai "M / Merah".
+ */
+function labelVariant(v: {
+  name?: string | null;
+  values?: { optionValue: { value: string; option: { order: number } } }[];
+}): string {
+  const urut = [...(v.values ?? [])].sort(
+    (a, b) => a.optionValue.option.order - b.optionValue.option.order,
+  );
+  return variantLabel(urut.map((x) => x.optionValue.value), v.name);
+}
 
 // Cart dijamin ada (auto-create di register). Tapi defensive: upsert kalau belum ada.
 async function ensureCart(userId: string) {
@@ -34,7 +48,16 @@ export async function getCartForUser(userId: string) {
               shop:   { select: { id: true, name: true, slug: true, isOpen: true } },
             },
           },
-          variant: { select: { id: true, name: true, priceModifier: true, stock: true } },
+          variant: {
+            select: {
+              id: true, name: true, priceModifier: true, stock: true,
+              // M11-A8: label variant diturunkan dari tautan nilainya, bukan
+              // dibaca dari kolom `name` yang cuma cache-nya.
+              values: {
+                select: { optionValue: { select: { value: true, option: { select: { order: true } } } } },
+              },
+            },
+          },
         },
       },
     },
@@ -77,7 +100,13 @@ export async function getCartForUser(userId: string) {
         preorderDays: it.product.isPreorder ? it.product.preorderDays : null,
       },
       variant: it.variant
-        ? { id: it.variant.id, name: it.variant.name, stock: it.variant.stock }
+        ? {
+            id: it.variant.id,
+            // Field-nya tetap bernama `name` — kontrak respons tidak berubah,
+            // yang berubah cuma dari mana isinya berasal.
+            name: labelVariant(it.variant),
+            stock: it.variant.stock,
+          }
         : null,
       shop: it.product.shop,
     };
@@ -105,7 +134,17 @@ export async function addItem(userId: string, input: {
   // Validasi produk & stok.
   const product = await prisma.product.findFirst({
     where: { id: input.productId, isActive: true, deletedAt: null },
-    include: { variants: true },
+    include: {
+      variants: {
+        include: {
+          // Tanpa tautan nilai di sini, `labelVariant` di pesan stok akan
+          // diam-diam jatuh ke kolom `name` — jalur yang justru sedang dilepas.
+          values: {
+            select: { optionValue: { select: { value: true, option: { select: { order: true } } } } },
+          },
+        },
+      },
+    },
   });
   if (!product) throw new NotFoundError('Produk tidak ditemukan');
 
@@ -113,7 +152,7 @@ export async function addItem(userId: string, input: {
     const variant = product.variants.find((v) => v.id === input.variantId);
     if (!variant) throw new BadRequestError('Varian tidak valid untuk produk ini');
     if (variant.stock < input.quantity) {
-      throw new BadRequestError(`Stok varian "${variant.name}" tinggal ${variant.stock}`);
+      throw new BadRequestError(`Stok varian "${labelVariant(variant)}" tinggal ${variant.stock}`);
     }
   } else {
     if (product.stock < input.quantity) {

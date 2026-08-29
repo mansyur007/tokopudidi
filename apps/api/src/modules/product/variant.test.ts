@@ -1,7 +1,7 @@
 // Unit test variant multi-axis (M11-A8) — logic yang tidak bergantung DB.
 import { describe, it, expect } from 'vitest';
 import {
-  cartesian, countCombinations, comboKey, comboLabel,
+  cartesian, countCombinations, comboKey, comboLabel, variantLabel,
   availableValues, findVariant,
   MAX_VARIANT_COMBINATIONS,
   productCreateSchema,
@@ -247,5 +247,34 @@ describe('productCreateSchema — aturan varian', () => {
         { name: 'Ukuran', values: Array.from({ length: 10 }, (_, i) => `U${i}`) },
       ],
     }).success).toBe(true);
+  });
+});
+
+describe('variantLabel', () => {
+  it('menurunkan label dari nilai option', () => {
+    expect(variantLabel(['Merah', 'M'])).toBe('Merah / M');
+    expect(variantLabel(['Bubuk Halus'])).toBe('Bubuk Halus');
+  });
+
+  it('jatuh ke `name` hanya kalau tautan nilainya belum ada (data belum di-backfill)', () => {
+    expect(variantLabel([], 'Merah')).toBe('Merah');
+    expect(variantLabel(undefined, 'Merah')).toBe('Merah');
+    expect(variantLabel(null, 'Merah')).toBe('Merah');
+  });
+
+  it('nilai yang ada MENANG atas `name` yang basi', () => {
+    // Inti perubahan M11-A8 tahap 4: kolom `name` cuma cache. Kalau isinya
+    // berbeda dari nilai sesungguhnya, yang benar adalah nilainya.
+    expect(variantLabel(['Merah', 'L'], 'Merah / M')).toBe('Merah / L');
+  });
+
+  it('tanpa nilai & tanpa name → string kosong, bukan "undefined"', () => {
+    expect(variantLabel([], undefined)).toBe('');
+    expect(variantLabel(null, null)).toBe('');
+  });
+
+  it('memangkas spasi seperti comboLabel', () => {
+    expect(variantLabel([' Merah ', ' M '])).toBe('Merah / M');
+    expect(variantLabel([], '  Merah  ')).toBe('Merah');
   });
 });
